@@ -1,0 +1,18 @@
+////////////////////////////////////////////////////////////////////////////////
+// Top
+////////////////////////////////////////////////////////////////////////////////
+module Top (
+	input logic [7:0] in1,
+	input logic [7:0] in2,
+	input logic [7:0] alpha,
+	output logic [7:0] outp
+);
+
+	logic [15:0] pix2;
+
+	assign pix2 = in2 * (8'hff - alpha);
+	assign outp = pix2[15:8];
+
+endmodule
+
+

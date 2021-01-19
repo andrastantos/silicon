@@ -1,0 +1,35 @@
+[*]
+[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
+[*] Sun Dec 27 02:47:02 2020
+[*]
+[dumpfile] "output/test_fsm_sim/test_fsm_sim.vcd"
+[dumpfile_mtime] "Sun Dec 27 02:45:41 2020"
+[dumpfile_size] 12600
+[savefile] "test_fsm_sim.gtkw"
+[timestart] 0
+[size] 1920 1061
+[pos] -1 -1
+*-7.567075 418 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 214
+[signals_width] 338
+[sst_expanded] 1
+[sst_vpaned_height] 341
+@28
+UseFSM_tb.clk
+UseFSM_tb.rst
+UseFSM_tb.data_in_valid
+@22
+UseFSM_tb.data_in[7:0]
+@28
+UseFSM_tb.data_last
+UseFSM_tb.data_out_valid
+@22
+UseFSM_tb.data_out[7:0]
+UseFSM_tb.my_sum[7:0]
+UseFSM_tb.next_my_sum[7:0]
+@28
+UseFSM_tb.my_fsm_state
+@29
+UseFSM_tb.my_fsm_next_state
+[pattern_trace] 1
+[pattern_trace] 0

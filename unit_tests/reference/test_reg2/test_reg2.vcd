@@ -1,0 +1,228 @@
+$date 2021-01-11 16:39:34.235747 $end
+$timescale 1 ns $end
+$scope module top $end
+$var wire 1 ! clk $end
+$var wire 1 " c1 $end
+$var wire 1 # c2 $end
+$var wire 1 $ c3 $end
+$var wire 1 % c4 $end
+$var wire 1 & clk_1 $end
+$var wire 1 ' r00 $end
+$var wire 1 ( r01 $end
+$var wire 1 ) r02 $end
+$var wire 1 * r03 $end
+$var wire 1 + r04 $end
+$var wire 1 , r10 $end
+$var wire 1 - r11 $end
+$var wire 1 . r12 $end
+$var wire 1 / r13 $end
+$var wire 1 0 r14 $end
+$var wire 1 1 r20 $end
+$var wire 1 2 r21 $end
+$var wire 1 3 r22 $end
+$var wire 1 4 r23 $end
+$var wire 1 5 r24 $end
+$var wire 1 6 r30 $end
+$var wire 1 7 r31 $end
+$var wire 1 8 r32 $end
+$var wire 1 9 r33 $end
+$var wire 1 : r34 $end
+$var wire 1 ; r40 $end
+$var wire 1 < r41 $end
+$var wire 1 = r42 $end
+$var wire 1 > r43 $end
+$var wire 1 ? r44 $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+0!
+0"
+1#
+0$
+1%
+1&
+x'
+x(
+x)
+x*
+x+
+x,
+x-
+x.
+x/
+x0
+x1
+x2
+x3
+x4
+x5
+x6
+x7
+x8
+x9
+x:
+x;
+x<
+x=
+x>
+x?
+$end
+#10
+1!
+1"
+0#
+1$
+0%
+0&
+X.
+X/
+X,
+X0
+X6
+X7
+X8
+X*
+X9
+X(
+X:
+X+
+X'
+X-
+X)
+#20
+0!
+0"
+1#
+0$
+1%
+1&
+X1
+X2
+X3
+X4
+X5
+X;
+X<
+X=
+X>
+X?
+#30
+1!
+1"
+0#
+1$
+0%
+0&
+#40
+0!
+0"
+1#
+0$
+1%
+1&
+#50
+1!
+1"
+0#
+1$
+0%
+0&
+#60
+0!
+0"
+1#
+0$
+1%
+1&
+#70
+1!
+1"
+0#
+1$
+0%
+0&
+#80
+0!
+0"
+1#
+0$
+1%
+1&
+#90
+1!
+1"
+0#
+1$
+0%
+0&
+#100
+0!
+0"
+1#
+0$
+1%
+1&
+#110
+1!
+1"
+0#
+1$
+0%
+0&
+#120
+0!
+0"
+1#
+0$
+1%
+1&
+#130
+1!
+1"
+0#
+1$
+0%
+0&
+#140
+0!
+0"
+1#
+0$
+1%
+1&
+#150
+1!
+1"
+0#
+1$
+0%
+0&
+#160
+0!
+0"
+1#
+0$
+1%
+1&
+#170
+1!
+1"
+0#
+1$
+0%
+0&
+#180
+0!
+0"
+1#
+0$
+1%
+1&
+#190
+1!
+1"
+0#
+1$
+0%
+0&

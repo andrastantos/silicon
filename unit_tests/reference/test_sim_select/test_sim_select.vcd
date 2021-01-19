@@ -1,0 +1,146 @@
+$date 2021-01-11 16:39:33.025214 $end
+$timescale 1 ns $end
+$scope module top $end
+$var wire 10 ! a $end
+$var wire 5 " b $end
+$var wire 1 # c $end
+$var wire 4 $ selectw $end
+$var wire 4 % select_one_hot $end
+$var wire 2 & u_output_port $end
+$var wire 4 ' u1_output_port $end
+$var wire 10 ( select1 $end
+$var wire 1 ) u3_output_port $end
+$var wire 1 * u4_output_port $end
+$var wire 1 + u5_output_port $end
+$var wire 10 , select2 $end
+$var wire 1 - u7_output_port $end
+$var wire 1 . u8_output_port $end
+$var wire 1 / u9_output_port $end
+$var wire 10 0 select3 $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+b11 !
+b10 "
+1#
+b0 $
+b1 %
+b11 &
+b0 '
+b11 (
+0)
+0*
+0+
+bX ,
+1-
+0.
+0/
+b11 0
+$end
+#10
+b1 $
+b10 %
+0-
+b1 '
+1)
+1.
+b10 (
+b11 ,
+b10 0
+#20
+b10 $
+b100 %
+1*
+1/
+b10 '
+0)
+0.
+b1 (
+b10 ,
+b1 0
+#30
+b11 $
+b1000 %
+0/
+b11 '
+1)
+bX (
+b11 ,
+bX 0
+#40
+b100 $
+b0 %
+0*
+b0 '
+1+
+0)
+b11 (
+b1 ,
+#50
+b101 $
+b1 '
+1)
+b10 (
+b11 ,
+#60
+b110 $
+1*
+b10 '
+0)
+b1 (
+b10 ,
+#70
+b111 $
+b11 '
+1)
+bX (
+b11 ,
+#80
+b1000 $
+0*
+b0 '
+0+
+0)
+b11 (
+bX ,
+#90
+b1001 $
+b1 '
+1)
+b10 (
+b11 ,
+#100
+b1010 $
+1*
+b10 '
+0)
+b1 (
+b10 ,
+#110
+b1011 $
+b11 '
+1)
+bX (
+b11 ,
+#120
+b1100 $
+0*
+b0 '
+1+
+0)
+b11 (
+b1 ,
+#130
+b1101 $
+b1 '
+1)
+b10 (
+b11 ,
+#140
+b1110 $
+1*
+b10 '
+0)
+b1 (
+b10 ,

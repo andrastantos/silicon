@@ -1,0 +1,60 @@
+[*]
+[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
+[*] Sun Dec 13 09:18:24 2020
+[*]
+[dumpfile] "output/z80_mem_if/z80_mem_if.vcd"
+[dumpfile_mtime] "Sun Dec 13 09:16:57 2020"
+[dumpfile_size] 6076
+[savefile] "z80_mem_if.gtkw"
+[timestart] 0
+[size] 1920 1017
+[pos] -1 -1
+*-6.007403 256 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] Z80MemIf_tb.
+[sst_width] 214
+[signals_width] 191
+[sst_expanded] 1
+[sst_vpaned_height] 299
+@28
+Z80MemIf_tb.clk
+Z80MemIf_tb.rst
+Z80MemIf_tb.start
+@200
+-APB_IF
+@28
+Z80MemIf_tb.psel
+Z80MemIf_tb.penable
+Z80MemIf_tb.pwrite
+@22
+Z80MemIf_tb.paddr[15:0]
+@28
+Z80MemIf_tb.pready
+Z80MemIf_tb.pio
+Z80MemIf_tb.pm1
+Z80MemIf_tb.prfsh
+@22
+Z80MemIf_tb.pwdata[7:0]
+Z80MemIf_tb.prdata[7:0]
+@200
+-INT_IF
+@28
+Z80MemIf_tb.start
+Z80MemIf_tb.busy
+Z80MemIf_tb.done
+Z80MemIf_tb.wr_not_rd
+@22
+Z80MemIf_tb.addr[15:0]
+@28
+Z80MemIf_tb.io_not_mem
+Z80MemIf_tb.m1
+Z80MemIf_tb.rfsh
+@22
+Z80MemIf_tb.data_in[7:0]
+Z80MemIf_tb.data_out[7:0]
+@200
+-INTERNAL
+@24
+Z80MemIf_tb.uut.phase_next[1:0]
+Z80MemIf_tb.uut.phase[1:0]
+[pattern_trace] 1
+[pattern_trace] 0

@@ -1,0 +1,46 @@
+[*]
+[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
+[*] Fri Sep  4 20:24:11 2020
+[*]
+[dumpfile] "output/test_sim/test_sim.vcd"
+[dumpfile_mtime] "Fri Sep  4 20:23:12 2020"
+[dumpfile_size] 48917
+[savefile] "i8255.gtkw"
+[timestart] 0
+[size] 1918 1031
+[pos] -1 -1
+*-5.898303 14 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] intel_8255_tb.
+[treeopen] intel_8255_tb.u.
+[sst_width] 261
+[signals_width] 205
+[sst_expanded] 1
+[sst_vpaned_height] 303
+@28
+intel_8255_tb.clk
+intel_8255_tb.rst
+intel_8255_tb.n_cs
+intel_8255_tb.n_rd
+intel_8255_tb.n_wr
+intel_8255_tb.addr[1:0]
+@22
+intel_8255_tb.data_in[7:0]
+intel_8255_tb.data_out[7:0]
+intel_8255_tb.pa_in[7:0]
+intel_8255_tb.pa_out[7:0]
+@28
+intel_8255_tb.pa_out_valid
+@22
+intel_8255_tb.pb_in[7:0]
+intel_8255_tb.pb_out[7:0]
+@28
+intel_8255_tb.pb_out_valid
+@22
+intel_8255_tb.pc_in[7:0]
+intel_8255_tb.pc_out[7:0]
+@28
+intel_8255_tb.pcl_out_valid
+@29
+intel_8255_tb.pch_out_valid
+[pattern_trace] 1
+[pattern_trace] 0

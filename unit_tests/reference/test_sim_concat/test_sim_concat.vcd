@@ -1,0 +1,22 @@
+$date 2021-01-11 16:39:33.242338 $end
+$timescale 1 ns $end
+$scope module top $end
+$var wire 4 ! uin1 $end
+$var wire 4 " uin2 $end
+$var wire 4 # uin3 $end
+$var wire 4 $ sin1 $end
+$var wire 8 % out1 $end
+$var wire 12 & out2 $end
+$var wire 12 ' out3 $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+b1 !
+b10 "
+b11 #
+b1111 $
+b10010 %
+b111100010010 &
+b100100011 '
+$end

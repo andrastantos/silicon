@@ -1,0 +1,4 @@
+#!/usr/bin/pip3 install -r requirements.txt
+
+pyvcd
+pytest

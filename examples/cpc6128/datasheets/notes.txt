@@ -1,0 +1,6 @@
+Memory arbitration discussion:
+
+https://retrocomputing.stackexchange.com/questions/919/memory-sharing-mechanism-in-the-amstrad-cpc-computer
+
+Great Z80 instruction set summary:
+https://clrhome.org/table/

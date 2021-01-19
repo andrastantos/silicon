@@ -1,0 +1,75 @@
+[*]
+[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
+[*] Sat Dec 12 09:42:40 2020
+[*]
+[dumpfile] "output/z80_reg_file/z80_reg_file.vcd"
+[dumpfile_mtime] "Sat Dec 12 09:41:34 2020"
+[dumpfile_size] 14421
+[savefile] "z80_reg_file.gtkw"
+[timestart] 0
+[size] 1920 1017
+[pos] -1 -1
+*-6.138053 48 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 214
+[signals_width] 216
+[sst_expanded] 1
+[sst_vpaned_height] 299
+@28
+Z80RegFile_tb.rst
+Z80RegFile_tb.clk
+@200
+-
+@23
+Z80RegFile_tb.wr_a[3:0]
+@22
+Z80RegFile_tb.wr_l[7:0]
+@28
+Z80RegFile_tb.wr_l_valid
+@22
+Z80RegFile_tb.wr_h[7:0]
+@28
+Z80RegFile_tb.wr_h_valid
+@22
+Z80RegFile_tb.wr_f[7:0]
+@28
+Z80RegFile_tb.wr_f_valid
+@200
+-
+@22
+Z80RegFile_tb.rd_a1[4:0]
+Z80RegFile_tb.rd_d1[7:0]
+Z80RegFile_tb.rd_a2[4:0]
+Z80RegFile_tb.rd_d2[7:0]
+@200
+-
+@28
+Z80RegFile_tb.exchange_af
+Z80RegFile_tb.exchange_bcdehl
+Z80RegFile_tb.exchange_de_hl
+@200
+-
+@22
+Z80RegFile_tb.xxxx[1:0]
+Z80RegFile_tb.rB[7:0]
+Z80RegFile_tb.rC[7:0]
+Z80RegFile_tb.rD[7:0]
+Z80RegFile_tb.rE[7:0]
+Z80RegFile_tb.rH[7:0]
+Z80RegFile_tb.rL[7:0]
+Z80RegFile_tb.rZ[7:0]
+Z80RegFile_tb.rA[7:0]
+Z80RegFile_tb.rF[7:0]
+Z80RegFile_tb.rW[7:0]
+Z80RegFile_tb.rI[7:0]
+Z80RegFile_tb.rR[7:0]
+Z80RegFile_tb.rBp[7:0]
+Z80RegFile_tb.rCp[7:0]
+@200
+-
+@28
+Z80RegFile_tb.af_prime
+Z80RegFile_tb.bcdehl_prime
+Z80RegFile_tb.dehl_swap
+Z80RegFile_tb.dehl_swap_prime
+[pattern_trace] 1
+[pattern_trace] 0

@@ -1,0 +1,41 @@
+$date 2021-01-11 16:39:32.682818 $end
+$timescale 1 ns $end
+$scope module top $end
+$var wire 1 ! in_1 $end
+$var wire 1 " in_2 $end
+$var wire 1 # out_and $end
+$var wire 1 $ out_or $end
+$var wire 1 % out_xor $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+x!
+x"
+x#
+x$
+x%
+$end
+#10
+0!
+0"
+0%
+0#
+0$
+#20
+1!
+1%
+1$
+#30
+0!
+1"
+#40
+1!
+0%
+1#
+#50
+X!
+X"
+X%
+X#
+X$

@@ -1,0 +1,16 @@
+////////////////////////////////////////////////////////////////////////////////
+// test_module
+////////////////////////////////////////////////////////////////////////////////
+module test_module (
+	input logic [1:0] data_in,
+	output logic [1:0] out1
+);
+
+	logic direct_wire;
+
+	assign direct_wire = data_in[0] ^ data_in[1];
+	assign out1 = {data_in[0] | data_in[1], data_in[0] & data_in[1]};
+
+endmodule
+
+

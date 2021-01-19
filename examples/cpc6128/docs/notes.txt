@@ -1,0 +1,1 @@
+Sound chip in verilog: https://github.com/dnotq/ym2149_audio

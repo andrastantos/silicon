@@ -1,0 +1,27 @@
+$date 2021-01-11 16:39:23.030064 $end
+$timescale 1 ns $end
+$scope module top_tb $end
+$var wire 5 ! in_a $end
+$var string 2 " out_a $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+bx !
+s "
+$end
+#10
+b0 !
+szero "
+#20
+b1 !
+sfirst "
+#30
+b10 !
+ssecond "
+#40
+b11 !
+sthird "
+#50
+bX !
+s "

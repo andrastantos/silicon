@@ -1,0 +1,115 @@
+[*]
+[*] GTKWave Analyzer v3.3.103 (w)1999-2019 BSI
+[*] Tue Oct 20 02:01:51 2020
+[*]
+[dumpfile] "output/mc6845_tb/mc6845_tb.vcd"
+[dumpfile_mtime] "Tue Oct 20 01:56:42 2020"
+[dumpfile_size] 3590601
+[savefile] "mc6845_tb.gtkw"
+[timestart] 30730
+[size] 1918 1031
+[pos] -1 -1
+*-12.413423 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 395
+[signals_width] 372
+[sst_expanded] 1
+[sst_vpaned_height] 303
+@28
+mc6845_tb.clk
+@200
+-HORIZONTAL TIMING
+@28
+mc6845_tb.pclk_en
+@22
+mc6845_tb.h_sync_cnt[3:0]
+mc6845_tb.h_cnt[7:0]
+@28
+mc6845_tb.h_disp_end
+mc6845_tb.h_sync_end
+mc6845_tb.h_sync_start
+mc6845_tb.h_sync_end
+@800022
+#{mc6845_tb.h_sync_cnt[3:0]} (0)mc6845_tb.h_sync_cnt[3:0] (1)mc6845_tb.h_sync_cnt[3:0] (2)mc6845_tb.h_sync_cnt[3:0] (3)mc6845_tb.h_sync_cnt[3:0]
+@1001200
+-group_end
+@28
+mc6845_tb.h_disp_valid
+mc6845_tb.h_line_end
+mc6845_tb.hs
+@200
+-VERTICAL TIMING
+@28
+mc6845_tb.vclk_en
+mc6845_tb.cclk_en
+mc6845_tb.char_row_end
+mc6845_tb.scan_line_end
+mc6845_tb.v_end
+mc6845_tb.char_row_end
+@22
+mc6845_tb.scan_line_cnt[5:0]
+mc6845_tb.char_row_cnt[6:0]
+@28
+mc6845_tb.v_sync_start
+mc6845_tb.v_disp_end
+@22
+mc6845_tb.v_sync_cnt[3:0]
+@28
+mc6845_tb.v_disp_valid
+mc6845_tb.v_end
+mc6845_tb.vs
+mc6845_tb.de
+@22
+mc6845_tb.field_cnt[4:0]
+@200
+-ADDRESS GENERATION
+@28
+mc6845_tb.de
+mc6845_tb.pclk_en
+@22
+mc6845_tb.ma[13:0]
+mc6845_tb.ra[4:0]
+mc6845_tb.next_char_addr[14:0]
+mc6845_tb.char_addr[14:0]
+mc6845_tb.line_start_addr[13:0]
+@200
+-CURSOR
+@28
+mc6845_tb.cursor_blink
+mc6845_tb.cursor_blink_period
+@22
+mc6845_tb.cursor_end[4:0]
+mc6845_tb.cursor_start[4:0]
+@28
+mc6845_tb.cursor_on
+mc6845_tb.cursor_rows
+mc6845_tb.cursor
+mc6845_tb.cursor_rows_start
+mc6845_tb.cursor_rows_end
+@22
+mc6845_tb.char_addr[14:0]
+@200
+-REGISTERS
+@22
+mc6845_tb.r0_horizontal_total[7:0]
+mc6845_tb.r1_horizontal_displayed[7:0]
+mc6845_tb.r2_horizontal_sync_pos[7:0]
+mc6845_tb.r3_sync_width[3:0]
+mc6845_tb.r4_vertical_total[6:0]
+mc6845_tb.r5_vertical_total_adjust[4:0]
+mc6845_tb.r6_vertical_displayed[6:0]
+mc6845_tb.r7_vertical_sync_pos[6:0]
+@28
+mc6845_tb.r8_interlace_and_skew[1:0]
+@22
+mc6845_tb.r9_max_scan_line_addr[4:0]
+mc6845_tb.r10_cursor_start[6:0]
+mc6845_tb.r11_cursor_end[4:0]
+mc6845_tb.r12_r13_start_addr[13:0]
+mc6845_tb.r12_start_addr[5:0]
+mc6845_tb.r13_start_addr[7:0]
+mc6845_tb.r14_cursor[5:0]
+mc6845_tb.r14_r15_cursor[13:0]
+mc6845_tb.r15_cursor[7:0]
+mc6845_tb.r16_r17_light_pen[13:0]
+[pattern_trace] 1
+[pattern_trace] 0
