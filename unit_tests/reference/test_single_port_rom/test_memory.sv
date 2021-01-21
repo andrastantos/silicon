@@ -1,0 +1,40 @@
+////////////////////////////////////////////////////////////////////////////////
+// Top
+////////////////////////////////////////////////////////////////////////////////
+module Top (
+	output logic [7:0] data_out,
+	input logic [7:0] addr,
+	input logic clk
+);
+
+	Memory mem (
+		.addr(addr),
+		.clk(clk),
+		.data_out(data_out)
+	);
+
+endmodule
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Memory
+////////////////////////////////////////////////////////////////////////////////
+module Memory (
+	input logic [7:0] addr,
+	input logic clk,
+	output logic [7:0] data_out
+);
+
+	wire [7:0] mem [255:0];
+	initial begin
+		$readmemb("xxx.bin", mem);
+	end
+	wire [7:0] addr_reg;
+	always @(posedge clk) begin
+	    addr_reg <= addr;
+	end
+	data_out <= mem[addr_reg];
+
+endmodule
+
+

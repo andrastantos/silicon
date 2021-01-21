@@ -90,9 +90,8 @@ from .number import logic
 class MemoryPortConfig:
     addr_type: NetType
     data_type: NetType
-    registered_addr: bool = True
-    registered_data_in: bool = True
-    registered_data_out: bool = False
+    registered_input: bool = True
+    registered_output: bool = False
     prefix: Optional[str] = None
 
 @dataclass
@@ -133,8 +132,6 @@ class Memory(GenericModule):
             self.optional_ports[f"{port_config.prefix}data_out"] = (port_config.data_type, Memory.OUTPUT)
             self.optional_ports[f"{port_config.prefix}write_en"] = (logic, Memory.INPUT)
             setattr(self, f"{port_config.prefix}clk", AutoInput(logic, keyword_only = True, auto_port_names = (f"{port_config}_clk", f"{port_config}_clock", "clk", "clock"), optional = False))
-            # An optional reset port for loading reset_content (FPGA only of course)
-            setattr(self, f"{port_config.prefix}arst", AutoInput(logic, keyword_only = True, auto_port_names = (f"{port_config}_arst", f"{port_config}_areset", "arst", "areset", "rst", "reset"), optional = True))
 
     def create_named_port(self, name: str) -> Optional[Port]:
         """
@@ -171,8 +168,31 @@ class Memory(GenericModule):
             raise SyntaxErrorException(f"For ROMs, reset_content must be specified")
         if has_write_en and not has_data_in:
             raise SyntaxErrorException("If a memory has a write-enable, it must have a corresponding data")
-        if mem_port_config.registered_addr and mem_port_config.registered_data_in and not mem_port_config.registered_data_out:
-            rtl_body =  f"\twire [{data_bits-1}:0] mem [{(1 << addr_bits)-1}:0];\n"
+        if not mem_port_config.registered_input:
+            raise SyntaxErrorException("Unregistered inputs are not supported with inferred memories")
+        rtl_body =  f"\twire [{data_bits-1}:0] mem [{(1 << addr_bits)-1}:0];\n"
+        if self.config.reset_content is not None:
+            rtl_body += f"\tinitial begin\n"
+            if callable(self.config.reset_content):
+                generator = self.config.reset_content()
+                try:
+                    for addr in range(1 << addr_bits):
+                        data = next(generator)
+                        rtl_body += f"\t\tmem[{addr}] <= {data_bits}'h{data:x};\n"
+                except StopIteration:
+                    pass # memory content is only partially specified
+                generator.close()
+            else:
+                rtl_body += f'\t\t$readmemb("{self.config.reset_content}", mem);\n'
+            rtl_body += f"\tend\n"
+            
+        if has_data_out:
+            if mem_port_config.registered_input:
+                rtl_body += f"\twire [{addr_bits-1}:0] addr_reg;\n"
+                addr_name = "addr_reg"
+            else:
+                addr_name = f"{mem_port_config.prefix}addr"
+        if has_data_in or has_data_out:
             rtl_body += f"\talways @(posedge {mem_port_config.prefix}clk) begin\n"
             if has_data_in:
                 if has_write_en:
@@ -181,11 +201,13 @@ class Memory(GenericModule):
                     rtl_body += f"\t    end\n"
                 else:
                     rtl_body += f"\t    mem[{mem_port_config.prefix}addr] <= {mem_port_config.prefix}data_in;\n"
-            if has_data_out:
-                rtl_body += f"\t    {mem_port_config.prefix}data_out <= mem[{mem_port_config.prefix}addr];\n"
+            if has_data_out and mem_port_config.registered_input:
+                rtl_body += f"\t    {addr_name} <= {mem_port_config.prefix}addr;\n"
+            if has_data_out and mem_port_config.registered_output:
+                rtl_body += f"\t    {mem_port_config.prefix}data_out <= mem[{addr_name}];\n"
             rtl_body += f"\tend\n"
-        else:
-            assert False
+        if has_data_out and not mem_port_config.registered_output:
+            rtl_body += f"\t{mem_port_config.prefix}data_out <= mem[{addr_name}];\n"
         return rtl_body
 
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
@@ -230,7 +252,7 @@ class Memory(GenericModule):
                     port_mem_size = data_bits * addr_bits
             mem_addr_range = mem_size // mem_data_bits
 
-            if not mem_port_config.registered_addr and not mem_port_config.registered_data_in and mem_port_config.registered_data_out:
+            if not mem_port_config.registered_input and mem_port_config.registered_output:
                 if mem_ratio == 1:
                     rtl_body =  f"\t    reg [{narrower_port_config.data_type.get_num_bits()-1}:0] ram[0:{mem_addr_range-1}];\n"
                     rtl_body += f"\t\n"
