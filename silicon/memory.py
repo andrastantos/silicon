@@ -168,13 +168,14 @@ class Memory(GenericModule):
             raise SyntaxErrorException(f"For ROMs, reset_content must be specified")
         if has_write_en and not has_data_in:
             raise SyntaxErrorException("If a memory has a write-enable, it must have a corresponding data")
-        if not mem_port_config.registered_input:
-            raise SyntaxErrorException("Unregistered inputs are not supported with inferred memories")
+        if not mem_port_config.registered_input and has_data_in:
+            raise SyntaxErrorException("Unregistered inputs are only supported for read ports on inferred memories")
         rtl_body =  f"\twire [{data_bits-1}:0] mem [{(1 << addr_bits)-1}:0];\n"
+
         if self.config.reset_content is not None:
             rtl_body += f"\tinitial begin\n"
             if callable(self.config.reset_content):
-                generator = self.config.reset_content()
+                generator = self.config.reset_content(data_bits, addr_bits)
                 try:
                     for addr in range(1 << addr_bits):
                         data = next(generator)
@@ -192,22 +193,179 @@ class Memory(GenericModule):
                 addr_name = "addr_reg"
             else:
                 addr_name = f"{mem_port_config.prefix}addr"
-        if has_data_in or has_data_out:
+        if has_data_in or (has_data_out and mem_port_config.registered_input):
             rtl_body += f"\talways @(posedge {mem_port_config.prefix}clk) begin\n"
             if has_data_in:
                 if has_write_en:
-                    rtl_body += f"\t    if ({mem_port_config.prefix}write_en) begin\n"
-                    rtl_body += f"\t        mem[{mem_port_config.prefix}addr] <= {mem_port_config.prefix}data_in;\n"
-                    rtl_body += f"\t    end\n"
+                    rtl_body += f"\t\tif ({mem_port_config.prefix}write_en) begin\n"
+                    rtl_body += f"\t\t\tmem[{mem_port_config.prefix}addr] <= {mem_port_config.prefix}data_in;\n"
+                    rtl_body += f"\t\tend\n"
                 else:
-                    rtl_body += f"\t    mem[{mem_port_config.prefix}addr] <= {mem_port_config.prefix}data_in;\n"
+                    rtl_body += f"\t\tmem[{mem_port_config.prefix}addr] <= {mem_port_config.prefix}data_in;\n"
             if has_data_out and mem_port_config.registered_input:
-                rtl_body += f"\t    {addr_name} <= {mem_port_config.prefix}addr;\n"
+                rtl_body += f"\t\t{addr_name} <= {mem_port_config.prefix}addr;\n"
             if has_data_out and mem_port_config.registered_output:
-                rtl_body += f"\t    {mem_port_config.prefix}data_out <= mem[{addr_name}];\n"
+                rtl_body += f"\t\t{mem_port_config.prefix}data_out <= mem[{addr_name}];\n"
             rtl_body += f"\tend\n"
         if has_data_out and not mem_port_config.registered_output:
             rtl_body += f"\t{mem_port_config.prefix}data_out <= mem[{addr_name}];\n"
+        return rtl_body
+
+    def generate_dual_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
+        # Determine memory size
+        mem_size = 0
+        mem_data_bits = 0
+        narrower_port_prefix = None # used for dual-port meories.
+        narrower_port_config = None # used for dual-port meories.
+        wider_port_prefix = None # used for dual-port meories.
+        wider_port_config = None # used for dual-port meories.
+        mem_ratio = 1 # Ratio between the two port widths. Defaults to 1, gets overriden if they are of different size
+        for port_config in self.port_configs:
+            data_bits = port_config.data_type.get_num_bits()
+            addr_bits = port_config.addr_type.get_num_bits()
+            mem_size = max(mem_size, data_bits * (1 << addr_bits))
+            mem_data_bits = max(data_bits, mem_data_bits)
+
+        for port_prefix, port_config in (("port_a", self.config.port_a), ("port_b", self.config.port_b)):
+            if port_config is not None:
+                data_bits = port_config.data_type.get_num_bits()
+                if mem_data_bits % data_bits != 0:
+                    raise SyntaxErrorException(f"For multi-port memories, data sizes on all ports must be integer multiples of one another")
+                ratio = mem_data_bits // data_bits
+                if not is_power_of_two(ratio):
+                    raise SyntaxErrorException(f"For multi-port memories, data size ratios must be powers of 2")
+                if ratio == 1 and wider_port_config is None:
+                    wider_port_config = port_config
+                    wider_port_prefix = port_prefix
+                else:
+                    mem_ratio = ratio
+                    narrower_port_config = port_config
+                    narrower_port_prefix = port_prefix
+                addr_bits = port_config.addr_type.get_num_bits()
+                port_mem_size = data_bits * addr_bits
+        mem_addr_range = mem_size // mem_data_bits
+
+        rtl_body = ""
+
+
+        narrower_has_data_in = hasattr(self, f"{narrower_port_config.prefix}data_in")
+        narrower_has_data_out = hasattr(self, f"{narrower_port_config.prefix}data_out")
+        narrower_has_write_en = hasattr(self, f"{narrower_port_config.prefix}write_en")
+
+        wider_has_data_in = hasattr(self, f"{wider_port_config.prefix}data_in")
+        wider_has_data_out = hasattr(self, f"{wider_port_config.prefix}data_out")
+        wider_has_write_en = hasattr(self, f"{wider_port_config.prefix}write_en")
+
+        has_data_in = narrower_has_data_in or wider_has_data_in
+        has_data_out = narrower_has_data_out or wider_has_data_out
+        if not has_data_in and not has_data_out:
+            raise SyntaxErrorException(f"Memory has neither its read nor its write data connected. That's not a valid use of a memory")
+        if not has_data_in and self.config.reset_content is None:
+            raise SyntaxErrorException(f"For ROMs, reset_content must be specified")
+        if narrower_has_write_en and not narrower_has_data_in:
+            raise SyntaxErrorException("If a memory has a write-enable, it must have a corresponding data")
+        if wider_has_write_en and not wider_has_data_in:
+            raise SyntaxErrorException("If a memory has a write-enable, it must have a corresponding data")
+        if not narrower_port_config.registered_input and narrower_has_data_in:
+            raise SyntaxErrorException("Unregistered inputs are only supported for read ports on inferred memories")
+        if not wider_port_config.registered_input and wider_has_data_in:
+            raise SyntaxErrorException("Unregistered inputs are only supported for read ports on inferred memories")
+
+        if mem_ratio == 1:
+            rtl_body =  f"\treg [{narrower_port_config.data_type.get_num_bits()-1}:0] mem[0:{mem_addr_range-1}];\n"
+        else:
+            rtl_body =  f"\treg [{mem_ratio-1}:0] [{narrower_port_config.data_type.get_num_bits()-1}:0] mem[0:{mem_addr_range-1}];\n"
+        rtl_body += f"\n"
+
+        if self.config.reset_content is not None:
+            rtl_body += f"\tinitial begin\n"
+            if callable(self.config.reset_content):
+                generator = self.config.reset_content(wider_port_config.data_type.get_num_bits(), mem_addr_range)
+                try:
+                    for addr in range(1 << addr_bits):
+                        data = next(generator)
+                        rtl_body += f"\t\tmem[{addr}] <= {data_bits}'h{data:x};\n"
+                except StopIteration:
+                    pass # memory content is only partially specified
+                generator.close()
+            else:
+                rtl_body += f'\t\t$readmemb("{self.config.reset_content}", mem);\n'
+            rtl_body += f"\tend\n"
+
+        rtl_body += f"\n"
+
+        if mem_ratio == 1:
+            if narrower_has_data_out:
+                if narrower_port_config.registered_input:
+                    rtl_body += f"\twire [{addr_bits-1}:0] {narrower_port_config.prefix}addr_reg;\n"
+                    addr_name = f"{narrower_port_config.prefix}addr_reg"
+                else:
+                    addr_name = f"{narrower_port_config.prefix}addr"
+            if narrower_has_data_in or (narrower_has_data_out and narrower_port_config.registered_input):
+                rtl_body += f"\talways @(posedge {narrower_port_config.prefix}clk) begin\n"
+                if narrower_has_data_in:
+                    if narrower_has_write_en:
+                        rtl_body += f"\t\tif ({narrower_port_config.prefix}write_en) begin\n"
+                        rtl_body += f"\t\t\tmem[{narrower_port_config.prefix}addr] <= {narrower_port_config.prefix}data_in;\n"
+                        rtl_body += f"\t\tend\n"
+                    else:
+                        rtl_body += f"\t\tmem[{narrower_port_config.prefix}addr] <= {narrower_port_config.prefix}data_in;\n"
+                if narrower_has_data_out and narrower_port_config.registered_input:
+                    rtl_body += f"\t\t{addr_name} <= {narrower_port_config.prefix}addr;\n"
+                if narrower_has_data_out and narrower_port_config.registered_output:
+                    rtl_body += f"\t\t{narrower_port_config.prefix}data_out <= mem[{addr_name}];\n"
+                rtl_body += f"\tend\n"
+            if narrower_has_data_out and not narrower_port_config.registered_output:
+                rtl_body += f"\t{narrower_port_config.prefix}data_out <= mem[{addr_name}];\n"
+        else:
+            if narrower_has_data_out:
+                if narrower_port_config.registered_input:
+                    rtl_body += f"\twire [{addr_bits-1}:0] {narrower_port_config.prefix}addr_reg;\n"
+                    addr_name = f"{narrower_port_config.prefix}addr_reg"
+                else:
+                    addr_name = f"{narrower_port_config.prefix}addr"
+            if narrower_has_data_in or (narrower_has_data_out and narrower_port_config.registered_input):
+                rtl_body += f"\talways @(posedge {narrower_port_config.prefix}clk) begin\n"
+                if narrower_has_data_in:
+                    if narrower_has_write_en:
+                        rtl_body += f"\t\tif ({narrower_port_config.prefix}write_en) begin\n"
+                        rtl_body += f"\t\t\tmem[{narrower_port_config.prefix}addr / {mem_ratio}][{narrower_port_config.prefix}addr % {mem_ratio}] <= {narrower_port_config.prefix}data_in;\n"
+                        rtl_body += f"\t\tend\n"
+                    else:
+                        rtl_body += f"\t\tmem[{narrower_port_config.prefix}addr / {mem_ratio}][{narrower_port_config.prefix}addr % {mem_ratio}] <= {narrower_port_config.prefix}data_in;\n"
+                if narrower_has_data_out and narrower_port_config.registered_input:
+                    rtl_body += f"\t\t{addr_name} <= {narrower_port_config.prefix}addr;\n"
+                if narrower_has_data_out and narrower_port_config.registered_output:
+                    rtl_body += f"\t\t{narrower_port_config.prefix}data_out <= mem[{addr_name} / {mem_ratio}][{addr_name} % {mem_ratio}];\n"
+                rtl_body += f"\tend\n"
+            if narrower_has_data_out and not narrower_port_config.registered_output:
+                rtl_body += f"\t{narrower_port_config.prefix}data_out <= mem[{addr_name} / {mem_ratio}][{addr_name} % {mem_ratio}];\n"
+
+        rtl_body += f"\n"
+
+        if wider_has_data_out:
+            if wider_port_config.registered_input:
+                rtl_body += f"\twire [{addr_bits-1}:0] {wider_port_config.prefix}addr_reg;\n"
+                addr_name = f"{wider_port_config.prefix}addr_reg"
+            else:
+                addr_name = f"{wider_port_config.prefix}addr"
+        if wider_has_data_in or (wider_has_data_out and wider_port_config.registered_input):
+            rtl_body += f"\talways @(posedge {wider_port_config.prefix}clk) begin\n"
+            if wider_has_data_in:
+                if wider_has_write_en:
+                    rtl_body += f"\t\tif ({wider_port_config.prefix}write_en) begin\n"
+                    rtl_body += f"\t\t\tmem[{wider_port_config.prefix}addr] <= {wider_port_config.prefix}data_in;\n"
+                    rtl_body += f"\t\tend\n"
+                else:
+                    rtl_body += f"\t\tmem[{wider_port_config.prefix}addr] <= {wider_port_config.prefix}data_in;\n"
+            if wider_has_data_out and wider_port_config.registered_input:
+                rtl_body += f"\t\t{addr_name} <= {wider_port_config.prefix}addr;\n"
+            if wider_has_data_out and wider_port_config.registered_output:
+                rtl_body += f"\t\t{wider_port_config.prefix}data_out <= mem[{addr_name}];\n"
+            rtl_body += f"\tend\n"
+        if wider_has_data_out and not wider_port_config.registered_output:
+            rtl_body += f"\t{wider_port_config.prefix}data_out <= mem[{addr_name}];\n"
+
         return rtl_body
 
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
@@ -219,98 +377,7 @@ class Memory(GenericModule):
         if self.get_port_count() == 1:
             rtl_body = self.generate_single_port_memory(netlist, back_end)
         elif self.get_port_count() == 2:
-            # Determine memory size
-            mem_size = 0
-            mem_data_bits = 0
-            narrower_port_prefix = None # used for dual-port meories.
-            narrower_port_config = None # used for dual-port meories.
-            wider_port_prefix = None # used for dual-port meories.
-            wider_port_config = None # used for dual-port meories.
-            mem_ratio = 1 # Ratio between the two port widths. Defaults to 1, gets overriden if they are of different size
-            for port_config in self.port_configs:
-                data_bits = port_config.data_type.get_num_bits()
-                addr_bits = port_config.addr_type.get_num_bits()
-                mem_size = max(mem_size, data_bits * (1 << addr_bits))
-                mem_data_bits = max(data_bits, mem_data_bits)
-
-            for port_prefix, port_config in (("port_a", self.config.port_a), ("port_b", self.config.port_b)):
-                if port_config is not None:
-                    data_bits = port_config.data_type.get_num_bits()
-                    if mem_data_bits % data_bits != 0:
-                        raise SyntaxErrorException(f"For multi-port memories, data sizes on all ports must be integer multiples of one another")
-                    ratio = mem_data_bits // data_bits
-                    if not is_power_of_two(ratio):
-                        raise SyntaxErrorException(f"For multi-port memories, data size ratios must be powers of 2")
-                    if ratio == 1 and wider_port_config is None:
-                        wider_port_config = port_config
-                        wider_port_prefix = port_prefix
-                    else:
-                        mem_ratio = ratio
-                        narrower_port_config = port_config
-                        narrower_port_prefix = port_prefix
-                    addr_bits = port_config.addr_type.get_num_bits()
-                    port_mem_size = data_bits * addr_bits
-            mem_addr_range = mem_size // mem_data_bits
-
-            if not mem_port_config.registered_input and mem_port_config.registered_output:
-                if mem_ratio == 1:
-                    rtl_body =  f"\t    reg [{narrower_port_config.data_type.get_num_bits()-1}:0] ram[0:{mem_addr_range-1}];\n"
-                    rtl_body += f"\t\n"
-                    rtl_body += f"\t    reg [{narrower_port_config.data_type.get_num_bits()-1}:0] {narrower_port_prefix}_data_reg;\n"
-                    rtl_body += f"\t    reg [{wider_port_config.data_type.get_num_bits()-1}:0] {wider_port_prefix}_data_reg;\n"
-                    rtl_body += f"\t\n"
-                    rtl_body += f"\t    always@(posedge {narrower_port_prefix}_clk)\n"
-                    rtl_body += f"\t    begin\n"
-                    rtl_body += f"\t        if({narrower_port_prefix}_write_en) begin\n"
-                    rtl_body += f"\t            ram[{narrower_port_prefix}_addr] <= {narrower_port_prefix}_data_in;\n"
-                    rtl_body += f"\t            {narrower_port_prefix}_data_reg <= {narrower_port_prefix}_data_in;\n"
-                    rtl_body += f"\t        end else begin\n"
-                    rtl_body += f"\t            {narrower_port_prefix}_data_reg <= ram[{narrower_port_prefix}_addr];\n"
-                    rtl_body += f"\t        end\n"
-                    rtl_body += f"\t    end\n"
-                    rtl_body += f"\t    assign {narrower_port_prefix}_data_out = {narrower_port_prefix}_data_reg;\n"
-                    rtl_body += f"\t\n"
-                    rtl_body += f"\t    always@(posedge {wider_port_prefix}_clk)\n"
-                    rtl_body += f"\t    begin\n"
-                    rtl_body += f"\t        if({wider_port_prefix}_writen_en) begin\n"
-                    rtl_body += f"\t            ram[{wider_port_prefix}_addr] <= {wider_port_prefix}_data_in;\n"
-                    rtl_body += f"\t            {wider_port_prefix}_data_reg <= {wider_port_prefix}_data_in;\n"
-                    rtl_body += f"\t        end else begin\n"
-                    rtl_body += f"\t            {wider_port_prefix}_data_reg <= ram[{wider_port_prefix}_addr];\n"
-                    rtl_body += f"\t        end\n"
-                    rtl_body += f"\t    end\n"
-                    rtl_body += f"\t    assign {wider_port_prefix}_data_out = {wider_port_prefix}_data_reg;\n"
-                else:
-                    rtl_body =  f"\t    reg [{mem_ratio-1}:0] [{narrower_port_config.data_type.get_num_bits()-1}:0] ram[0:{mem_addr_range-1}];\n"
-                    rtl_body += f"\t\n"
-                    rtl_body += f"\t    reg [{narrower_port_config.data_type.get_num_bits()-1}:0] {narrower_port_prefix}_data_reg;\n"
-                    rtl_body += f"\t    reg [{wider_port_config.data_type.get_num_bits()-1}:0] {wider_port_prefix}_data_reg;\n"
-                    rtl_body += f"\t\n"
-                    rtl_body += f"\t    // Narrower port\n"
-                    rtl_body += f"\t    always@(posedge {narrower_port_prefix}_clk)\n"
-                    rtl_body += f"\t    begin\n"
-                    rtl_body += f"\t        if({narrower_port_prefix}_write_en) begin\n"
-                    rtl_body += f"\t            ram[{narrower_port_prefix}_addr / {mem_ratio}][{narrower_port_prefix}_addr % {mem_ratio}] <= {narrower_port_prefix}_data_in;\n"
-                    rtl_body += f"\t            {narrower_port_prefix}_data_reg <= {narrower_port_prefix}_data_in;\n"
-                    rtl_body += f"\t        end else begin\n"
-                    rtl_body += f"\t            {narrower_port_prefix}_data_reg <= ram[{narrower_port_prefix}_addr / {mem_ratio}][{narrower_port_prefix}_addr % {mem_ratio}];\n"
-                    rtl_body += f"\t        end\n"
-                    rtl_body += f"\t    end\n"
-                    rtl_body += f"\t    assign {narrower_port_prefix}_data_out = {narrower_port_prefix}_data_reg;\n"
-                    rtl_body += f"\t\n"
-                    rtl_body += f"\t    // Wider port\n"
-                    rtl_body += f"\t    always@(posedge {wider_port_prefix}_clk)\n"
-                    rtl_body += f"\t    begin\n"
-                    rtl_body += f"\t        if({wider_port_prefix}_writen_en) begin\n"
-                    rtl_body += f"\t            ram[{wider_port_prefix}_addr] <= {wider_port_prefix}_data_in;\n"
-                    rtl_body += f"\t            {wider_port_prefix}_data_reg <= {wider_port_prefix}_data_in;\n"
-                    rtl_body += f"\t        end else begin\n"
-                    rtl_body += f"\t            {wider_port_prefix}_data_reg <= ram[{wider_port_prefix}_addr];\n"
-                    rtl_body += f"\t        end\n"
-                    rtl_body += f"\t    end\n"
-                    rtl_body += f"\t    assign {wider_port_prefix}_data_out = {wider_port_prefix}_data_reg;\n"
-            else:
-                assert False
+            rtl_body = self.generate_dual_port_memory(netlist, back_end)
         else:
             raise SyntaxErrorException(f"No more than two ports are supported on memory instances")
 

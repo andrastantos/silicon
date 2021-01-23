@@ -29,11 +29,7 @@ module Memory (
 	initial begin
 		$readmemb("xxx.bin", mem);
 	end
-	wire [7:0] addr_reg;
-	always @(posedge clk) begin
-		addr_reg <= addr;
-	end
-	data_out <= mem[addr_reg];
+	data_out <= mem[addr];
 
 endmodule
 

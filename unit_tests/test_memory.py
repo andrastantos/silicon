@@ -74,6 +74,31 @@ def test_single_port_ram_tt(mode: str = "rtl"):
 
 
 
+def test_single_port_async_rom(mode: str = "rtl"):
+
+    class Top(Module):
+        data_out = Output(Unsigned(8))
+        addr = Input(Unsigned(8))
+        clk = Input(logic)
+
+        def body(self):
+            config = MemoryConfig(
+                MemoryPortConfig(
+                    addr_type = self.addr.get_net_type(),
+                    data_type = self.data_out.get_net_type(),
+                    registered_input = False,
+                    registered_output = False
+                ),
+                None,
+                reset_content = "xxx.bin"
+            )
+            mem = Memory(config)
+            self.data_out <<= mem.data_out
+            mem.addr <<= self.addr
+
+    if mode == "rtl":
+        test.rtl_generation(Top(), inspect.currentframe().f_code.co_name)
+
 def test_single_port_rom(mode: str = "rtl"):
 
     class Top(Module):
@@ -107,7 +132,7 @@ def test_single_port_rom2(mode: str = "rtl"):
         clk = Input(logic)
 
         def body(self):
-            def rom_content():
+            def rom_content(data_bits, addr_bits):
                 i = 0
                 while True:
                     yield i
@@ -138,7 +163,7 @@ def test_single_port_rom3(mode: str = "rtl"):
         clk = Input(logic)
 
         def body(self):
-            def rom_content():
+            def rom_content(data_bits, addr_bits):
                 i = 0
                 for data in range(20):
                     yield i
@@ -169,7 +194,7 @@ def test_single_port_rom4(mode: str = "rtl"):
         clk = Input(logic)
 
         def body(self):
-            def rom_content():
+            def rom_content(data_bits, addr_bits):
                 i = 0
                 for data in range(20):
                     yield i
@@ -192,6 +217,119 @@ def test_single_port_rom4(mode: str = "rtl"):
     if mode == "rtl":
         test.rtl_generation(Top(), inspect.currentframe().f_code.co_name)
 
+READ_WRITE = 3
+READ = 1
+WRITE = 2
+def _test_simple_dual_port_ram(mode: str, registered_input_a: bool, registered_output_a: bool, registered_input_b: bool, registered_output_b: bool, port_a: int = READ_WRITE, port_b: int = READ_WRITE):
+
+    class Top(Module):
+        data_in_a = Input(Unsigned(14))
+        data_out_a = Output(Unsigned(14))
+        data_in_b = Input(Unsigned(14))
+        data_out_b = Output(Unsigned(14))
+        addr_a = Input(Unsigned(6))
+        addr_b = Input(Unsigned(6))
+        write_en_a = Input(logic)
+        write_en_b = Input(logic)
+        clk = Input(logic)
+
+        def body(self):
+            config = MemoryConfig(
+                MemoryPortConfig(
+                    addr_type = self.addr_a.get_net_type(),
+                    data_type = self.data_in_a.get_net_type(),
+                    registered_input = registered_input_a,
+                    registered_output = registered_output_a
+                ),
+                MemoryPortConfig(
+                    addr_type = self.addr_b.get_net_type(),
+                    data_type = self.data_in_b.get_net_type(),
+                    registered_input = registered_input_b,
+                    registered_output = registered_output_b
+                ),
+                reset_content = "config.bin"
+            )
+            mem = Memory(config)
+            if port_a & READ != 0:
+                self.data_out_a <<= mem.port_a_data_out
+            if port_a & WRITE != 0:
+                mem.port_a_data_in <<= self.data_in_a
+                mem.port_a_write_en = self.write_en_a
+            mem.port_a_addr <<= self.addr_a
+
+            if port_b & READ != 0:
+                self.data_out_b <<= mem.port_b_data_out
+            if port_b & WRITE != 0:
+                mem.port_b_data_in <<= self.data_in_b
+                mem.port_b_write_en = self.write_en_b
+            mem.port_b_addr <<= self.addr_b
+
+    if mode == "rtl":
+        test.rtl_generation(Top(), inspect.currentframe().f_back.f_code.co_name)
+
+def test_simple_dual_port_ram_ffff(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, False, False, False, False)
+
+def test_simple_dual_port_ram_ffft(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, False, False, False, True)
+
+def test_simple_dual_port_ram_fftf(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, False, False, True, False)
+
+def test_simple_dual_port_ram_fftt(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, False, False, True, True)
+
+def test_simple_dual_port_ram_ftff(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, False, True, False, False)
+
+def test_simple_dual_port_ram_ftft(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, False, True, False, True)
+
+def test_simple_dual_port_ram_fttf(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, False, True, True, False)
+
+def test_simple_dual_port_ram_fttt(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, False, True, True, True)
+
+def test_simple_dual_port_ram_tfff(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, True, False, False, False)
+
+def test_simple_dual_port_ram_tfft(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, True, False, False, True)
+
+def test_simple_dual_port_ram_tftf(mode: str = "rtl"):
+    _test_simple_dual_port_ram(mode, True, False, True, False)
+
+def test_simple_dual_port_ram_tftt(mode: str = "rtl"):
+    _test_simple_dual_port_ram(mode, True, False, True, True)
+
+def test_simple_dual_port_ram_ttff(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, True, True, False, False)
+
+def test_simple_dual_port_ram_ttft(mode: str = "rtl"):
+    with ExpectError(SyntaxErrorException):
+        _test_simple_dual_port_ram(mode, True, True, False, True)
+
+def test_simple_dual_port_ram_tttf(mode: str = "rtl"):
+    _test_simple_dual_port_ram(mode, True, True, True, False)
+
+def test_simple_dual_port_ram_tttt(mode: str = "rtl"):
+    _test_simple_dual_port_ram(mode, True, True, True, True)
+
+def test_simple_dual_port_ram_rw(mode: str = "rtl"):
+    _test_simple_dual_port_ram(mode, True, False, True, False, READ, WRITE)
+
 # TODO:
 # - Test all 8 combinations of registered in/out
 # - Test various address and data-types (structs for example)
@@ -206,6 +344,11 @@ if __name__ == "__main__":
     #test_single_port_rom("rtl")
     #test_single_port_rom2("rtl")
     #test_single_port_rom3("rtl")
-    test_single_port_rom4("rtl")
-
+    #test_single_port_rom4("rtl")
+    #test_simple_dual_port_ram_tftf("rtl")
+    #test_simple_dual_port_ram_tftt("rtl")
+    #test_simple_dual_port_ram_tttf("rtl")
+    #test_simple_dual_port_ram_tttt("rtl")
+    #test_single_port_async_rom("rtl")
+    test_simple_dual_port_ram_rw("rtl")
 

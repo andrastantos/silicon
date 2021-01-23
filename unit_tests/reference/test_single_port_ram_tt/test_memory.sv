@@ -34,11 +34,11 @@ module Memory (
 	wire [7:0] mem [255:0];
 	wire [7:0] addr_reg;
 	always @(posedge clk) begin
-	    if (write_en) begin
-	        mem[addr] <= data_in;
-	    end
-	    addr_reg <= addr;
-	    data_out <= mem[addr_reg];
+		if (write_en) begin
+			mem[addr] <= data_in;
+		end
+		addr_reg <= addr;
+		data_out <= mem[addr_reg];
 	end
 
 endmodule
