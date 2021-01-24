@@ -14,13 +14,13 @@ module Top (
 );
 
 	Memory mem (
-		.port_a_addr(addr_a),
-		.port_a_clk(clk),
-		.port_b_addr(addr_b),
-		.port_b_clk(clk),
-		.port_a_data_out(data_out_a),
-		.port_b_data_in(data_in_b),
-		.port_b_write_en(write_en_b)
+		.port1_addr(addr_a),
+		.port1_clk(clk),
+		.port2_addr(addr_b),
+		.port2_clk(clk),
+		.port1_data_out(data_out_a),
+		.port2_data_in(data_in_b),
+		.port2_write_en(write_en_b)
 	);
 
 	assign data_out_b = 14'bX;
@@ -31,13 +31,13 @@ endmodule
 // Memory
 ////////////////////////////////////////////////////////////////////////////////
 module Memory (
-	input logic [5:0] port_a_addr,
-	input logic port_a_clk,
-	input logic [5:0] port_b_addr,
-	input logic port_b_clk,
-	output logic [13:0] port_a_data_out,
-	input logic [13:0] port_b_data_in,
-	input logic port_b_write_en
+	input logic [5:0] port1_addr,
+	input logic port1_clk,
+	input logic [5:0] port2_addr,
+	input logic port2_clk,
+	output logic [13:0] port1_data_out,
+	input logic [13:0] port2_data_in,
+	input logic port2_write_en
 );
 
 	reg [13:0] mem[0:63];
@@ -46,17 +46,17 @@ module Memory (
 		$readmemb("config.bin", mem);
 	end
 
-	always @(posedge port_b_clk) begin
-		if (port_b_write_en) begin
-			mem[port_b_addr] <= port_b_data_in;
+	always @(posedge port2_clk) begin
+		if (port2_write_en) begin
+			mem[port2_addr] <= port2_data_in;
 		end
 	end
 
-	wire [5:0] port_a_addr_reg;
-	always @(posedge port_a_clk) begin
-		port_a_addr_reg <= port_a_addr;
+	wire [5:0] port1_addr_reg;
+	always @(posedge port1_clk) begin
+		port1_addr_reg <= port1_addr;
 	end
-	port_a_data_out <= mem[port_a_addr_reg];
+	port1_data_out <= mem[port1_addr_reg];
 
 endmodule
 

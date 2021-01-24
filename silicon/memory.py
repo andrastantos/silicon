@@ -75,7 +75,7 @@
 # ARM (Artisan)
 # Essentially 'contact your foundry'
 
-from .module import GenericModule
+from .module import GenericModule, has_port
 from .port import Input, Output, Wire, AutoInput, Port
 from .net_type import NetType
 from collections import OrderedDict
@@ -83,21 +83,20 @@ from dataclasses import dataclass
 from .composite import Struct
 from .utils import str_block, is_power_of_two
 from .exceptions import SyntaxErrorException
-from typing import Optional 
+from typing import Optional, Sequence
 from .number import logic
 
 @dataclass
 class MemoryPortConfig:
-    addr_type: NetType
-    data_type: NetType
+    addr_type: Optional[NetType] = None
+    data_type: Optional[NetType] = None
     registered_input: bool = True
     registered_output: bool = False
     prefix: Optional[str] = None
 
 @dataclass
 class MemoryConfig:
-    port_a: MemoryPortConfig
-    port_b: Optional[MemoryPortConfig]
+    port_configs: Sequence[MemoryPortConfig]
     reset_content: Optional[str] = None
 
 # TODO:
@@ -110,13 +109,13 @@ class Memory(GenericModule):
     def construct(self, config: MemoryConfig):
         from copy import deepcopy
         self.config = deepcopy(config)
-        self.port_configs = []
         self.optional_ports = OrderedDict()
         self._port_cnt = 0
-        for port_config in (self.config.port_a, self.config.port_b):
+        for port_config in self.config.port_configs:
             if port_config is not None:
                 self._port_cnt += 1
-        for port_prefix, port_config in (("port_a", self.config.port_a), ("port_b", self.config.port_b)):
+        for idx, port_config in enumerate(self.config.port_configs):
+            port_prefix = f"port{idx+1}"
             if port_config is not None:
                 if port_config.prefix is None:
                     if self.get_port_count() == 1:
@@ -125,8 +124,7 @@ class Memory(GenericModule):
                         port_config.prefix = port_prefix + "_"
                 else:
                     port_config.prefix += "_"
-                self.port_configs.append(port_config)
-        for port_config in self.port_configs:
+        for port_config in self.config.port_configs:
             setattr(self, f"{port_config.prefix}addr", Input(port_config.addr_type))
             self.optional_ports[f"{port_config.prefix}data_in"] = (port_config.data_type, Memory.INPUT)
             self.optional_ports[f"{port_config.prefix}data_out"] = (port_config.data_type, Memory.OUTPUT)
@@ -154,22 +152,53 @@ class Memory(GenericModule):
 
     def generate_single_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         # Sing-port memory
-        mem_port_config = self.port_configs[0]
-        data_bits = mem_port_config.data_type.get_num_bits()
-        addr_bits = mem_port_config.addr_type.get_num_bits()
+        mem_port_config = self.config.port_configs[0]
+        data_conf_bits = mem_port_config.data_type.get_num_bits() if mem_port_config.data_type is not None else None
+        addr_conf_bits = mem_port_config.addr_type.get_num_bits() if mem_port_config.addr_type is not None else None
 
-        has_data_in = hasattr(self, f"{mem_port_config.prefix}data_in")
-        has_data_out = hasattr(self, f"{mem_port_config.prefix}data_out")
-        has_write_en = hasattr(self, f"{mem_port_config.prefix}write_en")
+        data_in_port = getattr(self, f"{mem_port_config.prefix}data_in", None)
+        data_out_port = getattr(self, f"{mem_port_config.prefix}data_out", None)
+        write_en_port = getattr(self, f"{mem_port_config.prefix}write_en", None)
+        addr_port = getattr(self, f"{mem_port_config.prefix}addr")
+        clk_port = getattr(self, f"{mem_port_config.prefix}clk", None)
 
-        if not has_data_in and not has_data_out:
+
+        if data_in_port is None and data_out_port is None:
             raise SyntaxErrorException(f"Memory has neither its read nor its write data connected. That's not a valid use of a memory")
-        if not has_data_in and self.config.reset_content is None:
+        if data_in_port is None and self.config.reset_content is None:
             raise SyntaxErrorException(f"For ROMs, reset_content must be specified")
-        if has_write_en and not has_data_in:
+        if write_en_port is not None and data_in_port is None:
             raise SyntaxErrorException("If a memory has a write-enable, it must have a corresponding data")
-        if not mem_port_config.registered_input and has_data_in:
+        if not mem_port_config.registered_input and data_in_port is not None:
             raise SyntaxErrorException("Unregistered inputs are only supported for read ports on inferred memories")
+
+        if data_in_port is not None:
+            data_in_bits = data_in_port.get_net_type().get_num_bits()
+            if data_conf_bits is not None and data_conf_bits < data_in_bits:
+                raise SyntaxErrorException(f"Memory was specified as {data_conf_bits} wide in config, yet data input port is {data_in_bits} wide")
+        if data_out_port is not None:
+            if not data_out_port.is_abstract():
+                data_out_bits = data_out_port.get_net_type().get_num_bits()
+                if data_conf_bits is not None and data_conf_bits < data_out_bits:
+                    raise SyntaxErrorException(f"Memory was specified as {data_conf_bits} wide in config, yet data output port is {data_out_bits} wide")
+
+        if data_conf_bits is not None:
+            data_bits = data_conf_bits
+        elif data_in_port is not None and data_out_port is not None:
+            data_bits = max(data_in_bits, data_out_bits)
+        elif data_in_port is not None:
+            data_bits = data_in_bits
+        elif data_out_port is not None:
+            data_bits = data_out_bits
+        else:
+            assert False, "We should have caught this above"
+
+        addr_bits = addr_port.get_net_type().get_num_bits()
+        if addr_conf_bits is not None and addr_bits > addr_conf_bits:
+            raise SyntaxErrorException(f"Memory was specified with address width of {addr_conf_bits} in config, yet address input port is {addr_bits} wide")
+        if addr_conf_bits is not None:
+            addr_bits = max(addr_conf_bits, addr_bits)
+
         rtl_body =  f"\twire [{data_bits-1}:0] mem [{(1 << addr_bits)-1}:0];\n"
 
         if self.config.reset_content is not None:
@@ -186,28 +215,42 @@ class Memory(GenericModule):
             else:
                 rtl_body += f'\t\t$readmemb("{self.config.reset_content}", mem);\n'
             rtl_body += f"\tend\n"
-            
-        if has_data_out:
+
+        # some preparation for inlining...
+        target_namespace = self
+        data_in_port = getattr(self, f"{mem_port_config.prefix}data_in", None)
+        data_out_port = getattr(self, f"{mem_port_config.prefix}data_out", None)
+        write_en_port = getattr(self, f"{mem_port_config.prefix}write_en", None)
+        addr_port = getattr(self, f"{mem_port_config.prefix}addr")
+        clk_port = getattr(self, f"{mem_port_config.prefix}clk", None)
+
+        data_in, _ = target_namespace._impl.get_rhs_expression_for_junction(data_in_port, back_end) if data_in_port is not None else (None, None)
+        write_en, _ = target_namespace._impl.get_rhs_expression_for_junction(write_en_port, back_end) if write_en_port is not None else (None, None)
+        addr, _ = target_namespace._impl.get_rhs_expression_for_junction(addr_port, back_end) if addr_port is not None else (None, None)
+        clk, _ = target_namespace._impl.get_rhs_expression_for_junction(clk_port, back_end, back_end.get_operator_precedence("()")) if clk_port is not None else (None, None)
+
+
+        if data_out_port is not None:
             if mem_port_config.registered_input:
                 rtl_body += f"\twire [{addr_bits-1}:0] addr_reg;\n"
                 addr_name = "addr_reg"
             else:
-                addr_name = f"{mem_port_config.prefix}addr"
-        if has_data_in or (has_data_out and mem_port_config.registered_input):
-            rtl_body += f"\talways @(posedge {mem_port_config.prefix}clk) begin\n"
-            if has_data_in:
-                if has_write_en:
-                    rtl_body += f"\t\tif ({mem_port_config.prefix}write_en) begin\n"
-                    rtl_body += f"\t\t\tmem[{mem_port_config.prefix}addr] <= {mem_port_config.prefix}data_in;\n"
+                addr_name = addr
+        if data_in_port is not None or (data_out_port is not None and mem_port_config.registered_input):
+            rtl_body += f"\talways @(posedge {clk}) begin\n"
+            if data_in_port is not None:
+                if write_en_port is not None:
+                    rtl_body += f"\t\tif ({write_en}) begin\n"
+                    rtl_body += f"\t\t\tmem[{addr}] <= {data_in};\n"
                     rtl_body += f"\t\tend\n"
                 else:
-                    rtl_body += f"\t\tmem[{mem_port_config.prefix}addr] <= {mem_port_config.prefix}data_in;\n"
-            if has_data_out and mem_port_config.registered_input:
-                rtl_body += f"\t\t{addr_name} <= {mem_port_config.prefix}addr;\n"
-            if has_data_out and mem_port_config.registered_output:
+                    rtl_body += f"\t\tmem[{addr}] <= {data_in};\n"
+            if data_out_port is not None and mem_port_config.registered_input:
+                rtl_body += f"\t\t{addr_name} <= {addr};\n"
+            if data_out_port is not None and mem_port_config.registered_output:
                 rtl_body += f"\t\t{mem_port_config.prefix}data_out <= mem[{addr_name}];\n"
             rtl_body += f"\tend\n"
-        if has_data_out and not mem_port_config.registered_output:
+        if data_out_port is not None and not mem_port_config.registered_output:
             rtl_body += f"\t{mem_port_config.prefix}data_out <= mem[{addr_name}];\n"
         return rtl_body
 
@@ -215,34 +258,32 @@ class Memory(GenericModule):
         # Determine memory size
         mem_size = 0
         mem_data_bits = 0
-        narrower_port_prefix = None # used for dual-port meories.
         narrower_port_config = None # used for dual-port meories.
-        wider_port_prefix = None # used for dual-port meories.
         wider_port_config = None # used for dual-port meories.
         mem_ratio = 1 # Ratio between the two port widths. Defaults to 1, gets overriden if they are of different size
-        for port_config in self.port_configs:
+        for port_config in self.config.port_configs:
+            if port_config.data_type is None:
+                raise SyntaxErrorException(f"For dual-port memories (for now at least) data-type must be specified in the configuration")
+            if port_config.addr_type is None:
+                raise SyntaxErrorException(f"For dual-port memories (for now at least) addr-type must be specified in the configuration")
             data_bits = port_config.data_type.get_num_bits()
             addr_bits = port_config.addr_type.get_num_bits()
             mem_size = max(mem_size, data_bits * (1 << addr_bits))
             mem_data_bits = max(data_bits, mem_data_bits)
 
-        for port_prefix, port_config in (("port_a", self.config.port_a), ("port_b", self.config.port_b)):
-            if port_config is not None:
-                data_bits = port_config.data_type.get_num_bits()
-                if mem_data_bits % data_bits != 0:
-                    raise SyntaxErrorException(f"For multi-port memories, data sizes on all ports must be integer multiples of one another")
-                ratio = mem_data_bits // data_bits
-                if not is_power_of_two(ratio):
-                    raise SyntaxErrorException(f"For multi-port memories, data size ratios must be powers of 2")
-                if ratio == 1 and wider_port_config is None:
-                    wider_port_config = port_config
-                    wider_port_prefix = port_prefix
-                else:
-                    mem_ratio = ratio
-                    narrower_port_config = port_config
-                    narrower_port_prefix = port_prefix
-                addr_bits = port_config.addr_type.get_num_bits()
-                port_mem_size = data_bits * addr_bits
+        for port_config in self.config.port_configs:
+            data_bits = port_config.data_type.get_num_bits()
+            if mem_data_bits % data_bits != 0:
+                raise SyntaxErrorException(f"For multi-port memories, data sizes on all ports must be integer multiples of one another")
+            ratio = mem_data_bits // data_bits
+            if not is_power_of_two(ratio):
+                raise SyntaxErrorException(f"For multi-port memories, data size ratios must be powers of 2")
+            if ratio == 1 and wider_port_config is None:
+                wider_port_config = port_config
+            else:
+                mem_ratio = ratio
+                narrower_port_config = port_config
+            addr_bits = port_config.addr_type.get_num_bits()
         mem_addr_range = mem_size // mem_data_bits
 
         rtl_body = ""
@@ -387,6 +428,35 @@ class Memory(GenericModule):
             "endmodule"
         )
         return ret_val
+    '''
+    def simulate(self) -> TSimEvent:
+        # TODO: load initial content
+
+        trigger_ports = []
+        for config in 
+        while True:
+            if has_async_reset:
+                yield (self.reset_port, self.clock_port)
+            else:
+                yield (self.clock_port, )
+            # Test for rising edge on clock
+            if has_async_reset and self.reset_port.sim_value == 1:
+                reset()
+            elif self.clock_port.is_sim_edge() and self.clock_port.previous_sim_value == 0 and self.clock_port.sim_value == 1:
+                if has_reset and self.reset_port.sim_value == 1:
+                    # This branch is never taken for async reset
+                    reset()
+                else:
+                    if self.input_port.is_sim_edge():
+                        self.output_port <<= None
+                    else:
+                        self.output_port <<= self.input_port
+    '''
+
+
+
+
+
 
 """
 // Quartus Prime SystemVerilog Template

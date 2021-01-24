@@ -138,10 +138,23 @@ def test_reg3():
             
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_reg4():
+    class top(Module):
+        sout1 = Output(Signed(length=5))
+        uin1 = Input(Unsigned(length=2))
+        clk1 = Input(logic)
+
+        def body(self):
+            self.sout1 = Reg(self.uin1, clock_port=(self.clk1 & self.uin1[0]))
+            
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+
 if __name__ == "__main__":
     #test_select()
     #test_select_one_first()
     #test_reg()
-    test_reg3()
+    #test_reg3()
     #test_mux()
     #test_select_with_none()
+    test_reg4()

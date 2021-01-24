@@ -14,16 +14,16 @@ module Top (
 );
 
 	Memory mem (
-		.port_a_addr(addr_a),
-		.port_a_clk(clk),
-		.port_b_addr(addr_b),
-		.port_b_clk(clk),
-		.port_a_data_out(data_out_a),
-		.port_a_data_in(data_in_a),
-		.port_a_write_en(write_en_a),
-		.port_b_data_out(data_out_b),
-		.port_b_data_in(data_in_b),
-		.port_b_write_en(write_en_b)
+		.port1_addr(addr_a),
+		.port1_clk(clk),
+		.port2_addr(addr_b),
+		.port2_clk(clk),
+		.port1_data_out(data_out_a),
+		.port1_data_in(data_in_a),
+		.port1_write_en(write_en_a),
+		.port2_data_out(data_out_b),
+		.port2_data_in(data_in_b),
+		.port2_write_en(write_en_b)
 	);
 
 endmodule

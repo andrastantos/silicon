@@ -13,13 +13,12 @@ import inspect
 
 def test_single_port_ram_no_ports(mode: str = "rtl"):
     config = MemoryConfig(
-        MemoryPortConfig(
+        (MemoryPortConfig(
             addr_type = Unsigned(8),
             data_type = Unsigned(8),
             registered_input = True,
             registered_output = False
-        ),
-        None,
+        ),),
         reset_content = None
     )
 
@@ -38,13 +37,12 @@ def _test_single_port_ram(mode: str, registered_input: bool, registered_output: 
 
         def body(self):
             config = MemoryConfig(
-                MemoryPortConfig(
+                (MemoryPortConfig(
                     addr_type = self.addr.get_net_type(),
                     data_type = self.data_in.get_net_type(),
                     registered_input = registered_input,
                     registered_output = registered_output
-                ),
-                None,
+                ),),
                 reset_content = None
             )
             mem = Memory(config)
@@ -83,13 +81,12 @@ def test_single_port_async_rom(mode: str = "rtl"):
 
         def body(self):
             config = MemoryConfig(
-                MemoryPortConfig(
+                (MemoryPortConfig(
                     addr_type = self.addr.get_net_type(),
                     data_type = self.data_out.get_net_type(),
                     registered_input = False,
                     registered_output = False
-                ),
-                None,
+                ),),
                 reset_content = "xxx.bin"
             )
             mem = Memory(config)
@@ -108,13 +105,12 @@ def test_single_port_rom(mode: str = "rtl"):
 
         def body(self):
             config = MemoryConfig(
-                MemoryPortConfig(
+                (MemoryPortConfig(
                     addr_type = self.addr.get_net_type(),
                     data_type = self.data_out.get_net_type(),
                     registered_input = True,
                     registered_output = False
-                ),
-                None,
+                ),),
                 reset_content = "xxx.bin"
             )
             mem = Memory(config)
@@ -139,13 +135,12 @@ def test_single_port_rom2(mode: str = "rtl"):
                     i += 1
 
             config = MemoryConfig(
-                MemoryPortConfig(
+                (MemoryPortConfig(
                     addr_type = self.addr.get_net_type(),
                     data_type = self.data_out.get_net_type(),
                     registered_input = True,
                     registered_output = False
-                ),
-                None,
+                ),),
                 reset_content = rom_content
             )
             mem = Memory(config)
@@ -170,13 +165,12 @@ def test_single_port_rom3(mode: str = "rtl"):
                     i += 1
 
             config = MemoryConfig(
-                MemoryPortConfig(
+                (MemoryPortConfig(
                     addr_type = self.addr.get_net_type(),
                     data_type = self.data_out.get_net_type(),
                     registered_input = True,
                     registered_output = False
-                ),
-                None,
+                ),),
                 reset_content = rom_content
             )
             mem = Memory(config)
@@ -201,13 +195,12 @@ def test_single_port_rom4(mode: str = "rtl"):
                     i += 1
 
             config = MemoryConfig(
-                MemoryPortConfig(
+                (MemoryPortConfig(
                     addr_type = self.addr.get_net_type(),
                     data_type = self.data_out.get_net_type(),
                     registered_input = True,
                     registered_output = True
-                ),
-                None,
+                ),),
                 reset_content = rom_content
             )
             mem = Memory(config)
@@ -235,7 +228,7 @@ def _test_simple_dual_port_ram(mode: str, registered_input_a: bool, registered_o
 
         def body(self):
             config = MemoryConfig(
-                MemoryPortConfig(
+                (MemoryPortConfig(
                     addr_type = self.addr_a.get_net_type(),
                     data_type = self.data_in_a.get_net_type(),
                     registered_input = registered_input_a,
@@ -246,23 +239,23 @@ def _test_simple_dual_port_ram(mode: str, registered_input_a: bool, registered_o
                     data_type = self.data_in_b.get_net_type(),
                     registered_input = registered_input_b,
                     registered_output = registered_output_b
-                ),
+                ),),
                 reset_content = "config.bin"
             )
             mem = Memory(config)
             if port_a & READ != 0:
-                self.data_out_a <<= mem.port_a_data_out
+                self.data_out_a <<= mem.port1_data_out
             if port_a & WRITE != 0:
-                mem.port_a_data_in <<= self.data_in_a
-                mem.port_a_write_en = self.write_en_a
-            mem.port_a_addr <<= self.addr_a
+                mem.port1_data_in <<= self.data_in_a
+                mem.port1_write_en = self.write_en_a
+            mem.port1_addr <<= self.addr_a
 
             if port_b & READ != 0:
-                self.data_out_b <<= mem.port_b_data_out
+                self.data_out_b <<= mem.port2_data_out
             if port_b & WRITE != 0:
-                mem.port_b_data_in <<= self.data_in_b
-                mem.port_b_write_en = self.write_en_b
-            mem.port_b_addr <<= self.addr_b
+                mem.port2_data_in <<= self.data_in_b
+                mem.port2_write_en = self.write_en_b
+            mem.port2_addr <<= self.addr_b
 
     if mode == "rtl":
         test.rtl_generation(Top(), inspect.currentframe().f_back.f_code.co_name)
@@ -349,6 +342,6 @@ if __name__ == "__main__":
     #test_simple_dual_port_ram_tftt("rtl")
     #test_simple_dual_port_ram_tttf("rtl")
     #test_simple_dual_port_ram_tttt("rtl")
-    #test_single_port_async_rom("rtl")
-    test_simple_dual_port_ram_rw("rtl")
+    test_single_port_async_rom("rtl")
+    #test_simple_dual_port_ram_rw("rtl")
 
