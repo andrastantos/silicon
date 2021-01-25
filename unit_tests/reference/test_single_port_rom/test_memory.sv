@@ -29,6 +29,7 @@ module Memory (
 	initial begin
 		$readmemb("xxx.bin", mem);
 	end
+
 	wire [7:0] addr_reg;
 	always @(posedge clk) begin
 		addr_reg <= addr;

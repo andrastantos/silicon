@@ -76,7 +76,7 @@
 # Essentially 'contact your foundry'
 
 from .module import GenericModule, has_port
-from .port import Input, Output, Wire, AutoInput, Port
+from .port import Input, Output, Wire, AutoInput, Port, EdgeType
 from .net_type import NetType
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -218,6 +218,7 @@ class Memory(GenericModule):
             addr_bits = port_config.addr_bits
             self.mem_size = max(self.mem_size, data_bits * (1 << addr_bits))
             self.mem_data_bits = max(data_bits, self.mem_data_bits)
+        self.mem_addr_range = self.mem_size // self.mem_data_bits
 
         # Finding primary and secondary ports, while checking for port compatibility
         for port_config in self.config.port_configs:
@@ -249,30 +250,37 @@ class Memory(GenericModule):
         if not has_data_in and self.config.reset_content is None:
             raise SyntaxErrorException(f"For ROMs, reset_content must be specified")
 
-
-    def generate_single_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
-        # Sing-port memory
-        prot_config = self.config.port_configs[0]
-
-        data_bits = prot_config.data_bits
-        addr_bits = prot_config.addr_bits
-
-        rtl_body =  f"\twire [{data_bits-1}:0] mem [{(1 << addr_bits)-1}:0];\n"
-
+    def generate_reset_content(self, back_end: 'BackEnd', memory_name: str) -> str:
+        rtl_body = ""
         if self.config.reset_content is not None:
             rtl_body += f"\tinitial begin\n"
             if callable(self.config.reset_content):
-                generator = self.config.reset_content(data_bits, addr_bits)
+                generator = self.config.reset_content(self.mem_data_bits, self.mem_addr_range)
                 try:
-                    for addr in range(1 << addr_bits):
+                    for addr in range(self.mem_addr_range):
                         data = next(generator)
-                        rtl_body += f"\t\tmem[{addr}] <= {data_bits}'h{data:x};\n"
+                        rtl_body += f"\t\t{memory_name}[{addr}] <= {self.mem_data_bits}'h{data:x};\n"
                 except StopIteration:
                     pass # memory content is only partially specified
                 generator.close()
             else:
                 rtl_body += f'\t\t$readmemb("{self.config.reset_content}", mem);\n'
             rtl_body += f"\tend\n"
+            rtl_body += f"\n"
+
+        return rtl_body
+
+    def generate_single_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
+        # Sing-port memory
+        prot_config = self.config.port_configs[0]
+
+        memory_name = "mem"
+        data_bits = prot_config.data_bits
+        addr_bits = prot_config.addr_bits
+
+        rtl_body =  f"\twire [{data_bits-1}:0] {memory_name} [{(1 << addr_bits)-1}:0];\n"
+
+        rtl_body += self.generate_reset_content(back_end, memory_name)
 
         data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(prot_config)
 
@@ -295,24 +303,25 @@ class Memory(GenericModule):
             if data_in_port is not None:
                 if write_en_port is not None:
                     rtl_body += f"\t\tif ({write_en}) begin\n"
-                    rtl_body += f"\t\t\tmem[{addr}] <= {data_in};\n"
+                    rtl_body += f"\t\t\t{memory_name}[{addr}] <= {data_in};\n"
                     rtl_body += f"\t\tend\n"
                 else:
-                    rtl_body += f"\t\tmem[{addr}] <= {data_in};\n"
+                    rtl_body += f"\t\t{memory_name}[{addr}] <= {data_in};\n"
             if data_out_port is not None and prot_config.registered_input:
                 rtl_body += f"\t\t{addr_name} <= {addr};\n"
             if data_out_port is not None and prot_config.registered_output:
-                rtl_body += f"\t\t{data_out} <= mem[{addr_name}];\n"
+                rtl_body += f"\t\t{data_out} <= {memory_name}[{addr_name}];\n"
             rtl_body += f"\tend\n"
         if data_out_port is not None and not prot_config.registered_output:
-            rtl_body += f"\t{data_out} <= mem[{addr_name}];\n"
+            rtl_body += f"\t{data_out} <= {memory_name}[{addr_name}];\n"
         return rtl_body
 
     def generate_dual_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
-        mem_addr_range = self.mem_size // self.mem_data_bits
 
         # some preparation for inlining...
         target_namespace = self
+
+        memory_name = "mem"
 
         rtl_body = ""
 
@@ -329,26 +338,12 @@ class Memory(GenericModule):
         mem_ratio = self.secondary_port_configs[0].mem_ratio
 
         if mixed_ratios:
-            rtl_body =  f"\treg [{mem_ratio-1}:0] [{self.mem_data_bits/mem_ratio-1}:0] mem[0:{mem_addr_range-1}];\n"
+            rtl_body =  f"\treg [{mem_ratio-1}:0] [{self.mem_data_bits/mem_ratio-1}:0] {memory_name}[0:{self.mem_addr_range-1}];\n"
         else:
-            rtl_body =  f"\treg [{self.mem_data_bits-1}:0] mem[0:{mem_addr_range-1}];\n"
+            rtl_body =  f"\treg [{self.mem_data_bits-1}:0] {memory_name}[0:{self.mem_addr_range-1}];\n"
         rtl_body += f"\n"
 
-        if self.config.reset_content is not None:
-            rtl_body += f"\tinitial begin\n"
-            if callable(self.config.reset_content):
-                generator = self.config.reset_content(wider_port_config.data_type.get_num_bits(), mem_addr_range)
-                try:
-                    for addr in range(1 << addr_bits):
-                        data = next(generator)
-                        rtl_body += f"\t\tmem[{addr}] <= {data_bits}'h{data:x};\n"
-                except StopIteration:
-                    pass # memory content is only partially specified
-                generator.close()
-            else:
-                rtl_body += f'\t\t$readmemb("{self.config.reset_content}", mem);\n'
-            rtl_body += f"\tend\n"
-        rtl_body += f"\n"
+        rtl_body += self.generate_reset_content(back_end, memory_name)
 
         for port_config in self.config.port_configs:
             data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
@@ -371,28 +366,28 @@ class Memory(GenericModule):
                     if write_en_port is not None:
                         rtl_body += f"\t\tif ({write_en}) begin\n"
                         if port_config.mem_ratio == 1:
-                            rtl_body += f"\t\t\tmem[{addr}] <= {data_in};\n"
+                            rtl_body += f"\t\t\t{memory_name}[{addr}] <= {data_in};\n"
                         else:
-                            rtl_body += f"\t\t\tmem[{addr} / {port_config.mem_ratio}][{addr} % {port_config.mem_ratio}] <= {data_in};\n"
+                            rtl_body += f"\t\t\t{memory_name}[{addr} / {port_config.mem_ratio}][{addr} % {port_config.mem_ratio}] <= {data_in};\n"
                         rtl_body += f"\t\tend\n"
                     else:
                         if port_config.mem_ratio == 1:
-                            rtl_body += f"\t\tmem[{addr}] <= {data_in};\n"
+                            rtl_body += f"\t\t{memory_name}[{addr}] <= {data_in};\n"
                         else:
-                            rtl_body += f"\t\tmem[{addr} / {port_config.mem_ratio}][{addr} % {port_config.mem_ratio}] <= {data_in};\n"
+                            rtl_body += f"\t\t{memory_name}[{addr} / {port_config.mem_ratio}][{addr} % {port_config.mem_ratio}] <= {data_in};\n"
                 if data_out_port is not None and port_config.registered_input:
                     rtl_body += f"\t\t{addr_name} <= {addr};\n"
                 if data_out_port is not None and port_config.registered_output:
                     if port_config.mem_ratio == 1:
-                        rtl_body += f"\t\t{data_out} <= mem[{addr_name}];\n"
+                        rtl_body += f"\t\t{data_out} <= {memory_name}[{addr_name}];\n"
                     else:
-                        rtl_body += f"\t\t{data_out} <= mem[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n"
+                        rtl_body += f"\t\t{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n"
                 rtl_body += f"\tend\n"
             if data_out_port is not None and not port_config.registered_output:
                 if port_config.mem_ratio == 1:
-                    rtl_body += f"\t{data_out} <= mem[{addr_name}];\n"
+                    rtl_body += f"\t{data_out} <= {memory_name}[{addr_name}];\n"
                 else:
-                    rtl_body += f"\t{data_out} <= mem[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n"
+                    rtl_body += f"\t{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n"
             rtl_body += f"\n"
 
         return rtl_body
@@ -438,39 +433,87 @@ class Memory(GenericModule):
         data_in_val = None
         write_en_val = None
 
+        # Memory holds entries for the narrowest port.
+        # Wider ports do multiple consequtive accesses based on endienness.
         memory_content = []
+
+        mem_data_bits = self.config.port_configs[0].data_bits
+        mem_addr_bits = self.config.port_configs[0].addr_bits
+        for port_config in self.config.port_configs[1:]:
+            mem_data_bits = min(mem_data_bits, port_config.data_bits)
+            mem_addr_bits = min(mem_addr_bits, port_config.addr_bits)
+        
         def get_sim_value(port):
             if port.is_sim_edge():
                 return None
             else:
                 return port.sim_value
 
+        def set_mem_val(addr, data):
+            while len(memory_content) <= addr:
+                memory_content.append(None)
+            memory_content[addr] = data
+        def get_mem_val(addr):
+            if addr < len(memory_content):
+                return None
+            return memory_content[addr]
+
         while True:
             yield trigger_ports
             for port_config in self.config.port_configs:
                 data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
                 # Deal with the inputs first
-                triggered = False
+                write = False
+                read = False
+                read_invalid = False
+                addr_val = get_sim_value(addr_port)
+                data_in_val = get_sim_value(data_in_port)
+                write_en_val = get_sim_value(write_en_port)
                 if port_config.registered_input:
-                    if clk_port.is_sim_edge() and clk_port.previous_sim_value == 0 and clk_port.sim_value == 1:
-                        triggered = True
-                        addr_val = get_sim_value(addr_port)
-                        data_in_val = get_sim_value(data_in_port)
-                        write_en_val = get_sim_value(write_en_port)
+                    clk_edge_type = clk_port.get_sim_edge()
+                    if clk_edge_type == EdgeType.Positive:
+                        write = write_en_port is None or write_en_val != 0
+                        read = True
+                    if clk_edge_type == EdgeType.Undefined:
+                        # In this case we don't know if a write or read happens or not. So make sure that data is X-ed out
+                        write = write_en_port is None or write_en_val != 0
+                        read = True
+                        data_in_val = None
+                        read_invalid = True
                 else:
-                    triggered = write_en_port.is_sim_edge and write_en_port.previous_sim_value == 0 and write_en_port.sim_value == 1
-                    addr_val = get_sim_value(addr_port)
-                    data_in_val = get_sim_value(data_in_port)
-                    write_en_val = 1
-                if triggered:
-                    if write_en_val != 0:
-                        pass
-
-                if has_reset and self.reset_port.sim_value == 1:
-                    # This branch is never taken for async reset
-                    reset()
-                else:
-                    if self.input_port.is_sim_edge():
-                        self.output_port <<= None
+                    write_edge_type = write_en_port.get_sim_edge()
+                    if write_edge_type == EdgeType.Positive:
+                        write = True
+                    if write_edge_type == EdgeType.Undefined:
+                        write = True
+                        data_in_val = None
+                    read = addr_port.get_sim_edge() != EdgeType.NoEdge
+                if write:
+                    if addr_val is None:
+                        # We don't know where we write. For now, let's invalidate the whole memory...
+                        memory_content = []
+                    burst_size = port_config.data_bits // mem_data_bits
+                    start_addr = addr_val * burst_size
+                    data_mask = (1 << port_config.data_bits) - 1
+                    for addr in range(start_addr, start_addr + burst_size):
+                        if data_in_val is None:
+                            set_mem_val(addr, None)
+                        else:
+                            set_mem_val(addr, data_in_val & data_mask)
+                            data_in_val >>= port_config.data_bits
+                if read and data_out_port is not None:
+                    if read_invalid:
+                        data_out_port <<= None
                     else:
-                        self.output_port <<= self.input_port
+                        data_out_val = 0
+                        burst_size = port_config.data_bits // mem_data_bits
+                        start_addr = addr_val * burst_size
+                        data_mask = (1 << port_config.data_bits) - 1
+                        for addr in range(start_addr + burst_size, start_addr, -1):
+                            data_section = get_mem_val(addr)
+                            if data_section is None:
+                                data_out_val = None
+                                break
+                            data_out_val = (data_out_val >> port_config.data_bits) | (data_section & data_mask)
+                        data_out_port <<= data_out_val
+

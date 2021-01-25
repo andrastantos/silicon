@@ -1,6 +1,6 @@
 from .module import Module, InlineBlock, InlineExpression, InlineStatement, InlineComposite, GenericModule, has_port
 from typing import Dict, Optional, Tuple, Any, Generator, Union, Sequence
-from .port import Junction, Input, Output, Port, AutoInput
+from .port import Junction, Input, Output, Port, AutoInput, EdgeType
 from .net_type import NetType, KeyKind
 from .exceptions import SyntaxErrorException, SimulationException
 from .tracer import no_trace
@@ -563,15 +563,19 @@ class Reg(Module):
             # Test for rising edge on clock
             if has_async_reset and self.reset_port.sim_value == 1:
                 reset()
-            elif self.clock_port.is_sim_edge() and self.clock_port.previous_sim_value == 0 and self.clock_port.sim_value == 1:
-                if has_reset and self.reset_port.sim_value == 1:
-                    # This branch is never taken for async reset
-                    reset()
-                else:
-                    if self.input_port.is_sim_edge():
-                        self.output_port <<= None
+            else:
+                edge_type = self.clock_port.get_sim_edge()
+                if edge_type == EdgeType.Positive:
+                    if has_reset and self.reset_port.sim_value == 1:
+                        # This branch is never taken for async reset
+                        reset()
                     else:
-                        self.output_port <<= self.input_port
+                        if self.input_port.get_sim_edge() != EdgeType.NoEdge:
+                            self.output_port <<= None
+                        else:
+                            self.output_port <<= self.input_port
+                elif edge_type == EdgeType.Undefined:
+                    self.output_port <<= None
 
 
 

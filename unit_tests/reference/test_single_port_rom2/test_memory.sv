@@ -284,6 +284,7 @@ module Memory (
 		mem[254] <= 8'hfe;
 		mem[255] <= 8'hff;
 	end
+
 	wire [7:0] addr_reg;
 	always @(posedge clk) begin
 		addr_reg <= addr;

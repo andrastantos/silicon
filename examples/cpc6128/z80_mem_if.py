@@ -138,7 +138,7 @@ def test_sim():
             while True:
                 yield self.clk, self.penable
                 self.pready <<= self.penable     if (self.psel == 1) else None
-                if self.clk_en and self.clk.is_sim_edge() and self.clk == 1:
+                if self.clk_en and self.clk.get_sim_edge() == EdgeType.Positive:
                     #self.prdata <<= self.paddr[7:0]  if (self.penable == 1) else None
                     self.prdata <<= self.paddr[7:0]
 

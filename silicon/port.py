@@ -7,9 +7,16 @@ from .exceptions import SyntaxErrorException, SimulationException
 from .utils import convert_to_junction, is_junction, is_input_port, is_output_port, is_wire, get_caller_local_junctions, is_junction_member, BoolMarker, is_module, implicit_adapt, MEMBER_DELIMITER
 from .port import KeyKind
 from collections import OrderedDict
+from enum import Enum
 
 class JunctionBase(object):
     pass
+
+class EdgeType(Enum):
+    NoEdge = 0
+    Positive = 1
+    Negative = 2
+    Undefined = 3
 
 class Junction(JunctionBase):
     
@@ -379,11 +386,18 @@ class Junction(JunctionBase):
         #    return None
         assert not self.is_composite(), "Simulator should never ask for the value of compound types"
         return self._xnet.sim_state.previous_value
-    def is_sim_edge(self) -> bool:
+    def get_sim_edge(self) -> EdgeType:
         #if not hasattr(self, "_xnet") or self._xnet is None:
         #    return None
         assert not self.is_composite(), "Simulator should never ask for the value of compound types"
-        return self._xnet.sim_state.is_edge()
+        if not self._xnet.sim_state.is_edge():
+            return EdgeType.NoEdge
+        if self.previous_sim_value == 0 and self.sim_value == 1:
+            return EdgeType.Positive
+        if self.previous_sim_value == 1 and self.sim_value == 0:
+            return EdgeType.Negative
+        return EdgeType.Undefined
+
     @property
     def vcd_type(self) -> str:
         """

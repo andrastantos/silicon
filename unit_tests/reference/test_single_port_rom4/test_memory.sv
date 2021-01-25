@@ -48,6 +48,7 @@ module Memory (
 		mem[18] <= 8'h12;
 		mem[19] <= 8'h13;
 	end
+
 	wire [7:0] addr_reg;
 	always @(posedge clk) begin
 		addr_reg <= addr;

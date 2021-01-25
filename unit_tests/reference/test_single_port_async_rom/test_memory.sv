@@ -29,6 +29,7 @@ module Memory (
 	initial begin
 		$readmemb("xxx.bin", mem);
 	end
+
 	data_out <= mem[addr];
 
 endmodule

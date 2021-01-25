@@ -66,20 +66,6 @@ class NetType(object):
         return sim_value
     def get_num_bits(self) -> int:
         raise NotImplementedError
-    """
-    def sim_value(self, parent_junction: 'Junction') -> Any:
-        if not hasattr(parent_junction, "_xnet") or parent_junction._xnet is None:
-            return None
-        return parent_junction._xnet.sim_state.value
-    def previous_sim_value(self, parent_junction: 'Junction') -> Any:
-        if not hasattr(parent_junction, "_xnet") or parent_junction._xnet is None:
-            return None
-        return parent_junction._xnet.sim_state.previous_value
-    def is_sim_edge(self, parent_junction: 'Junction') -> bool:
-        if not hasattr(parent_junction, "_xnet") or parent_junction._xnet is None:
-            return None
-        return parent_junction._xnet.sim_state.is_edge()
-    """
     def adapt_from(self, input: 'Junction', implicit: bool) -> Optional['Junction']:
         """
         Return None if adaptation is not supported
