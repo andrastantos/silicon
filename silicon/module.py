@@ -1094,7 +1094,10 @@ class Module(object):
             ret_val += ");"
             return ret_val
 
-        def populate_submodule_names(self, netlist: 'Netlist', symbol_table: 'Module.SymbolTable') -> None:
+        def create_symbol_table(self) -> None:
+            self.symbol_table = Module.SymbolTable()
+
+        def populate_submodule_names(self, netlist: 'Netlist') -> None:
             """
             Makes sure that every sub_module have a name and that all names are unique.
             """
@@ -1108,13 +1111,13 @@ class Module(object):
                     base_instance_name = "u"
                     delimiter = ""
                     sub_module._impl.has_explicit_name = False
-                unique_name = symbol_table.register_symbol(base_instance_name, sub_module, delimiter)
+                unique_name = self.symbol_table.register_symbol(base_instance_name, sub_module, delimiter)
 
                 if sub_module._impl.name is not None and sub_module._impl.name != unique_name:
                     print(f"WARNING: module name {sub_module._impl.name} is not unique or reserved. Overriding to {unique_name}")
                 sub_module._impl.name = unique_name
 
-        def populate_xnet_names(self, netlist: 'Netlist', symbol_table: 'Module.SymbolTable') -> None:
+        def populate_xnet_names(self, netlist: 'Netlist') -> None:
             """
             Makes sure that every xnet within the modules body have at least one name and that all names are unqiue.
             """
@@ -1123,9 +1126,9 @@ class Module(object):
             for my_port_name, my_port in self.get_ports().items():
                 xnets = netlist.get_xnets_for_junction(my_port, my_port_name)
                 for name, (xnet, port) in xnets.items():
-                    if symbol_table.is_reserved_name(name):
+                    if self.symbol_table.is_reserved_name(name):
                         raise SyntaxErrorException(f"Port name {name} uses a reserved word inside module {self._true_module}")
-                    unique_name = symbol_table.register_symbol(name, xnet)
+                    unique_name = self.symbol_table.register_symbol(name, xnet)
                     xnet.add_name(self._true_module, unique_name, is_explicit=True, is_input=is_input_port(port))
                     if unique_name != name:
                         raise SyntaxErrorException(f"Port name {name} is not unique inside module {self._true_module}")
@@ -1133,9 +1136,9 @@ class Module(object):
             for my_wire_name, my_wire in self.get_wires().items():
                 xnets = netlist.get_xnets_for_junction(my_wire, my_wire_name)
                 for name, (xnet, wire) in xnets.items():
-                    if symbol_table.is_reserved_name(name):
+                    if self.symbol_table.is_reserved_name(name):
                         raise SyntaxErrorException(f"Wire name {name} uses a reserved word inside module {self._true_module}")
-                    unique_name = symbol_table.register_symbol(name, xnet)
+                    unique_name = self.symbol_table.register_symbol(name, xnet)
                     xnet.add_name(self._true_module, unique_name, is_explicit=True, is_input=False)
                     if unique_name != name:
                         raise SyntaxErrorException(f"Wire name {name} is not unique inside module {self._true_module}")
@@ -1152,14 +1155,14 @@ class Module(object):
                 # If this wire was not assigned to a local variable directly (maybe part of a container of sorts)
                 # Give it an auto-generated name.
                 base_name = my_wire.local_name if explicit else "wire"
-                base_name = symbol_table.register_symbol(base_name, my_wire)
+                base_name = self.symbol_table.register_symbol(base_name, my_wire)
                 xnets = netlist.get_xnets_for_junction(my_wire, base_name)
                 for name, (xnet, wire) in xnets.items():
                     if name != base_name:
-                        unique_name = symbol_table.register_symbol(name, xnet)
+                        unique_name = self.symbol_table.register_symbol(name, xnet)
                     else:
                         unique_name = base_name
-                        symbol_table.replace_symbol(base_name, xnet)
+                        self.symbol_table.replace_symbol(base_name, xnet)
                     xnet.add_name(self._true_module, unique_name, is_explicit=explicit, is_input=False)
                     self._wires[unique_name] = wire
                     self._junctions[unique_name] = wire
@@ -1191,7 +1194,7 @@ class Module(object):
                                     source_module = sub_module
                             assert source_module is not None, "Strange: I don't think it's possible that an xnet is sourced by a floating port..."
                             name = f"{source_module._impl.name}{MEMBER_DELIMITER}{source_port.interface_name}{name_suffix}"
-                            unique_name = symbol_table.register_symbol(name, xnet)
+                            unique_name = self.symbol_table.register_symbol(name, xnet)
                             assert unique_name == name
                             xnet.add_name(self._true_module, unique_name, is_explicit=False, is_input=False) # These ports are not inputs, at least not as far is this context is concerned.
 

@@ -274,7 +274,10 @@ class Memory(GenericModule):
         # Sing-port memory
         prot_config = self.config.port_configs[0]
 
-        memory_name = "mem"
+        # some preparation for inlining...
+        target_namespace = self
+        memory_name = netlist.register_symbol(target_namespace, "mem", None)
+
         data_bits = prot_config.data_bits
         addr_bits = prot_config.addr_bits
 
@@ -284,8 +287,6 @@ class Memory(GenericModule):
 
         data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(prot_config)
 
-        # some preparation for inlining...
-        target_namespace = self
         data_in, _ = target_namespace._impl.get_rhs_expression_for_junction(data_in_port, back_end) if data_in_port is not None else (None, None)
         data_out = target_namespace._impl.get_lhs_name_for_junction(data_out_port) if data_out_port is not None else None
         write_en, _ = target_namespace._impl.get_rhs_expression_for_junction(write_en_port, back_end) if write_en_port is not None else (None, None)
@@ -294,8 +295,8 @@ class Memory(GenericModule):
 
         if data_out_port is not None:
             if prot_config.registered_input:
-                rtl_body += f"\twire [{addr_bits-1}:0] addr_reg;\n"
-                addr_name = "addr_reg"
+                addr_name = netlist.register_symbol(target_namespace, "addr_reg", None)
+                rtl_body += f"\twire [{addr_bits-1}:0] {addr_name};\n"
             else:
                 addr_name = addr
         if data_in_port is not None or (data_out_port is not None and prot_config.registered_input):
@@ -321,7 +322,7 @@ class Memory(GenericModule):
         # some preparation for inlining...
         target_namespace = self
 
-        memory_name = "mem"
+        memory_name = netlist.register_symbol(target_namespace, "mem", None)
 
         rtl_body = ""
 
@@ -356,8 +357,8 @@ class Memory(GenericModule):
 
             if data_out_port is not None:
                 if port_config.registered_input:
-                    rtl_body += f"\twire [{port_config.addr_bits-1}:0] {port_config.prefix}addr_reg;\n"
-                    addr_name = f"{port_config.prefix}addr_reg"
+                    addr_name = netlist.register_symbol(target_namespace, f"{port_config.prefix}addr_reg", None)
+                    rtl_body += f"\twire [{port_config.addr_bits-1}:0] {addr_name};\n"
                 else:
                     addr_name = addr
             if data_in_port is not None or (data_out_port is not None and port_config.registered_input):

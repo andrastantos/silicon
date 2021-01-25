@@ -187,6 +187,8 @@ class Netlist(object):
         if is_port(junction):
             self.ports.add(type(junction)) # This would be 'Input' or 'Output' for most cases
 
+    def register_symbol(self, scope: 'Module', base_name: str, object: Any, delimiter: str = "_") -> str:
+        return scope._impl.symbol_table.register_symbol(base_name, object, delimiter)
 
     def _create_xnets(self):
         """
@@ -369,9 +371,9 @@ class Netlist(object):
         """
         def populate_names(module: 'Module'):
             from .module import Module
-            symbol_table = Module.SymbolTable()
-            module._impl.populate_submodule_names(self, symbol_table)
-            module._impl.populate_xnet_names(self, symbol_table)
+            module._impl.create_symbol_table()
+            module._impl.populate_submodule_names(self)
+            module._impl.populate_xnet_names(self)
             for sub_module in module._impl.get_sub_modules():
                 populate_names(sub_module)
 
