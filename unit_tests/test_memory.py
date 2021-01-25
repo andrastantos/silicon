@@ -51,8 +51,43 @@ def _test_single_port_ram(mode: str, registered_input: bool, registered_output: 
             mem.addr <<= self.addr
             mem.write_en = self.write_en
 
+        def simulate(self) -> TSimEvent:
+            def clk() -> int:
+                yield 10
+                self.clk <<= ~self.clk
+                yield 10
+                self.clk <<= ~self.clk
+                yield 0
+            
+            self.clk <<= 1
+            self.write_en <<= 0
+            yield 10
+            for i in range(10):
+                yield from clk()
+            self.data_in <<= 0
+            self.addr <<= 0
+            self.write_en <<= 1
+            yield from clk()
+            self.addr <<= 1
+            self.write_en <<= 0
+            yield from clk()
+            if registered_input:
+                yield from clk()
+            assert self.data_in.sim_value == 0
+            yield from clk()
+            self.write_en <<= 1
+            self.data_in <<= 3
+            yield from clk()
+            if registered_input:
+                yield from clk()
+            assert self.data_in.sim_value == 3
+            yield from clk()
+            
+
     if mode == "rtl":
         test.rtl_generation(Top(), inspect.currentframe().f_back.f_code.co_name)
+    else:
+        test.simulation(Top, "_test_single_port_ram")
 
 def test_single_port_ram_ff(mode: str = "rtl"):
     with ExpectError(SyntaxErrorException):
@@ -334,7 +369,7 @@ if __name__ == "__main__":
     #test_single_port_ram_ft("rtl")
     #test_single_port_ram_tf("rtl")
     #test_single_port_ram_tt("rtl")
-    test_single_port_rom("rtl")
+    #test_single_port_rom("rtl")
     #test_single_port_rom2("rtl")
     #test_single_port_rom3("rtl")
     #test_single_port_rom4("rtl")
@@ -345,3 +380,4 @@ if __name__ == "__main__":
     #test_single_port_async_rom("rtl")
     #test_simple_dual_port_ram_rw("rtl")
 
+    test_single_port_ram_tt("sim")

@@ -424,11 +424,11 @@ class Memory(GenericModule):
             _, _, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
             if port_config.registered_input or port_config.registered_output:
                 assert clk_port is not None
-                trigger_ports += clk_port
+                trigger_ports.append(clk_port)
             else:
-                trigger_ports += addr_port
+                trigger_ports.append(addr_port)
                 if write_en_port is not None:
-                    trigger_ports += write_en_port
+                    trigger_ports.append(write_en_port)
 
         addr_val = None
         data_in_val = None
@@ -445,7 +445,7 @@ class Memory(GenericModule):
             mem_addr_bits = min(mem_addr_bits, port_config.addr_bits)
         
         def get_sim_value(port):
-            if port.is_sim_edge():
+            if port.get_sim_edge() != EdgeType.NoEdge:
                 return None
             else:
                 return port.sim_value
@@ -455,13 +455,15 @@ class Memory(GenericModule):
                 memory_content.append(None)
             memory_content[addr] = data
         def get_mem_val(addr):
-            if addr < len(memory_content):
+            if addr >= len(memory_content):
                 return None
             return memory_content[addr]
 
+        last_read_values = [None] * self.get_port_count()
+
         while True:
             yield trigger_ports
-            for port_config in self.config.port_configs:
+            for idx, port_config in enumerate(self.config.port_configs):
                 data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
                 # Deal with the inputs first
                 write = False
@@ -475,6 +477,8 @@ class Memory(GenericModule):
                     if clk_edge_type == EdgeType.Positive:
                         write = write_en_port is None or write_en_val != 0
                         read = True
+                        if port_config.registered_output:
+                            data_out_port <<= last_read_values[idx]
                     if clk_edge_type == EdgeType.Undefined:
                         # In this case we don't know if a write or read happens or not. So make sure that data is X-ed out
                         write = write_en_port is None or write_en_val != 0
@@ -493,28 +497,31 @@ class Memory(GenericModule):
                     if addr_val is None:
                         # We don't know where we write. For now, let's invalidate the whole memory...
                         memory_content = []
-                    burst_size = port_config.data_bits // mem_data_bits
-                    start_addr = addr_val * burst_size
-                    data_mask = (1 << port_config.data_bits) - 1
-                    for addr in range(start_addr, start_addr + burst_size):
-                        if data_in_val is None:
-                            set_mem_val(addr, None)
-                        else:
-                            set_mem_val(addr, data_in_val & data_mask)
-                            data_in_val >>= port_config.data_bits
+                    else:
+                        burst_size = port_config.data_bits // mem_data_bits
+                        start_addr = addr_val * burst_size
+                        data_mask = (1 << port_config.data_bits) - 1
+                        for addr in range(start_addr, start_addr + burst_size):
+                            if data_in_val is None:
+                                set_mem_val(addr, None)
+                            else:
+                                set_mem_val(addr, data_in_val & data_mask)
+                                data_in_val >>= port_config.data_bits
                 if read and data_out_port is not None:
-                    if read_invalid:
+                    if read_invalid or addr_val is None:
                         data_out_port <<= None
                     else:
                         data_out_val = 0
                         burst_size = port_config.data_bits // mem_data_bits
                         start_addr = addr_val * burst_size
                         data_mask = (1 << port_config.data_bits) - 1
-                        for addr in range(start_addr + burst_size, start_addr, -1):
+                        for addr in range(start_addr + burst_size - 1, start_addr - 1, -1):
                             data_section = get_mem_val(addr)
                             if data_section is None:
                                 data_out_val = None
                                 break
                             data_out_val = (data_out_val >> port_config.data_bits) | (data_section & data_mask)
-                        data_out_port <<= data_out_val
+                        last_read_values[idx] = data_out_val
+                        if not port_config.registered_output:
+                            data_out_port <<= data_out_val
 
