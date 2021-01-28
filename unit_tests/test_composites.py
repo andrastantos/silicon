@@ -159,13 +159,6 @@ def test_generic_struct():
 
     test.rtl_generation(AlphaBender, inspect.currentframe().f_code.co_name)
 
-def no_trace(func):
-    def wrapper(*args, **kwargs):
-        with NoTrace():
-            return func(*args, **kwargs)
-    
-    return wrapper
-
 def test_struct_with_method():
     pixel_width = 12
 
@@ -176,8 +169,8 @@ def test_struct_with_method():
             self.add_member("r", Unsigned(length))
             self.add_member("g", Unsigned(length))
             self.add_member("b", Unsigned(length))
+
         @behavior
-        
         def blend(self, other, alpha):
             
             def blend_mono(in1, in2):
@@ -203,6 +196,80 @@ def test_struct_with_method():
     test.rtl_generation(AlphaBender, inspect.currentframe().f_code.co_name)
 
 
+def test_struct_to_number(mode: str = "rtl"):
+    pixel_width = 8
+
+    class Pixel(Struct):
+        def __init__(self, length: int):
+            super().__init__()
+            self.length = length
+            self.add_member("r", Unsigned(length))
+            self.add_member("g", Unsigned(length))
+            self.add_member("b", Unsigned(length))
+
+    class Top(Module):
+        in1 = Input(Pixel(pixel_width))
+        outp = Output()
+        
+        def body(self):
+            self.outp = self.in1.to_number()
+
+        def simulate(self):
+            def test(r,g,b):
+                self.in1.r <<= r
+                self.in1.g <<= g
+                self.in1.b <<= b
+                yield 0
+                expected = r << pixel_width * 2 | g << pixel_width | b
+                actual = self.outp.sim_value
+                assert actual == expected, f"Expected {expected:x}, got {actual:x} for rgb: {r:x},{g:x},{b:x}"
+
+            yield 10
+            for x in range(16):
+                yield from test(x, 2*x, 3*x)
+            print("Done")
+
+
+    if mode == "rtl":
+        test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        test.simulation(Top, "test_struct_to_number")
+
+def test_struct_to_number_sim():
+    test_struct_to_number("sim")
+
+def test_struct_sub_module(mode: str = "rtl"):
+    pixel_width = 8
+
+    class Pixel(Struct):
+        def __init__(self, length: int):
+            super().__init__()
+            self.length = length
+            self.add_member("r", Unsigned(length))
+            self.add_member("g", Unsigned(length))
+            self.add_member("b", Unsigned(length))
+
+    class Sub(Module):
+        in1 = Input(Pixel(pixel_width))
+        in2 = Input(Pixel(pixel_width))
+        outp = Output(Pixel(pixel_width))
+        
+        def body(self):
+            self.outp = Select(1, self.in1, self.in2)
+
+    class Top(Module):
+        in1 = Input(Pixel(pixel_width))
+        outp = Output()
+        
+        def body(self):
+            self.outp = Sub(self.in1, self.in1)
+
+    if mode == "rtl":
+        test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        assert False
+
+
 
 if __name__ == "__main__":
     #test_select_struct()
@@ -211,4 +278,7 @@ if __name__ == "__main__":
     #test_reg_struct()
     #test_struct_of_struct()
     #test_generic_struct()
-    test_struct_with_method()
+    #test_struct_with_method()
+    #test_struct_to_number("rtl")
+    test_struct_to_number("sim")
+    #test_struct_sub_module("rtl")

@@ -4,11 +4,13 @@ from .net_type import NetType, KeyKind
 from .netlist import Netlist
 from .back_end import BackEnd
 from .exceptions import SyntaxErrorException, SimulationException
-from .module import Module, GenericModule
+from .module import Module, GenericModule, InlineExpression, InlineBlock
 from .port import Input, Output, Port, Junction
 from .tracer import no_trace
-from .utils import TSimEvent
+from .utils import TSimEvent, MEMBER_DELIMITER
 from collections import namedtuple, OrderedDict
+from copy import copy
+from .number import Unsigned
 
 import types
 
@@ -57,15 +59,32 @@ class Composite(NetType):
         if name in self.members:
             raise SyntaxErrorException(f"Member {name} already exists on composite type {type(self)}")
         if isinstance(member, NetType):
-            self.members[name] = (member, False, None)
+            self.members[name] = (member, False)
         if isinstance(member, Reverse):
             if self._support_reverse:
-                self.members[name] = (member.net_type, True, None)
+                self.members[name] = (member.net_type, True)
             else:
                 raise SyntaxErrorException(f"Composite type {type(self)} doesn't support reverse members")
 
-    def get_members(self) -> Tuple[Tuple[Union[str, NetType, bool]]]:
+    def get_members(self) -> Dict[str, Tuple[Union[NetType, bool]]]:
         return self.members
+
+    def get_all_members(self, prefix: str) -> Dict[str, Tuple[Union[NetType, bool]]]:
+        def get_sub_members(composite, prefix: Optional[str], reverse: bool) -> Dict[str, Tuple[Union[NetType, bool]]]:
+            def compose_name(prefix: Optional[str], member_name: str) -> str:
+                if prefix is None:
+                    return member_name
+                else:
+                    return f"{prefix}{MEMBER_DELIMITER}{member_name}"
+            ret_val = OrderedDict()
+            for (member_name, (member_type, member_reverse)) in composite.get_members().items():
+                if member_type.is_composite():
+                    ret_val.update(get_all_members(member_type, compose_name(prefix, member_name), reverse ^ member_reverse))
+                else:
+                    ret_val[compose_name(prefix, member_name)] = (member_type, member_reverse)
+            return ret_val
+
+        return get_sub_members(self, prefix, False)        
 
     def sort_source_keys(self, keys: Dict['Key', 'Junction'], back_end: 'BackEnd') -> Tuple['Key']:
         """ Sort the set of blobs as required by the back-end """
@@ -84,7 +103,7 @@ class Composite(NetType):
         return f"{self.generate_type_ref(back_end)}.{for_port.generate_junction_ref(back_end)}_port"
 
     def get_num_bits(self) -> int:
-        return sum(member.get_num_bits() for member in self.get_members().values())
+        return sum(member_type.get_num_bits() for member_type, member_reverse in self.get_members().values())
 
     @property
     def vcd_type(self) -> str:
@@ -98,15 +117,15 @@ class Composite(NetType):
         raise SimulationException(f"Unconnected interfaces are not supported")
     def generate_assign(self, sink_name: str, source_expression: str, xnet: 'XNet', back_end: 'BackEnd') -> str:
         ret_val = ""
-        for (member_name, (member_type, member_reverse, _)) in self.get_members().items():
+        for (member_name, (member_type, member_reverse)) in self.get_members().items():
             if member_reverse:
-                ret_val += member_type.generate_assign(f"{source_expression}.{member_name}", f"{sink_name}.{member_name}", None, back_end) + "\n"
+                ret_val += member_type.generate_assign(f"{source_expression}{MEMBER_DELIMITER}{member_name}", f"{sink_name}{MEMBER_DELIMITER}{member_name}", None, back_end) + "\n"
             else:
-                ret_val += member_type.generate_assign(f"{sink_name}.{member_name}", f"{source_expression}.{member_name}", None, back_end) + "\n"
+                ret_val += member_type.generate_assign(f"{sink_name}{MEMBER_DELIMITER}{member_name}", f"{source_expression}{MEMBER_DELIMITER}{member_name}", None, back_end) + "\n"
         return ret_val
 
     def setup_junction(self, junction: 'Junction') -> None:
-        for (member_name, (member_type, member_reverse, _)) in self.get_members().items():
+        for (member_name, (member_type, member_reverse)) in self.get_members().items():
             junction.create_member_junction(member_name, member_type, member_reverse)
         self.set_behaviors(junction)
 
@@ -149,6 +168,56 @@ class Struct(Composite):
 
     def __eq__(self, other):
         return self is other or type(self) is type(other)
+
+    class ToNumber(Module):
+        input_port = Input()
+        output_port = Output()
+        def body(self):
+            new_net_type = Unsigned(self.input_port.get_net_type().get_num_bits())
+            assert not self.output_port.is_specialized()
+            self.output_port.set_net_type(new_net_type)
+
+        def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
+            assert len(self.get_outputs()) == 1
+            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+
+        def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
+            assert back_end.language == "SystemVerilog"
+            ret_val = ""
+            op_precedence = back_end.get_operator_precedence("{}")
+            ret_val += "{"
+            xnets = self._impl.netlist.get_xnets_for_junction(self.input_port)
+            for idx, (xnet, _) in enumerate(xnets.values()):
+                name, _ = xnet.get_rhs_expression(target_namespace, back_end)
+                if idx != 0:
+                    ret_val += ", "
+                ret_val += f"{name}"
+            ret_val += "}"
+            return ret_val, op_precedence
+
+        def simulate(self) -> TSimEvent:
+            while True:
+                yield self.get_inputs().values()
+                xnets = self._impl.netlist.get_xnets_for_junction(self.input_port)
+                value = 0
+                for xnet, _ in xnets.values():
+                    xval = xnet.sim_value
+                    if xval is None:
+                        value = None
+                        break
+                    value = value << xnet.get_num_bits()
+                    value |= xval
+                self.output_port <<= value
+
+        def is_combinational(self) -> bool:
+            """
+            Returns True if the module is purely combinational, False otherwise
+            """
+            return True
+
+    @behavior
+    def to_number(self) -> Junction:
+        return Struct.ToNumber(self)
 
 class Interface(Composite):
     def __init__(self):

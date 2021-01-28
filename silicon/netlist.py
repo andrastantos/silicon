@@ -158,6 +158,13 @@ class XNet(object):
             return alias.get_net_type()
         assert False
 
+    @property
+    def sim_value(self) -> Any:
+        return self.sim_state.value
+
+    def get_num_bits(self) -> int:
+        return self.get_net_type().get_num_bits()
+
 class Netlist(object):
     def __init__(self, top_level: 'Module'):
         assert is_module(top_level)
@@ -341,7 +348,7 @@ class Netlist(object):
     def get_xnet_for_junction(self, junction: 'Junction') -> 'XNet':
         return self.junction_to_xnet_map[junction]
 
-    def get_xnets_for_junction(self, junction: 'Junction', base_name: str = "<unknown>") -> Dict[str, 'XNet']:
+    def get_xnets_for_junction(self, junction: 'Junction', base_name: str = "<unknown>") -> Dict[str, Tuple['XNet', 'Junction']]:
         if not junction.is_composite():
             return {base_name: (self.get_xnet_for_junction(junction), junction)}
         ret_val = OrderedDict()

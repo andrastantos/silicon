@@ -343,16 +343,30 @@ class Module(object):
                     for idx, (sub_module_port_name, sub_module_port) in enumerate(sub_module_ports.items()):
                         if sub_module_port.is_deleted():
                             continue
-                        if is_output_port(sub_module_port):
-                            source_str = self._impl.get_lhs_name_for_junction(sub_module_port)
-                        elif is_input_port(sub_module_port):
-                            source_str, _ = self._impl.get_rhs_expression_for_junction(sub_module_port, back_end)
+                        if sub_module_port.is_composite():
+                            for sub_module_port_member in sub_module_port.get_all_member_junctions(False):
+                                if is_output_port(sub_module_port):
+                                    source_str = self._impl.get_lhs_name_for_junction(sub_module_port_member)
+                                elif is_input_port(sub_module_port_member):
+                                    source_str, _ = self._impl.get_rhs_expression_for_junction(sub_module_port_member, back_end)
+                                else:
+                                    assert False
+                                rtl_instantiations += f"\t\t.{sub_module_port_member.interface_name}({source_str})"
+                                if idx != last_port_idx:
+                                    rtl_instantiations += ","
+                                rtl_instantiations += "\n"
+                            rtl_instantiations += "\n"
                         else:
-                            assert False
-                        rtl_instantiations += f"\t\t.{sub_module_port_name}({source_str})"
-                        if idx != last_port_idx:
-                            rtl_instantiations += ","
-                        rtl_instantiations += "\n"
+                            if is_output_port(sub_module_port):
+                                source_str = self._impl.get_lhs_name_for_junction(sub_module_port)
+                            elif is_input_port(sub_module_port):
+                                source_str, _ = self._impl.get_rhs_expression_for_junction(sub_module_port, back_end)
+                            else:
+                                assert False
+                            rtl_instantiations += f"\t\t.{sub_module_port_name}({source_str})"
+                            if idx != last_port_idx:
+                                rtl_instantiations += ","
+                            rtl_instantiations += "\n"
                     rtl_instantiations += "\t);\n"
                 if not has_inline_support and not self._impl._body_generated:
                     sub_module._impl._generate_needed = True

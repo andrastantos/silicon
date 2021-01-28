@@ -378,8 +378,10 @@ class Junction(JunctionBase):
     def sim_value(self) -> Any:
         #if not hasattr(self, "_xnet") or self._xnet is None:
         #    return None
-        assert not self.is_composite(), "Simulator should never ask for the value of compound types"
-        return self._xnet.sim_state.value
+        #assert not self.is_composite(), "Simulator should never ask for the value of compound types"
+        #return self._xnet.sim_state.value
+        return self._xnet.sim_value
+
     @property
     def previous_sim_value(self) -> Any:
         #if not hasattr(self, "_xnet") or self._xnet is None:
