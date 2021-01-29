@@ -50,10 +50,7 @@ class InlineStatement(InlineBlock):
         super().__init__(target_ports)
         self.statement = statement
     def get_inline_assignments(self, back_end: 'BackEnd') -> str:
-        ret_val = ""
-        for target_port in self.target_ports:
-            ret_val += f"\tassign {target_port.interface_name} = {self.expression};\n"
-        return ret_val
+        return "\t"+self.statement
     def inline(self, scope: 'Module', netlist: 'Netlist', back_end: 'BackEnd') -> Optional[str]:
         return "\t"+self.statement
 
