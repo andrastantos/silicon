@@ -4,7 +4,7 @@ from .net_type import NetType, KeyKind
 from .netlist import Netlist
 from .back_end import BackEnd
 from .exceptions import SyntaxErrorException, SimulationException
-from .module import Module, GenericModule, InlineExpression, InlineBlock
+from .module import Module, GenericModule, InlineExpression, InlineBlock, InlineStatement
 from .port import Input, Output, Port, Junction
 from .tracer import no_trace
 from .utils import TSimEvent, MEMBER_DELIMITER
@@ -215,10 +215,62 @@ class Struct(Composite):
             """
             return True
 
+    class FromNumber(GenericModule):
+        input_port = Input()
+        output_port = Output()
+        def construct(self, output_type: NetType):
+            self.output_port.set_net_type(output_type)
+        def body(self):
+            in_bits = self.input_port.get_net_type().get_num_bits()
+            out_bits = self.output_port.get_net_type().get_num_bits()
+            if in_bits > out_bits:
+                raise SyntaxErrorException(f"Can't convert Number of {in_bits} bits into a Struct {type(self)}, which needs only {out_bits} bits.")
+
+        def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
+            assert len(self.get_outputs()) == 1
+            yield InlineStatement((self.output_port,), self.generate_inline_statement(back_end, target_namespace))
+
+        def generate_inline_statement(self, back_end: 'BackEnd', target_namespace: Module) -> str:
+            assert back_end.language == "SystemVerilog"
+            ret_val = "assign "
+            ret_val += "{"
+            xnets = self._impl.netlist.get_xnets_for_junction(self.output_port)
+            for idx, (xnet, _) in enumerate(xnets.values()):
+                name = xnet.get_lhs_name(target_namespace, allow_implicit=True)
+                assert name is not None
+                if idx != 0:
+                    ret_val += ", "
+                ret_val += f"{name}"
+            ret_val += "}"
+            input_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.input_port, back_end)
+            ret_val += f" = {input_expression};"
+            return ret_val
+
+        def simulate(self) -> TSimEvent:
+            while True:
+                yield self.get_inputs().values()
+                members = self.output_port.get_all_member_junctions(add_self=False)
+                value = self.input_port.sim_value
+                for member in reversed(members):
+                    if value is None:
+                        member <<= None
+                    else:
+                        bits = member.get_num_bits()
+                        member <<= value & ((1 << bits) -1)
+                        value = value >> bits
+
+        def is_combinational(self) -> bool:
+            """
+            Returns True if the module is purely combinational, False otherwise
+            """
+            return True
+
     @behavior
     def to_number(self) -> Junction:
         return Struct.ToNumber(self)
-
+    @behavior
+    def from_number(self, input: Junction) -> None:
+        self <<= Struct.FromNumber(self.get_net_type())(input)
 class Interface(Composite):
     def __init__(self):
         super().__init__(support_reverse = True)

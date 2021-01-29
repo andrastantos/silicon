@@ -235,8 +235,45 @@ def test_struct_to_number(mode: str = "rtl"):
     else:
         test.simulation(Top, "test_struct_to_number")
 
-def test_struct_to_number_sim():
-    test_struct_to_number("sim")
+def test_number_to_struct(mode: str = "rtl"):
+    pixel_width = 8
+
+    class Pixel(Struct):
+        def __init__(self, length: int):
+            super().__init__()
+            self.length = length
+            self.add_member("r", Unsigned(length))
+            self.add_member("g", Unsigned(length))
+            self.add_member("b", Unsigned(length))
+
+    class Top(Module):
+        in1 = Input(Unsigned(pixel_width * 3))
+        outp = Output(Pixel(pixel_width))
+        
+        def body(self):
+            self.outp.from_number(self.in1)
+
+        def simulate(self):
+            def test(r,g,b):
+                self.in1 <<= r << pixel_width * 2 | g << pixel_width | b
+                yield 0
+                assert self.outp.r == r, f"Expected R {r:x}, got {self.outp.r:x} for rgb: {r:x},{g:x},{b:x}"
+                assert self.outp.g == g, f"Expected G {g:x}, got {self.outp.g:x} for rgb: {r:x},{g:x},{b:x}"
+                assert self.outp.b == b, f"Expected B {b:x}, got {self.outp.b:x} for rgb: {r:x},{g:x},{b:x}"
+
+            yield 10
+            for x in range(16):
+                yield from test(x, 2*x, 3*x)
+            print("Done")
+
+
+    if mode == "rtl":
+        test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        test.simulation(Top, "test_struct_to_number")
+
+def test_number_to_struct_sim():
+    test_number_to_struct("sim")
 
 def test_struct_sub_module(mode: str = "rtl"):
     pixel_width = 8
@@ -280,5 +317,7 @@ if __name__ == "__main__":
     #test_generic_struct()
     #test_struct_with_method()
     #test_struct_to_number("rtl")
-    test_struct_to_number("sim")
+    #test_struct_to_number("sim")
     #test_struct_sub_module("rtl")
+    #test_number_to_struct("rtl")
+    test_number_to_struct("sim")
