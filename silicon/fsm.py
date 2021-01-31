@@ -10,7 +10,7 @@ from .primitives import SelectOne, Reg
 from .tracer import no_trace
 from .exceptions import SyntaxErrorException
 from .utils import is_junction, is_junction_member, is_junction_or_member
-from .number import Number
+from .number import Number, logic
 from .constant import get_net_type_for_const
 from .back_end import str_to_id
 from collections import OrderedDict
@@ -79,16 +79,14 @@ class FSMLogic(Module):
         f.attr(rankdir='LR', size='8,5')
 
         # Try to figure out the default port
-        xnet = netlist.get_xnet_for_junction(self.default_state)
-        default_value, _ = xnet.get_rhs_expression(scope, back_end)
+        default_value, _ = self.default_state.get_rhs_expression(back_end, scope, self.next_state.get_net_type())
         f.node(name="__others__", xlabel="others", shape="point", fillcolor="gray", style="dashed", height="0.2")
         f.node(name=str(default_value), label=str(default_value), shape="circle")
         f.edge("__others__", str(default_value), style="dashed")
 
         f.attr('node', shape='circle')
         for (current_state, new_state), condition_port in self._state_transition_table.items():
-            xnet = netlist.get_xnet_for_junction(condition_port)
-            condition_str, _ = xnet.get_rhs_expression(scope, back_end)
+            condition_str, _ = condition_port.get_rhs_expression(back_end, scope, logic)
             f.edge(_get_state_name(current_state), _get_state_name(new_state), label=condition_str)
         return f
 
@@ -160,8 +158,7 @@ class FSM(GenericModule):
 
         # Try to figure out the reset port
 
-        xnet = netlist.get_xnet_for_junction(self.reset_value)
-        reset_value, _ = xnet.get_rhs_expression(scope, back_end)
+        reset_value, _ = self.reset_value.get_rhs_expression(back_end, scope, self.next_state.get_net_type())
         f.node(name=str(reset_value), xlabel=str(reset_value), shape="point", height="0.2")
 
         return self.fsm_logic.draw(scope, netlist, back_end, f)

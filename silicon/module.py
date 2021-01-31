@@ -343,9 +343,9 @@ class Module(object):
                         if sub_module_port.is_composite():
                             for sub_module_port_member in sub_module_port.get_all_member_junctions(False):
                                 if is_output_port(sub_module_port):
-                                    source_str = sub_module_port_member.get_net_type().get_lhs_name(sub_module_port_member, back_end, self)
+                                    source_str = sub_module_port_member.get_lhs_name(back_end, self)
                                 elif is_input_port(sub_module_port_member):
-                                    source_str, _ = self._impl.get_rhs_expression_for_junction(sub_module_port_member, back_end)
+                                    source_str, _ = sub_module_port_member.get_rhs_expression(back_end, self)
                                 else:
                                     assert False
                                 rtl_instantiations += back_end.indent(f".{sub_module_port_member.interface_name}({source_str})")
@@ -355,9 +355,9 @@ class Module(object):
                             rtl_instantiations += "\n"
                         else:
                             if is_output_port(sub_module_port):
-                                source_str = sub_module_port.get_net_type().get_lhs_name(sub_module_port, back_end, self)
+                                source_str = sub_module_port.get_lhs_name(back_end, self)
                             elif is_input_port(sub_module_port):
-                                source_str, _ = self._impl.get_rhs_expression_for_junction(sub_module_port, back_end)
+                                source_str, _ = sub_module_port.get_rhs_expression(back_end, self)
                             else:
                                 assert False
                             rtl_instantiations += back_end.indent(f".{sub_module_port_name}({source_str})")
@@ -370,16 +370,17 @@ class Module(object):
 
             # Next, generate all the required wire definitions.
             for xnet in self._impl.netlist.get_xnets_for_module(self):
-                xnet_rhs_expression, _ = xnet.get_rhs_expression(self, back_end)
-                names = xnet.get_explicit_names(self, add_used=True, add_assigned=True, exclude_assigned=False)
-                if names is not None:
-                    for name in names:
-                        if name not in interface_port_names:
-                            rtl_wire_definitions += f"{xnet.get_net_type().generate_type_ref(back_end)} {name};\n"
-                names = xnet.get_explicit_names(self, add_used=True, add_assigned=False, exclude_assigned=True)
-                if names is not None:
-                    for name in names:
-                        rtl_wire_assignments += f"{xnet.generate_assign(name, xnet_rhs_expression, back_end)}\n"
+                if xnet.get_net_type() is not None:
+                    xnet_rhs_expression, _ = xnet.get_rhs_expression(self, back_end)
+                    names = xnet.get_explicit_names(self, add_used=True, add_assigned=True, exclude_assigned=False)
+                    if names is not None:
+                        for name in names:
+                            if name not in interface_port_names:
+                                rtl_wire_definitions += f"{xnet.get_net_type().generate_type_ref(back_end)} {name};\n"
+                    names = xnet.get_explicit_names(self, add_used=True, add_assigned=False, exclude_assigned=True)
+                    if names is not None:
+                        for name in names:
+                            rtl_wire_assignments += f"{xnet.generate_assign(name, xnet_rhs_expression, back_end)}\n"
 
         ret_val = (
             str_block(rtl_header, "", "\n\n") +
@@ -1216,15 +1217,6 @@ class Module(object):
             with self._in_generate:
                 with self._inside:
                     return self._true_module.generate(netlist, back_end)
-        
-        def get_rhs_expression_for_junction(self, junction, back_end: 'BackEnd', outer_precedence: Optional[int] = None) -> Tuple[str, int]:
-            assert not junction.is_composite()
-            xnet = self.netlist.get_xnet_for_junction(junction)
-            expr, prec = xnet.get_rhs_expression(self._true_module, back_end)
-            if outer_precedence is not None and prec > outer_precedence:
-                return f"({expr})", back_end.get_operator_precedence("()")
-            else:
-                return expr, prec
 
 
 class GenericModule(Module):

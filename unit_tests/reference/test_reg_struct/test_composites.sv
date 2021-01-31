@@ -61,12 +61,12 @@ module top (
 	always_ff @(posedge clk1) wire <= uin2_b;
 	always_ff @(posedge clk1) wire_1 <= uin2_g;
 	always_ff @(posedge clk1) wire_2 <= uin2_r;
-	always_ff @(posedge clk2) uout2_b <= reset ? 8'b0 : uin2_b;
-	always_ff @(posedge clk2) uout2_g <= reset ? 8'b0 : uin2_g;
-	always_ff @(posedge clk2) uout2_r <= reset ? 8'b0 : uin2_r;
-	always_ff @(posedge clk1) uout3_b <= reset ? 8'b0 : uin1_b;
-	always_ff @(posedge clk1) uout3_g <= reset ? 8'b0 : uin1_g;
-	always_ff @(posedge clk1) uout3_r <= reset ? 8'b0 : uin1_r;
+	always_ff @(posedge clk2) uout2_b <= reset ? 8'0 : uin2_b;
+	always_ff @(posedge clk2) uout2_g <= reset ? 8'0 : uin2_g;
+	always_ff @(posedge clk2) uout2_r <= reset ? 8'0 : uin2_r;
+	always_ff @(posedge clk1) uout3_b <= reset ? 8'0 : uin1_b;
+	always_ff @(posedge clk1) uout3_g <= reset ? 8'0 : uin1_g;
+	always_ff @(posedge clk1) uout3_r <= reset ? 8'0 : uin1_r;
 	assign reset = uin2_r[0];
 	always_ff @(posedge clk1) wire_3 <= uin1_b;
 	always_ff @(posedge clk1) wire_4 <= uin1_g;
@@ -75,9 +75,9 @@ module top (
 	always_ff @(posedge clk1) wire_7 <= reset ? uin1_g : uin1_g;
 	always_ff @(posedge clk1) wire_8 <= reset ? uin1_r : uin1_r;
 
-	assign uout4_b = 8'bX;
-	assign uout4_g = 8'bX;
-	assign uout4_r = 8'bX;
+	assign uout4_b = 8'x;
+	assign uout4_g = 8'x;
+	assign uout4_r = 8'x;
 	assign clk = clk1;
 	assign uout1_b = wire;
 	assign registered_b = wire;

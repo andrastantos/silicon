@@ -1,4 +1,4 @@
-$date 2021-01-11 16:39:32.610730 $end
+$date 2021-01-31 09:16:37.381021 $end
 $timescale 1 ns $end
 $scope module mc6845_tb $end
 $var wire 1 ! rst $end
@@ -20,28 +20,23 @@ $dumpvars
 x#
 x$
 x%
-x&
-x'
-x(
-x)
-x*
+X&
+X'
+X(
+X)
+X*
 $end
 #20
 0"
 #30
 1"
-X'
-X(
-X*
 1#
-X)
 0%
-X&
 #40
 0"
 #50
 1"
-1*
 0#
+1*
 0)
 1%

@@ -816,6 +816,16 @@ class Junction(JunctionBase):
         else:
             self.from_number(input.to_number())
 
+    def get_lhs_name(self, back_end: 'BackEnd', target_namespace: 'Module', allow_implicit: bool=True) -> Optional[str]:
+        return self.get_net_type().get_lhs_name(self, back_end, target_namespace, allow_implicit)
+
+    def get_rhs_expression(self, back_end: 'BackEnd', target_namespace: 'Module', default_type: Optional[NetType] = None, outer_precedence: Optional[int] = None) -> Tuple[str, int]:
+        if self.is_typeless():
+            assert default_type is not None
+            return default_type.get_unconnected_value(back_end), 0
+        else:
+            return self.get_net_type().get_rhs_expression(self, back_end, target_namespace, outer_precedence)
+
 
 class Port(Junction):
     

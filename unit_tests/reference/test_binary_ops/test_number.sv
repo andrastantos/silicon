@@ -64,9 +64,9 @@ module top (
 	assign uout10 = {(uin1 & (uin2 | uin5))[3], (uin1 & (uin2 | uin5))[2], (uin1 & (uin2 | uin5))[1], (uin1 & (uin2 | uin5))[0]};
 	assign uout11 = {(uin1 & (uin2 | uin5))[0], (uin1 & (uin2 | uin5))[1], (uin1 & (uin2 | uin5))[2], (uin1 & (uin2 | uin5))[3]};
 
-	assign uout5 = 4'bX;
-	assign uout6 = 4'bX;
-	assign uout12 = 4'bX;
+	assign uout5 = 4'x;
+	assign uout6 = 4'x;
+	assign uout12 = 4'x;
 endmodule
 
 

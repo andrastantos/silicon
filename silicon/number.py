@@ -91,7 +91,7 @@ class Number(NetType):
             assert back_end.language == "SystemVerilog"
 
             op_precedence = back_end.get_operator_precedence("[]")
-            rhs_name, _ = target_namespace._impl.get_rhs_expression_for_junction(self.input, back_end,op_precedence)
+            rhs_name, _ = self.input.get_rhs_expression(back_end, target_namespace, self.output.get_net_type(), op_precedence)
             assert self.key.start <= self.input.get_net_type().length, "FIXME: accessing slices of a Number outside it's length is not yet supported!!"
             if self.key.end == self.key.start:
                 return f"{rhs_name}[{self.key.start}]", op_precedence
@@ -134,6 +134,14 @@ class Number(NetType):
         if name is None:
             return None
         return name
+
+    def get_rhs_expression(self, for_junction: Junction, back_end: 'BackEnd', target_namespace: Module, outer_precedence: Optional[int] = None) -> Tuple[str, int]:
+        xnet = target_namespace._impl.netlist.get_xnet_for_junction(for_junction)
+        expr, prec = xnet.get_rhs_expression(target_namespace, back_end)
+        if outer_precedence is not None and prec > outer_precedence:
+            return f"({expr})", back_end.get_operator_precedence("()")
+        else:
+            return expr, prec
 
     def generate_type_ref(self, back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
@@ -454,7 +462,7 @@ class Number(NetType):
                     ret_val += "unsigned'("
             if need_size_cast:
                 ret_val += f"{self.output.length}'("
-            rhs_name, precedence = target_namespace._impl.get_rhs_expression_for_junction(self.input, back_end)
+            rhs_name, precedence = self.input.get_rhs_expression(back_end, target_namespace, self.output.get_net_type())
             ret_val += rhs_name
             if need_size_cast:
                 precedence = 0
@@ -601,7 +609,7 @@ class Number(NetType):
 
     def compose_concatenated_expression(self, back_end: 'BackEnd', input_map: Dict['Number.Key', Junction], target_namespace: Module) -> Tuple[str, int]:
         def compose_sub_source_expression(sub_port: Junction, section_length: int) -> Tuple[str, int]:
-            raw_expr, precedence = target_namespace._impl.get_rhs_expression_for_junction(sub_port, back_end)
+            raw_expr, precedence = sub_port.get_rhs_expression(back_end, target_namespace)
             if sub_port.get_net_type().length == section_length or section_length == self.length:
                 # If the request source is of the right length or it covers the whole junction, return it as-is
                 return raw_expr, precedence

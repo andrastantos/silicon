@@ -112,12 +112,12 @@ class Select(Module):
         final_precedence = back_end.get_operator_precedence("?:",None)
         op_precedence = back_end.get_operator_precedence("?:",None)
         eq_precedence = back_end.get_operator_precedence("==",None)
-        selector_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.selector_port, back_end, eq_precedence)
+        selector_expression, _ = self.selector_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), eq_precedence)
 
         first = True
         if len(value_ports) == 2 and self.selector_port.get_net_type().length == 1:
-            false_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(value_ports[0], back_end, op_precedence)
-            true_expression,  _ = target_namespace._impl.get_rhs_expression_for_junction(value_ports[1], back_end, op_precedence)
+            false_expression, _ = value_ports[0].get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
+            true_expression,  _ = value_ports[1].get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += f"{selector_expression} ? {true_expression} : {false_expression}"
         else:
             for selector_idx in sorted(value_ports.keys()):
@@ -126,10 +126,10 @@ class Select(Module):
                     final_precedence = back_end.get_operator_precedence("|",False)
                 first = False
                 value_port = value_ports[selector_idx]
-                value_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(value_port, back_end, op_precedence)
+                value_expression, _ = value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
                 ret_val += f"{selector_expression} == {selector_idx} ? {value_expression} : {zero}"
             # We don't add the default expression, because that's not the right thing to do: we would have to guard it with an 'else' clause, but that doesn't really exist in a series of and-or gates
-            #default_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.default, back_end, op_precedence)
+            #default_expression, _ = self.default.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             #ret_val += default_expression
 
         return ret_val, final_precedence
@@ -140,13 +140,13 @@ class Select(Module):
 
         ret_val = "always_comb begin"
         eq_precedence = back_end.get_operator_precedence("==",None)
-        selector_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.selector_port, back_end, eq_precedence)
-        output_str = output_port.get_net_type().get_lhs_name(output_port, back_end, target_namespace, allow_implicit=True)
+        selector_expression, _ = self.selector_port.get_rhs_expression(back_end, target_namespace, None, eq_precedence)
+        output_str = output_port.get_lhs_name(back_end, target_namespace, allow_implicit=True)
 
         first = True
         if len(value_ports) == 2 and self.selector_port.get_net_type().length == 1:
-            false_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(value_ports[0], back_end)
-            true_expression,  _ = target_namespace._impl.get_rhs_expression_for_junction(value_ports[1], back_end)
+            false_expression, _ = value_ports[0].get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
+            true_expression,  _ = value_ports[0].get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
             ret_val += back_end.indent(f"if {selector_expression} begin")
             ret_val += bace_end.indent(f"? {true_expression} : {false_expression}")
         else:
@@ -155,10 +155,10 @@ class Select(Module):
                     ret_val += " | "
                 first = False
                 value_port = value_ports[selector_idx]
-                value_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(value_port, back_end)
+                value_expression, _ = value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
                 ret_val += f"{selector_expression} == {selector_idx} ? {value_expression} : {zero}"
             # We don't add the default expression, because that's not the right thing to do: we would have to guard it with an 'else' clause, but that doesn't really exist in a series of and-or gates
-            #default_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.default, back_end, op_precedence)
+            #default_expression, _ = self.default.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             #ret_val += default_expression
 
         ret_val += "end"
@@ -330,11 +330,14 @@ class SelectOne(_SelectOneHot):
         op_precedence = back_end.get_operator_precedence("?:",None)
         final_precedence = back_end.get_operator_precedence("|",False)
         for selector, value in selector_to_value_map.items():
-            selector_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(selector, back_end, op_precedence)
-            value_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(value, back_end, op_precedence)
+            selector_expression, _ = selector.get_rhs_expression(back_end, target_namespace, None, op_precedence)
+            value_expression, _ = value.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += f"{selector_expression} ? {value_expression} : {zero} | "
-        default_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.default, back_end, op_precedence)
-        ret_val += default_expression
+        if not self.default.is_typeless():
+            default_expression, _ = self.default.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
+            ret_val += default_expression
+        else:
+            ret_val = ret_val[:-2] # delete the last '|'
         return ret_val, final_precedence
 
 class SelectFirst(_SelectOneHot):
@@ -401,10 +404,10 @@ class SelectFirst(_SelectOneHot):
                 value = value_ports[idx]
             except:
                 raise SyntaxErrorException(f"SelectFirst is missing input value for index {idx}")
-            selector_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(selector, back_end, op_precedence)
-            value_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(value, back_end, op_precedence)
+            selector_expression, _ = selector.get_rhs_expression(back_end, target_namespace, None, op_precedence)
+            value_expression, _ = value.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += f"{selector_expression} ? {value_expression} : "
-        default_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.default, back_end, op_precedence)
+        default_expression, _ = self.default.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
         ret_val += default_expression
         return ret_val, op_precedence
 
@@ -555,19 +558,19 @@ class Reg(Module):
         assert back_end.language == "SystemVerilog"
         assert is_module(target_namespace)
         netlist = target_namespace._impl.netlist
-        output_name = output_port.get_net_type().get_lhs_name(output_port, back_end, target_namespace)
+        output_name = output_port.get_lhs_name(back_end, target_namespace)
         assert output_name is not None
-        clk, _ = target_namespace._impl.get_rhs_expression_for_junction(self.clock_port, back_end, back_end.get_operator_precedence("()")) # Get parenthesis around the expression if it's anything complex
+        clk, _ = self.clock_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("()")) # Get parenthesis around the expression if it's anything complex
         if not self.reset_port.has_driver():
-            input_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(input_port, back_end, back_end.get_operator_precedence("<="))
+            input_expression, _ = input_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("<="))
             ret_val = f"always_ff @(posedge {clk}) {output_name} <= {input_expression};\n"
         else:
-            rst_expression, rst_precedence = target_namespace._impl.get_rhs_expression_for_junction(self.reset_port, back_end)
+            rst_expression, rst_precedence = self.reset_port.get_rhs_expression(back_end, target_namespace)
             if reset_value_port.has_driver():
-                rst_val_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(reset_value_port, back_end, back_end.get_operator_precedence("?:"))
+                rst_val_expression, _ = reset_value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), back_end.get_operator_precedence("?:"))
             else:
                 rst_val_expression = output_port.get_net_type().get_default_value(back_end)
-            input_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(input_port, back_end, back_end.get_operator_precedence("?:"))
+            input_expression, _ = input_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("?:"))
             rst_sensitivty_expression, _ = back_end.wrap_expression(rst_expression, rst_precedence, back_end.get_operator_precedence("()"))
             rst_test_expression, _ = back_end.wrap_expression(rst_expression, rst_precedence, back_end.get_operator_precedence("?:"))
             if self.sync_reset:

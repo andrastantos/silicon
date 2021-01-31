@@ -23,7 +23,7 @@ module Top (
 		.port2_write_en(write_en_b)
 	);
 
-	assign data_out_b = 14'bX;
+	assign data_out_b = 14'x;
 endmodule
 
 

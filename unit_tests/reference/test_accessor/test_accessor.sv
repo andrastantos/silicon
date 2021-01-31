@@ -18,7 +18,7 @@ module Test (
 		.output(out_2)
 	);
 
-	assign out_3 = 8'bX;
+	assign out_3 = 8'x;
 endmodule
 
 

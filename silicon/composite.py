@@ -94,12 +94,6 @@ class Composite(NetType):
     def vcd_type(self) -> str:
         return None
 
-    def get_unconnected_value(self, back_end: 'BackEnd') -> str:
-        raise SyntaxErrorException(f"Unconnected interfaces are not supported")
-    def get_default_value(self, back_end: 'BackEnd') -> str:
-        raise SyntaxErrorException(f"Unconnected interfaces are not supported")
-    def get_unconnected_sim_value(self) -> Any:
-        raise SimulationException(f"Unconnected interfaces are not supported")
     def generate_assign(self, sink_name: str, source_expression: str, xnet: 'XNet', back_end: 'BackEnd') -> str:
         ret_val = ""
         for (member_name, (member_type, member_reverse)) in self.get_members().items():
@@ -113,6 +107,12 @@ class Composite(NetType):
         for (member_name, (member_type, member_reverse)) in self.get_members().items():
             junction.create_member_junction(member_name, member_type, member_reverse)
         super().setup_junction(junction)
+
+    def get_unconnected_sim_value(self) -> Any:
+        assert False, "Simulation should never enquire about unconnected values of Composites"
+    
+    def get_default_sim_value(self) -> Any:
+        assert False, "Simulation should never enquire about default values of Composites"
 
 class Struct(Composite):
     def __init__(self):
@@ -185,9 +185,9 @@ class Struct(Composite):
             ret_val = ""
             op_precedence = back_end.get_operator_precedence("{}")
             ret_val += "{"
-            xnets = self._impl.netlist.get_xnets_for_junction(self.input_port)
-            for idx, (xnet, _) in enumerate(xnets.values()):
-                name, _ = xnet.get_rhs_expression(target_namespace, back_end)
+            members = self.input_port.get_all_member_junctions(add_self=False)
+            for idx, (member) in enumerate(members):
+                name, _ = member.get_rhs_expression(back_end, target_namespace)
                 if idx != 0:
                     ret_val += ", "
                 ret_val += f"{name}"
@@ -241,7 +241,7 @@ class Struct(Composite):
                     ret_val += ", "
                 ret_val += f"{name}"
             ret_val += "}"
-            input_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.input_port, back_end)
+            input_expression, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
             ret_val += f" = {input_expression};"
             return ret_val
 
@@ -276,6 +276,10 @@ class Struct(Composite):
 class Interface(Composite):
     def __init__(self):
         super().__init__(support_reverse = True)
+    def get_unconnected_value(self, back_end: 'BackEnd') -> str:
+        raise SyntaxErrorException(f"Unconnected interfaces are not supported")
+    def get_default_value(self, back_end: 'BackEnd') -> str:
+        raise SyntaxErrorException(f"Unconnected interfaces are not supported")
 
 
 
@@ -313,7 +317,7 @@ class Interface(Composite):
         def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
             assert back_end.language == "SystemVerilog"
             op_precedence = back_end.get_operator_precendence(".")
-            input_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.input_port, back_end, op_precedence)
+            input_expression, _ = self.input_port.get_rhs_expression(back_end, target_namespace, None, op_precedence)
             return f"{input_expression}.{self.member}", op_precedence
 
         

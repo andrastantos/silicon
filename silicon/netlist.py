@@ -34,12 +34,10 @@ class XNet(object):
     def get_rhs_expression(self, scope: 'Module', back_end: 'BackEnd') -> Tuple[str, int]:
         assert scope is None or is_module(scope)
         if self.source is None:
-            # No source, just generated X-es
-            from .utils import first
-            junction = first(chain(self.sinks, self.transitions, self.aliases))
-            if junction.is_typeless():
-                return back_end.get_unconnected_value(), 0
-            return junction.get_net_type().get_unconnected_value(back_end), 0
+            net_type = self.get_net_type()
+            if net_type is None:
+                raise SyntaxErrorException(f"Can't determine unconnected value for unconnected XNet {xnet}")
+            return net_type.get_unconnected_value(back_end), 0
         if scope in self.assigned_names:
             return self.assigned_names[scope], 0
         if scope in self.rhs_expressions:

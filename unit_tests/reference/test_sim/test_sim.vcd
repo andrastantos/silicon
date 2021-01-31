@@ -1,4 +1,4 @@
-$date 2021-01-11 16:39:32.470596 $end
+$date 2021-01-31 09:16:37.264743 $end
 $timescale 1 ns $end
 $scope module test_self_wire_tb $end
 $var wire 1 ! n_cs $end
@@ -28,8 +28,8 @@ x&
 x'
 x(
 x)
-bx *
-bx +
+bX *
+bX +
 x,
 0-
 bX .
@@ -39,7 +39,6 @@ $end
 #30
 1$
 b0 +
-bX *
 #40
 0$
 #50
@@ -64,8 +63,8 @@ X'
 0(
 0,
 0)
-b0 .
 b0 *
+b0 .
 #120
 0$
 #130

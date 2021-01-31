@@ -24,8 +24,8 @@ module top (
 
 	always_ff @(posedge clk) u_output_port <= uin1;
 	always_ff @(posedge clk) registered <= uin2;
-	always_ff @(posedge clk2) u5_output_port <= reset ? 4'b0 : uin2;
-	always_ff @(posedge clk) u6_output_port <= reset ? 2'b0 : uin1;
+	always_ff @(posedge clk2) u5_output_port <= reset ? 4'0 : uin2;
+	always_ff @(posedge clk) u6_output_port <= reset ? 2'0 : uin1;
 	assign reset = uin2[0];
 	always_ff @(posedge clk) reset_reg <= uin2[1] ? 2'h3 : uin1;
 	always_ff @(posedge clk) reset_reg2 <= reset ? 2'h2 : uin1;
@@ -34,7 +34,7 @@ module top (
 	assign uout2 = u5_output_port;
 	assign uout3 = u6_output_port;
 
-	assign uout4 = 5'bX;
+	assign uout4 = 5'x;
 	assign clk_1 = clk2;
 endmodule
 

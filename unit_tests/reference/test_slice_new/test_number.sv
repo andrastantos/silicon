@@ -9,7 +9,7 @@ module top (
 
 	assign uout1 = {uin1[1], uin1[0]};
 
-	assign uout2 = 2'bX;
+	assign uout2 = 2'x;
 endmodule
 
 

@@ -93,7 +93,7 @@ class NInputGate(Gate):
             if not first:
                 ret_val += f" {op} "
             first = False
-            input_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(input, back_end, op_precedence)
+            input_expression, _ = input.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += input_expression
         return ret_val, op_precedence
 
@@ -204,7 +204,7 @@ class UnaryGate(Gate):
         ret_val = ""
         op, op_precedence = self.generate_op(back_end)
         ret_val += f" {op} "
-        input_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.input_port_0, back_end, op_precedence)
+        input_expression, _ = self.input_port_0.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
         ret_val += input_expression
         return ret_val, op_precedence
 
@@ -255,7 +255,7 @@ class abs_gate(UnaryGate):
         assert back_end.language == "SystemVerilog"
         q_op_precedence = back_end.get_operator_precedence("?:", None)
         op_precedence = max(q_op_precedence, back_end.get_operator_precedence(">", True))
-        input_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.input_port, back_end, op_precedence)
+        input_expression, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
         return f"{input_expression} > 1'b0 ? {input_expression} : -{input_expression}", q_op_precedence
     def get_operation_str(self) -> str:
         return "ABS"
@@ -273,7 +273,7 @@ class bool_gate(UnaryGate):
     def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
         op_precedence = back_end.get_operator_precedence("==", True)
-        input_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.input_port, back_end, op_precedence)
+        input_expression, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
         return f"{input_expression} == 1'b0", op_precedence
 
 
@@ -308,7 +308,7 @@ class BinaryGate(Gate):
             if not first:
                 ret_val += f" {op} "
             first = False
-            input_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(input, back_end, op_precedence)
+            input_expression, _ = input.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += input_expression
         return ret_val, op_precedence
     @classmethod

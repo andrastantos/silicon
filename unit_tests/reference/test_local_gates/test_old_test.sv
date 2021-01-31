@@ -31,8 +31,8 @@ module top (
 	assign out_6 = 1'h1;
 
 	and_gate B (
-		.in_a(1'bX),
-		.in_b(1'bX),
+		.in_a(1'x),
+		.in_b(1'x),
 		.out_a(tttt)
 	);
 
@@ -71,7 +71,7 @@ module top (
 	assign out_2 = in_4;
 	assign xxx = in_4;
 	assign xxxx = in_4;
-	assign out_4 = 1'bX;
+	assign out_4 = 1'x;
 	assign ttt = tttt;
 	assign out_1 = yyyy;
 	assign out_a = yyyy;

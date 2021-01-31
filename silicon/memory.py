@@ -286,11 +286,11 @@ class _Memory(GenericModule):
 
         data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(prot_config)
 
-        data_in, _ = target_namespace._impl.get_rhs_expression_for_junction(data_in_port, back_end) if data_in_port is not None else (None, None)
-        data_out = data_out_port.get_net_type().get_lhs_name(data_out_port, back_end, target_namespace) if data_out_port is not None else None
-        write_en, _ = target_namespace._impl.get_rhs_expression_for_junction(write_en_port, back_end) if write_en_port is not None else (None, None)
-        addr, _ = target_namespace._impl.get_rhs_expression_for_junction(addr_port, back_end) if addr_port is not None else (None, None)
-        clk, _ = target_namespace._impl.get_rhs_expression_for_junction(clk_port, back_end, back_end.get_operator_precedence("()")) if clk_port is not None else (None, None)
+        data_in, _ = data_in_port.get_rhs_expression(back_end, target_namespace) if data_in_port is not None else (None, None)
+        data_out = data_out_port.get_lhs_name(back_end, target_namespace) if data_out_port is not None else None
+        write_en, _ = write_en_port.get_rhs_expression(back_end, target_namespace) if write_en_port is not None else (None, None)
+        addr, _ = addr_port.get_rhs_expression(back_end, target_namespace) if addr_port is not None else (None, None)
+        clk, _ = clk_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("()")) if clk_port is not None else (None, None)
 
         if data_out_port is not None:
             if prot_config.registered_input:
@@ -344,11 +344,11 @@ class _Memory(GenericModule):
         for port_config in self.config.port_configs:
             data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
 
-            data_in, _ = target_namespace._impl.get_rhs_expression_for_junction(data_in_port, back_end) if data_in_port is not None else (None, None)
-            data_out = data_out_port.get_net_type().get_lhs_name(data_out_port, back_end, target_namespace) if data_out_port is not None else None
-            write_en, _ = target_namespace._impl.get_rhs_expression_for_junction(write_en_port, back_end) if write_en_port is not None else (None, None)
-            addr, _ = target_namespace._impl.get_rhs_expression_for_junction(addr_port, back_end) if addr_port is not None else (None, None)
-            clk, _ = target_namespace._impl.get_rhs_expression_for_junction(clk_port, back_end, back_end.get_operator_precedence("()")) if clk_port is not None else (None, None)
+            data_in, _ = data_in_port.get_rhs_expression(back_end, target_namespace) if data_in_port is not None else (None, None)
+            data_out = data_out_port.get_lhs_name(back_end, target_namespace) if data_out_port is not None else None
+            write_en, _ = write_en_port.get_rhs_expression(back_end, target_namespace) if write_en_port is not None else (None, None)
+            addr, _ = addr_port.get_rhs_expression(back_end, target_namespace) if addr_port is not None else (None, None)
+            clk, _ = clk_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("()")) if clk_port is not None else (None, None)
 
             if data_out_port is not None:
                 if port_config.registered_input:

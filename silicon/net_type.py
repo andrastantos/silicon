@@ -60,14 +60,14 @@ class NetType(object):
 
     def get_unconnected_value(self, back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
-        return f"{self.get_num_bits()}'bX"
+        return f"{self.get_num_bits()}'x"
     def get_default_value(self, back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
-        return f"{self.get_num_bits()}'b0"
+        return f"{self.get_num_bits()}'0"
     def generate_assign(self, sink_name: str, source_expression: str, xnet: 'XNet', back_end: 'BackEnd') -> str:
         return f"assign {sink_name} = {source_expression};"
     def get_unconnected_sim_value(self) -> Any:
-        raise NotImplementedError
+        raise None
     def get_default_sim_value(self) -> Any:
         raise NotImplementedError
     def validate_sim_value(self, sim_value: Any, parent_junction: 'Junction') -> Any:

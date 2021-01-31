@@ -311,6 +311,7 @@ def test_struct_sub_module(mode: str = "rtl"):
 if __name__ == "__main__":
     #test_select_struct()
     #test_select_one_struct()
+    test_select_first_struct("rtl")
     #test_select_first_struct("sim")
     #test_reg_struct()
     #test_struct_of_struct()
@@ -320,4 +321,4 @@ if __name__ == "__main__":
     #test_struct_to_number("sim")
     #test_struct_sub_module("rtl")
     #test_number_to_struct("rtl")
-    test_number_to_struct("sim")
+    #test_number_to_struct("sim")

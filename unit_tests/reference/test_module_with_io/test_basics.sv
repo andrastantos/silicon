@@ -6,7 +6,7 @@ module top (
 	output logic signed [7:0] output
 );
 
-	assign output = 8'bX;
+	assign output = 8'x;
 endmodule
 
 

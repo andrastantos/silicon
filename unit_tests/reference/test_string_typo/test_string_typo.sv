@@ -10,7 +10,7 @@ module Test (
 	assign out_1 = 8'hf;
 	assign out_1b = 8'hf;
 
-	assign out_2 = 8'bX;
+	assign out_2 = 8'x;
 endmodule
 
 

@@ -168,7 +168,7 @@ class Enum(Number):
         def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
             assert back_end.language == "SystemVerilog"
 
-            rhs_name, _ = target_namespace._impl.get_rhs_expression_for_junction(self.input, back_end)
+            rhs_name, _ = self.input.get_rhs_expression(back_end, target_namespace, self.output.get_net_type())
             ret_val = f"{self.output.get_net_type().get_type_name()}'({rhs_name})"
             return ret_val, 0
         def simulate(self) -> TSimEvent:

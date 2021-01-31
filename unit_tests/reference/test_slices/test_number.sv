@@ -22,7 +22,7 @@ module top (
 	assign uout2 = {uin1, uin1};
 	assign sout1 = sin1[0];
 
-	assign sout4 = 8'bX;
+	assign sout4 = 8'x;
 endmodule
 
 

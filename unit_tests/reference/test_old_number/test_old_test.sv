@@ -37,8 +37,8 @@ module top (
 		.out_a(u9_out_a)
 	);
 
-	assign out_a = 1'bX;
-	assign out_c = 3'bX;
+	assign out_a = 1'x;
+	assign out_c = 3'x;
 endmodule
 
 
