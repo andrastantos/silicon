@@ -127,8 +127,13 @@ class Number(NetType):
             """
             return True
 
-
-
+    def get_lhs_name(self, for_junction: Junction, back_end: 'BackEnd', target_namespace: Module, allow_implicit: bool=True) -> Optional[str]:
+        assert back_end.language == "SystemVerilog"
+        xnet = target_namespace._impl.netlist.get_xnet_for_junction(for_junction)
+        name = xnet.get_lhs_name(target_namespace, allow_implicit=allow_implicit)
+        if name is None:
+            return None
+        return name
 
     def generate_type_ref(self, back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"

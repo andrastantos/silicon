@@ -343,7 +343,7 @@ class Module(object):
                         if sub_module_port.is_composite():
                             for sub_module_port_member in sub_module_port.get_all_member_junctions(False):
                                 if is_output_port(sub_module_port):
-                                    source_str = self._impl.get_lhs_name_for_junction(sub_module_port_member)
+                                    source_str = sub_module_port_member.get_net_type().get_lhs_name(sub_module_port_member, back_end, self)
                                 elif is_input_port(sub_module_port_member):
                                     source_str, _ = self._impl.get_rhs_expression_for_junction(sub_module_port_member, back_end)
                                 else:
@@ -355,7 +355,7 @@ class Module(object):
                             rtl_instantiations += "\n"
                         else:
                             if is_output_port(sub_module_port):
-                                source_str = self._impl.get_lhs_name_for_junction(sub_module_port)
+                                source_str = sub_module_port.get_net_type().get_lhs_name(sub_module_port, back_end, self)
                             elif is_input_port(sub_module_port):
                                 source_str, _ = self._impl.get_rhs_expression_for_junction(sub_module_port, back_end)
                             else:
@@ -1225,13 +1225,6 @@ class Module(object):
                 return f"({expr})", back_end.get_operator_precedence("()")
             else:
                 return expr, prec
-
-        def get_lhs_name_for_junction(self, junction, *, allow_implicit: bool = True) -> Optional[str]:
-            assert not junction.is_composite()
-            xnet = self.netlist.get_xnet_for_junction(junction)
-            name = xnet.get_lhs_name(self._true_module, allow_implicit=allow_implicit)
-            assert name is not None, "An XNet should always have at least an implicit name in every interesting scope"
-            return name
 
 
 class GenericModule(Module):

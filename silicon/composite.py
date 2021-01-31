@@ -154,6 +154,20 @@ class Struct(Composite):
     def __eq__(self, other):
         return self is other or type(self) is type(other)
 
+    def get_lhs_name(self, for_junction: Junction, back_end: BackEnd, target_namespace: Module, allow_implicit: bool=True) -> Optional[str]:
+        assert back_end.language == "SystemVerilog"
+        ret_val += "{"
+        xnets = for_junction._impl.netlist.get_xnets_for_junction(for_junction)
+        for idx, (xnet, _) in enumerate(xnets.values()):
+            name = xnet.get_lhs_name(target_namespace, allow_implicit=allow_implicit)
+            if name is None:
+                return None
+            if idx != 0:
+                ret_val += ", "
+            ret_val += f"{name}"
+        ret_val += "}"
+        return ret_val
+
     class ToNumber(Module):
         input_port = Input()
         output_port = Output()

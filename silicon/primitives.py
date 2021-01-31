@@ -134,6 +134,37 @@ class Select(Module):
 
         return ret_val, final_precedence
 
+    def generate_inline_statement(self, back_end: 'BackEnd', target_namespace: Module, output_port: Junction, value_ports: Dict[Any, Junction]) -> str:
+        assert back_end.language == "SystemVerilog"
+        output_type = output_port.get_net_type()
+
+        ret_val = "always_comb begin"
+        eq_precedence = back_end.get_operator_precedence("==",None)
+        selector_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.selector_port, back_end, eq_precedence)
+        output_str = output_port.get_net_type().get_lhs_name(output_port, back_end, target_namespace, allow_implicit=True)
+
+        first = True
+        if len(value_ports) == 2 and self.selector_port.get_net_type().length == 1:
+            false_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(value_ports[0], back_end)
+            true_expression,  _ = target_namespace._impl.get_rhs_expression_for_junction(value_ports[1], back_end)
+            ret_val += back_end.indent(f"if {selector_expression} begin")
+            ret_val += bace_end.indent(f"? {true_expression} : {false_expression}")
+        else:
+            for selector_idx in sorted(value_ports.keys()):
+                if not first:
+                    ret_val += " | "
+                first = False
+                value_port = value_ports[selector_idx]
+                value_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(value_port, back_end)
+                ret_val += f"{selector_expression} == {selector_idx} ? {value_expression} : {zero}"
+            # We don't add the default expression, because that's not the right thing to do: we would have to guard it with an 'else' clause, but that doesn't really exist in a series of and-or gates
+            #default_expression, _ = target_namespace._impl.get_rhs_expression_for_junction(self.default, back_end, op_precedence)
+            #ret_val += default_expression
+
+        ret_val += "end"
+        return ret_val
+
+
     def is_combinational(self) -> bool:
         """
         Returns True if the module is purely combinational, False otherwise
@@ -524,7 +555,7 @@ class Reg(Module):
         assert back_end.language == "SystemVerilog"
         assert is_module(target_namespace)
         netlist = target_namespace._impl.netlist
-        output_name = target_namespace._impl.get_lhs_name_for_junction(output_port)
+        output_name = output_port.get_net_type().get_lhs_name(output_port, back_end, target_namespace)
         assert output_name is not None
         clk, _ = target_namespace._impl.get_rhs_expression_for_junction(self.clock_port, back_end, back_end.get_operator_precedence("()")) # Get parenthesis around the expression if it's anything complex
         if not self.reset_port.has_driver():
