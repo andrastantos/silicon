@@ -672,6 +672,8 @@ class Number(NetType):
         return self
     @behavior
     def from_number(self, input: Junction) -> None:
+        if not isinstance(input.get_net_type(), Number):
+            raise SyntaxErrorException(f"from_number can only be used to convert from Numbers. For generic type conversion, use 'convert_from'")
         self <<= input.to_number()
 
     @classmethod
