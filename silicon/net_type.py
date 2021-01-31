@@ -4,15 +4,32 @@ from .netlist import Netlist
 from .exceptions import SyntaxErrorException
 from .utils import first
 from enum import Enum as PyEnum
+from types import MethodType
 
 class KeyKind(PyEnum):
     Index = 0
     Member = 1
 
+# A decorator for behaviors
+class Behavior(object):
+    def __init__(self, method):
+        self.method = method
+def behavior(method):
+    return Behavior(method)
+
 class NetType(object):
     def __init__(self):
         self.parent_junction = None
         pass
+
+    def set_behaviors(self, instance: 'Junction'):
+        if instance.get_net_type() is not self:
+            raise SyntaxErrorException("Can only set behaviors on a Junction that has the same net-type")
+        for attr_name in dir(self):
+            attr_value = getattr(self,attr_name)
+            if isinstance(attr_value, Behavior):
+                setattr(instance, attr_name, MethodType(attr_value.method, instance))
+
     def generate_type_ref(self, back_end: 'BackEnd') -> str:
         raise NotImplementedError
     def generate_net_type_ref(self, for_junction: 'Junction', back_end: 'BackEnd') -> str:
@@ -131,10 +148,10 @@ class NetType(object):
     def setup_junction(self, junction: 'Junction') -> None:
         """
         Called during junction type assignment to give the type a chance to set whatever needs to be set on a junction.
-        This probably includes things, such as introducing members for composite types.
+        This includes things, such as imbuning junctions with behaviors.
         TODO: maybe Number should use this technique to inject legnth/min/max/signed into the Junction?
         """
-        pass
+        self.set_behaviors(junction)
 
     def __ne__(self, other):
         # One usually overrides only __eq__, so provide a default, compatible __ne__ implementation

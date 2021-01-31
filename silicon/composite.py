@@ -1,6 +1,6 @@
 from typing import Tuple, Union, Any, Dict, Set, Optional, Generator, Sequence
 
-from .net_type import NetType, KeyKind
+from .net_type import NetType, KeyKind, behavior
 from .netlist import Netlist
 from .back_end import BackEnd
 from .exceptions import SyntaxErrorException, SimulationException
@@ -10,7 +10,7 @@ from .tracer import no_trace
 from .utils import TSimEvent, MEMBER_DELIMITER
 from collections import namedtuple, OrderedDict
 from copy import copy
-from .number import Unsigned
+from .number import Unsigned, Number
 
 import types
 
@@ -24,13 +24,6 @@ class Reverse(object):
         if not isinstance(net_type, NetType):
             raise SyntaxErrorException(f"Can only reverse Net types. {net_type} is of type {type(net_type)}.")
         self.net_type = net_type
-
-# A decorator for behaviors
-class Behavior(object):
-    def __init__(self, method):
-        self.method = method
-def behavior(method):
-    return Behavior(method)
 
 class Composite(NetType):
     """
@@ -46,14 +39,6 @@ class Composite(NetType):
             val = getattr(self,name)
             if isinstance(val, (NetType, Reverse)):
                 self.add_member(name, val)
-
-    def set_behaviors(self, instance: 'Junction'):
-        if instance.get_net_type() is not self:
-            raise SyntaxErrorException("Can only set behaviors on a Junction that has the same net-type")
-        for attr_name in dir(self):
-            attr_value = getattr(self,attr_name)
-            if isinstance(attr_value, Behavior):
-                setattr(instance, attr_name, types.MethodType(attr_value.method, instance))
 
     def add_member(self, name: str, member: Union[NetType, Reverse]):
         if name in self.members:
@@ -127,7 +112,7 @@ class Composite(NetType):
     def setup_junction(self, junction: 'Junction') -> None:
         for (member_name, (member_type, member_reverse)) in self.get_members().items():
             junction.create_member_junction(member_name, member_type, member_reverse)
-        self.set_behaviors(junction)
+        super().setup_junction(junction)
 
 class Struct(Composite):
     def __init__(self):
@@ -270,7 +255,10 @@ class Struct(Composite):
         return Struct.ToNumber(self)
     @behavior
     def from_number(self, input: Junction) -> None:
-        self <<= Struct.FromNumber(self.get_net_type())(input)
+        if not isinstance(input.get_net_type(), Number):
+            raise SyntaxErrorException(f"from_number can only be used to convert from Numbers. For generic type conversion, use 'convert_from'")
+        self <<= Struct.FromNumber(self.get_net_type())(input.to_number())
+
 class Interface(Composite):
     def __init__(self):
         super().__init__(support_reverse = True)
@@ -344,7 +332,7 @@ class Interface(Composite):
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign output_port = '{"
+            ret_val += "\nassign output_port = '{"
             last_key = len(self.member_names)-1
             for idx, member_name in enumerate(self.member_names):
                 ret_val += "{}: {}".format(member_name, member_name)

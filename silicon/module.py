@@ -31,7 +31,7 @@ class InlineExpression(InlineBlock):
         self.precedence = precedence
     def get_inline_assignments(self, back_end: 'BackEnd') -> str:
         assert len(self.target_ports) == 1
-        return f"\tassign {first(self.target_ports).interface_name} = {self.expression};\n"
+        return f"assign {first(self.target_ports).interface_name} = {self.expression};\n"
     def inline(self, scope: 'Module', netlist: 'Netlist', back_end: 'BackEnd') -> Optional[str]:
         assert len(self.target_ports) == 1
         inline_port = first(self.target_ports)
@@ -40,7 +40,7 @@ class InlineExpression(InlineBlock):
         xnet.add_rhs_expression(scope, self.expression, self.precedence)
         inline_port_name = xnet.get_lhs_name(scope, allow_implicit=False)
         if inline_port_name is not None:
-            return f"\t{xnet.generate_assign(inline_port_name, self.expression, back_end)}\n"
+            return f"{xnet.generate_assign(inline_port_name, self.expression, back_end)}\n"
         else:
             return None
 
@@ -50,9 +50,9 @@ class InlineStatement(InlineBlock):
         super().__init__(target_ports)
         self.statement = statement
     def get_inline_assignments(self, back_end: 'BackEnd') -> str:
-        return "\t"+self.statement
+        return self.statement
     def inline(self, scope: 'Module', netlist: 'Netlist', back_end: 'BackEnd') -> Optional[str]:
-        return "\t"+self.statement
+        return self.statement
 
 class InlineComposite(InlineBlock):
     def __init__(self, target_port: Port, member_inlines: Sequence[InlineBlock] = []):
@@ -334,7 +334,7 @@ class Module(object):
 
                     if rtl_instantiations != "":
                         rtl_instantiations += "\n"
-                    rtl_instantiations += "\t{} {} (\n".format(module_class_name, sub_module._impl.name)
+                    rtl_instantiations += f"{module_class_name} {sub_module._impl.name} (\n"
                     sub_module_ports = sub_module.get_ports()
                     last_port_idx = len(sub_module_ports) - 1
                     for idx, (sub_module_port_name, sub_module_port) in enumerate(sub_module_ports.items()):
@@ -348,7 +348,7 @@ class Module(object):
                                     source_str, _ = self._impl.get_rhs_expression_for_junction(sub_module_port_member, back_end)
                                 else:
                                     assert False
-                                rtl_instantiations += f"\t\t.{sub_module_port_member.interface_name}({source_str})"
+                                rtl_instantiations += back_end.indent(f".{sub_module_port_member.interface_name}({source_str})")
                                 if idx != last_port_idx:
                                     rtl_instantiations += ","
                                 rtl_instantiations += "\n"
@@ -360,11 +360,11 @@ class Module(object):
                                 source_str, _ = self._impl.get_rhs_expression_for_junction(sub_module_port, back_end)
                             else:
                                 assert False
-                            rtl_instantiations += f"\t\t.{sub_module_port_name}({source_str})"
+                            rtl_instantiations += back_end.indent(f".{sub_module_port_name}({source_str})")
                             if idx != last_port_idx:
                                 rtl_instantiations += ","
                             rtl_instantiations += "\n"
-                    rtl_instantiations += "\t);\n"
+                    rtl_instantiations += ");\n"
                 if not has_inline_support and not self._impl._body_generated:
                     sub_module._impl._generate_needed = True
 
@@ -375,18 +375,18 @@ class Module(object):
                 if names is not None:
                     for name in names:
                         if name not in interface_port_names:
-                            rtl_wire_definitions += f"\t{xnet.get_net_type().generate_type_ref(back_end)} {name};\n"
+                            rtl_wire_definitions += f"{xnet.get_net_type().generate_type_ref(back_end)} {name};\n"
                 names = xnet.get_explicit_names(self, add_used=True, add_assigned=False, exclude_assigned=True)
                 if names is not None:
                     for name in names:
-                        rtl_wire_assignments += f"\t{xnet.generate_assign(name, xnet_rhs_expression, back_end)}\n"
+                        rtl_wire_assignments += f"{xnet.generate_assign(name, xnet_rhs_expression, back_end)}\n"
 
         ret_val = (
             str_block(rtl_header, "", "\n\n") +
-            str_block(rtl_wire_definitions, "", "\n") +
-            str_block(rtl_inline_assignments, "", "\n") +
-            str_block(rtl_instantiations, "", "\n") +
-            str_block(rtl_wire_assignments, "", "") +
+            str_block(back_end.indent(rtl_wire_definitions), "", "\n") +
+            str_block(back_end.indent(rtl_inline_assignments), "", "\n") +
+            str_block(back_end.indent(rtl_instantiations), "", "\n") +
+            str_block(back_end.indent(rtl_wire_assignments), "", "") +
             "endmodule"
         )
         return ret_val
@@ -1099,7 +1099,7 @@ class Module(object):
                             if after_composite:
                                 ret_val += "\n"
                                 after_composite = False
-                        ret_val += f"\t{port_interface_str}"
+                        ret_val += back_end.indent(f"{port_interface_str}")
             if not first_port:
                 ret_val += "\n"
             ret_val += ");"

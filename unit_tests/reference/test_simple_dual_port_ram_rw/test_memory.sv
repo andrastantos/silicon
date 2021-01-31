@@ -47,12 +47,12 @@ module Memory (
 	end
 
 	wire [5:0] port1_addr_reg;
-	always @(posedge port2_clk) begin
+	always @(posedge port1_clk) begin
 		port1_addr_reg <= port1_addr;
 	end
 	port1_data_out <= mem[port1_addr_reg];
 
-	always @(posedge port2_clk) begin
+	always @(posedge port1_clk) begin
 		if (port2_write_en) begin
 			mem[port2_addr] <= port2_data_in;
 		end

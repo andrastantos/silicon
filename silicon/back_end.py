@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, IO, Tuple, Optional, Sequence
 from .module import Module
 from collections import OrderedDict
+from textwrap import indent
 
 class BackEnd(object):
     def __init__(self):
@@ -126,6 +127,9 @@ class SystemVerilog(BackEnd):
             expression = "(" + expression + ")"
             expression_precedence = self.get_operator_precedence("()")
         return expression, expression_precedence
+
+    def indent(self, lines: str, indent_cnt: int = 1) -> str:
+        return indent(lines, "\t"*indent_cnt)
 
     @staticmethod
     def get_reserved_names() -> Sequence[str]:

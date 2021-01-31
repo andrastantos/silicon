@@ -134,8 +134,8 @@ class Enum(Number):
 
     def generate(self, netlist: Netlist, back_end: 'BackEnd') -> str:
         base_type = super().generate_type_ref(back_end)
-        values = ",\n\t".join(f"{e.name}={e.value}" for e in self.base_type)
-        return f"typedef enum {base_type} {{\n\t{values}\n}} {self.get_type_name()};"
+        values = ",\n".join(f"{e.name}={e.value}" for e in self.base_type)
+        return f"typedef enum {base_type} {{\n{back_end.indent(values)}\n}} {self.get_type_name()};"
     def generate_type_ref(self, back_end: 'BackEnd') -> str:
         return self.get_type_name()
 

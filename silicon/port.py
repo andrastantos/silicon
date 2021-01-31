@@ -810,6 +810,12 @@ class Junction(JunctionBase):
             ret_val.add(self)
         return ret_val
 
+    def convert_from(self, input: 'Junction') -> None:
+        if self.get_net_type() is input.get_net_type():
+            self <<= input
+        else:
+            self.from_number(input.to_number())
+
 
 class Port(Junction):
     

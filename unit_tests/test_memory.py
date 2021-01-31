@@ -358,6 +358,73 @@ def test_simple_dual_port_ram_tttt(mode: str = "rtl"):
 def test_simple_dual_port_ram_rw(mode: str = "rtl"):
     _test_simple_dual_port_ram(mode, True, False, True, False, READ, WRITE)
 
+class Pixel(Struct):
+    r = Unsigned(8)
+    g = Unsigned(8)
+    b = Unsigned(8)
+
+def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered_output: bool = False):
+    class Top(Module):
+        data_in = Input(Pixel())
+        data_out = Output(Pixel())
+        addr = Input(Unsigned(8))
+        write_en = Input(logic)
+        clk = Input(logic)
+
+        def body(self):
+            config = MemoryConfig(
+                (MemoryPortConfig(
+                    addr_type = self.addr.get_net_type(),
+                    data_type = self.data_in.get_net_type(),
+                    registered_input = registered_input,
+                    registered_output = registered_output
+                ),),
+                reset_content = None
+            )
+            mem = Memory(config)
+            mem.data_in <<= self.data_in
+            self.data_out <<= mem.data_out
+            mem.addr <<= self.addr
+            mem.write_en = self.write_en
+
+        def simulate(self) -> TSimEvent:
+            def clk() -> int:
+                yield 10
+                self.clk <<= ~self.clk
+                yield 10
+                self.clk <<= ~self.clk
+                yield 0
+            
+            self.clk <<= 1
+            self.write_en <<= 0
+            yield 10
+            for i in range(10):
+                yield from clk()
+            self.data_in <<= 0
+            self.addr <<= 0
+            self.write_en <<= 1
+            yield from clk()
+            self.addr <<= 1
+            self.write_en <<= 0
+            yield from clk()
+            if registered_input:
+                yield from clk()
+            assert self.data_in.sim_value == 0
+            yield from clk()
+            self.write_en <<= 1
+            self.data_in <<= 3
+            yield from clk()
+            if registered_input:
+                yield from clk()
+            assert self.data_in.sim_value == 3
+            yield from clk()
+            
+
+    if mode == "rtl":
+        test.rtl_generation(Top(), inspect.currentframe().f_code.co_name)
+    else:
+        test.simulation(Top, "_test_single_port_ram")
+
 # TODO:
 # - Test all 8 combinations of registered in/out
 # - Test various address and data-types (structs for example)
@@ -380,4 +447,5 @@ if __name__ == "__main__":
     #test_single_port_async_rom("rtl")
     #test_simple_dual_port_ram_rw("rtl")
 
-    test_single_port_ram_tt("sim")
+    #test_single_port_ram_tt("sim")
+    test_struct_ram("rtl")

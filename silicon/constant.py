@@ -44,14 +44,6 @@ class ConstantModule(GenericModule):
         ret_val = f"{self.generate_const_val(back_end)}"
         return ret_val, 0
 
-    def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
-        assert back_end.language == "SystemVerilog"
-        ret_val = ""
-        ret_val += self.generate_module_header(back_end)
-        ret_val += f"\n\tassign output_port = {self.generate_const_val(back_end)};\n"
-        ret_val += "endmodule\n\n\n"
-        return ret_val
-    
     def simulate(self) -> TSimEvent:
         self.output_port <<= self.constant.value
 

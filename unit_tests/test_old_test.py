@@ -17,8 +17,8 @@ def test_local_gates():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a & in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -29,8 +29,8 @@ def test_local_gates():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a & in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -41,8 +41,8 @@ def test_local_gates():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a & in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -53,8 +53,8 @@ def test_local_gates():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a & in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -65,8 +65,8 @@ def test_local_gates():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a & in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -77,8 +77,8 @@ def test_local_gates():
         def generate(self, netlist: 'Netlist', back_end: 'Backend') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a | in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a | in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -89,8 +89,8 @@ def test_local_gates():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a ^ in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -101,8 +101,8 @@ def test_local_gates():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a ^ in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -113,8 +113,8 @@ def test_local_gates():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a ^ in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -146,9 +146,9 @@ def test_local_gates():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\t//a = {}, b = {}\n".format(self.a, self.b)
-            ret_val += "\tassign out_a = in_a & in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("//a = {}, b = {}\n".format(self.a, self.b))
+            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -201,8 +201,8 @@ def test_unconnected_submodule():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a & in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -216,139 +216,6 @@ def test_unconnected_submodule():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
-"""
-def test_struct():
-    class Point(Struct):
-        x = logic
-        y = logic
-
-    class Interface(Struct):
-        data = Vector(logic, 16)
-        ready = logic
-        valid = logic
-
-    class and_gate(Module):
-        in_a = Input(logic)
-        in_b = Input(logic)
-        out_a = Output(logic)
-        def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
-            ret_val = ""
-            assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a & in_b;\n"
-            ret_val += "endmodule\n\n\n"
-            return ret_val
-
-    class top(Module):
-        in_a = Input(Vector(logic, length=5))
-        out_b = Output(Vector(logic, length=5))
-        if_in = Input(Interface())
-        if_out = Output(Interface())
-        p_in1 = Input(Point())
-        p_in2 = Input(Point())
-        p_out = Output(Point())
-        out_a = Output(logic)
-
-        def body(self):
-            self.out_a = and_gate(self.p_in1.x, self.p_in1.y)
-            self.p_out.x = and_gate(self.p_in1.x, self.p_in1.y)
-            pass
-
-    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
-"""
-
-"""
-def test_vector():
-
-    class and_gate(Module):
-        in_a = Input(logic)
-        in_b = Input(logic)
-        out_a = Output(logic)
-        def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
-            ret_val = ""
-            assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a & in_b;\n"
-            ret_val += "endmodule\n\n\n"
-            return ret_val
-
-    class or_gate(Module):
-        in_a = Input(logic)
-        in_b = Input(logic)
-        out_a = Output(logic)
-        def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
-            ret_val = ""
-            assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a | in_b;\n"
-            ret_val += "endmodule\n\n\n"
-            return ret_val
-
-    class xor_gate(Module):
-        in_a = Input(logic)
-        in_b = Input(logic)
-        out_a = Output(logic)
-        def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
-            ret_val = ""
-            assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a ^ in_b;\n"
-            ret_val += "endmodule\n\n\n"
-            return ret_val
-
-    class full_adder(Module):
-        in_a = Input(logic)
-        in_b = Input(logic)
-        in_c = Input(logic)
-        out_a = Output(logic)
-        out_c = Output(logic)
-        
-        def body(self):
-            self.out_a = xor_gate(self.in_a, xor_gate(self.in_b, self.in_c))
-            self.out_c = or_gate(
-                and_gate(self.in_a, self.in_b),
-                or_gate(
-                    and_gate(self.in_a, self.in_c),
-                    and_gate(self.in_b, self.in_c)
-                )
-            )
-
-    class top(Module):
-        in_a = Input(Vector(logic, length=5))
-        in_b = Input(Vector(logic, length=16))
-        out_a = Output(logic)
-        out_b = Output(Vector(logic, length=11))
-        out_c = Output(Vector(logic, length=3))
-        out_d = Output(Vector(logic, length=11))
-
-        def body(self):
-            # Funny thing. This works:
-            #   (a, b) = some_multi_output_gate()
-            # This also works:
-            #   bus = (a, b, c)
-            # This stuff doesnt:
-            #   (a, b) = (c, d, e)
-            # But, this works too, provided all elements are broken out_a:
-            #   (a, b) = bus
-            # This again, is borken:
-            #   (a, bus_a) = bus_b
-            # But maybe it's an edge-case enough that it doesn't matter. We at least get a Python error for the broken cases.
-            # We can also make a 'concat' and a 'split' module if we really want to to make single-line assignments like that work.
-            a0 = self.in_a[0]
-            b0 = self.in_b[0]
-            c0 = and_gate(a0, b0)
-            self.out_b[0] = c0
-            self.out_b[3] = and_gate(self.in_a[3], self.in_a[4])
-            self.out_b[1:3] = self.in_a[1:3]
-            self.out_c = [a0, b0, c0]
-            # There's a strange artifact in the generation of this code. It outputs:
-            #   assign out_d = {{7{1'bX}}, {in_a[4], in_b[0], u1_out}};
-            # This is probably not a big deal, but maybe at some point we sohuld optimize away the extra {} braces to improve readability.
-            self.out_d[1:4] = (c0, b0, self.in_a[4])
-
-    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
-"""
-
 def test_old_number():
     class and_gate(Module):
         in_a = Input(logic)
@@ -357,8 +224,8 @@ def test_old_number():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a & in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -369,8 +236,8 @@ def test_old_number():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a | in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a | in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -381,8 +248,8 @@ def test_old_number():
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             ret_val = ""
             assert back_end.language == "SystemVerilog"
-            ret_val += self.generate_module_header(back_end)
-            ret_val += "\n\tassign out_a = in_a ^ in_b;\n"
+            ret_val += self.generate_module_header(back_end) + "\n"
+            ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 

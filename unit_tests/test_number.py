@@ -16,8 +16,8 @@ class and_gate(Module):
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         ret_val = ""
         assert back_end.language == "SystemVerilog"
-        ret_val += self.generate_module_header(back_end)
-        ret_val += "\n\tassign out_a = in_a & in_b;\n"
+        ret_val += self.generate_module_header(back_end) + "\n"
+        ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
         ret_val += "endmodule\n\n\n"
         return ret_val
 
@@ -28,8 +28,8 @@ class or_gate(Module):
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         ret_val = ""
         assert back_end.language == "SystemVerilog"
-        ret_val += self.generate_module_header(back_end)
-        ret_val += "\n\tassign out_a = in_a | in_b;\n"
+        ret_val += self.generate_module_header(back_end) + "\n"
+        ret_val += back_end.indent("assign out_a = in_a | in_b;\n")
         ret_val += "endmodule\n\n\n"
         return ret_val
 
@@ -40,8 +40,8 @@ class xor_gate(Module):
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         ret_val = ""
         assert back_end.language == "SystemVerilog"
-        ret_val += self.generate_module_header(back_end)
-        ret_val += "\n\tassign out_a = in_a ^ in_b;\n"
+        ret_val += self.generate_module_header(back_end) + "\n"
+        ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
         ret_val += "endmodule\n\n\n"
         return ret_val
 

@@ -251,7 +251,7 @@ def test_number_to_struct(mode: str = "rtl"):
         outp = Output(Pixel(pixel_width))
         
         def body(self):
-            self.outp.from_number(self.in1)
+            self.outp.convert_from(self.in1)
 
         def simulate(self):
             def test(r,g,b):

@@ -1,6 +1,6 @@
 from typing import Optional, Any, Tuple, Generator, Union, Dict, Set, Sequence
 from .exceptions import SyntaxErrorException, SimulationException
-from .net_type import NetType, KeyKind
+from .net_type import NetType, KeyKind, behavior
 from .module import GenericModule, Module, InlineBlock, InlineExpression, has_port
 from .port import Input, Output, Junction, Port
 from .tracer import no_trace
@@ -666,6 +666,13 @@ class Number(NetType):
                 return None
             value |= sub_source_value << last_top_idx
         return value
+
+    @behavior
+    def to_number(self) -> Junction:
+        return self
+    @behavior
+    def from_number(self, input: Junction) -> None:
+        self <<= input.to_number()
 
     @classmethod
     def result_type(cls, net_types: Sequence[Optional['NetType']], operation: str) -> 'NetType':

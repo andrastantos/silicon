@@ -75,7 +75,7 @@
 # ARM (Artisan)
 # Essentially 'contact your foundry'
 
-from .module import GenericModule, has_port
+from .module import GenericModule, has_port, Module, InlineBlock, InlineStatement
 from .port import Input, Output, Wire, AutoInput, Port, EdgeType
 from .net_type import NetType
 from collections import OrderedDict
@@ -83,9 +83,10 @@ from dataclasses import dataclass
 from .composite import Struct
 from .utils import str_block, is_power_of_two
 from .exceptions import SyntaxErrorException
-from typing import Optional, Sequence
-from .number import logic
+from typing import Optional, Sequence, Generator
+from .number import logic, Unsigned
 from .utils import TSimEvent
+from textwrap import indent
 
 @dataclass
 class MemoryPortConfig:
@@ -111,7 +112,7 @@ class MemoryConfig:
 #            that they don't compare equal and a different module body is generated (and referenced) for each. It is important to note that
 #            there's nothing different between these objects! It's just that they are *used* differently, yet they generate different bodies.
 
-class Memory(GenericModule):
+class _Memory(GenericModule):
     INPUT = 1
     OUTPUT = 2
     def construct(self, config: MemoryConfig):
@@ -123,17 +124,17 @@ class Memory(GenericModule):
             if port_config is not None:
                 if port_config.prefix is None:
                     if self.get_port_count() == 1:
-                        port_config.prefix = ""
+                        port_config.real_prefix = ""
                     else:
-                        port_config.prefix = port_prefix + "_"
+                        port_config.real_prefix = port_prefix + "_"
                 else:
-                    port_config.prefix += "_"
+                    port_config.real_prefix = port_config.prefix + "_"
         for port_config in self.config.port_configs:
-            setattr(self, f"{port_config.prefix}addr", Input(port_config.addr_type))
-            self.optional_ports[f"{port_config.prefix}data_in"] = (port_config.data_type, Memory.INPUT)
-            self.optional_ports[f"{port_config.prefix}data_out"] = (port_config.data_type, Memory.OUTPUT)
-            self.optional_ports[f"{port_config.prefix}write_en"] = (logic, Memory.INPUT)
-            setattr(self, f"{port_config.prefix}clk", AutoInput(logic, keyword_only = True, auto_port_names = (f"{port_config}_clk", f"{port_config}_clock", "clk", "clock"), optional = False))
+            setattr(self, f"{port_config.real_prefix}addr", Input(port_config.addr_type))
+            self.optional_ports[f"{port_config.real_prefix}data_in"] = (port_config.data_type, Memory.INPUT)
+            self.optional_ports[f"{port_config.real_prefix}data_out"] = (port_config.data_type, Memory.OUTPUT)
+            self.optional_ports[f"{port_config.real_prefix}write_en"] = (logic, Memory.INPUT)
+            setattr(self, f"{port_config.real_prefix}clk", AutoInput(logic, keyword_only = True, auto_port_names = (f"{port_config}_clk", f"{port_config}_clock", "clk", "clock"), optional = False))
 
     def create_named_port(self, name: str) -> Optional[Port]:
         """
@@ -155,11 +156,11 @@ class Memory(GenericModule):
         return len(self.config.port_configs)
 
     def _get_port_ports(self, port_config) -> Sequence[Port]:
-        data_in_port = getattr(self, f"{port_config.prefix}data_in", None)
-        data_out_port = getattr(self, f"{port_config.prefix}data_out", None)
-        write_en_port = getattr(self, f"{port_config.prefix}write_en", None)
-        addr_port = getattr(self, f"{port_config.prefix}addr")
-        clk_port = getattr(self, f"{port_config.prefix}clk", None)
+        data_in_port = getattr(self, f"{port_config.real_prefix}data_in", None)
+        data_out_port = getattr(self, f"{port_config.real_prefix}data_out", None)
+        write_en_port = getattr(self, f"{port_config.real_prefix}write_en", None)
+        addr_port = getattr(self, f"{port_config.real_prefix}addr")
+        clk_port = getattr(self, f"{port_config.real_prefix}clk", None)
         return data_in_port, data_out_port, write_en_port, addr_port, clk_port
 
     def _setup(self):
@@ -253,35 +254,33 @@ class Memory(GenericModule):
     def generate_reset_content(self, back_end: 'BackEnd', memory_name: str) -> str:
         rtl_body = ""
         if self.config.reset_content is not None:
-            rtl_body += f"\tinitial begin\n"
+            rtl_body += f"initial begin\n"
             if callable(self.config.reset_content):
                 generator = self.config.reset_content(self.mem_data_bits, self.mem_addr_range)
                 try:
                     for addr in range(self.mem_addr_range):
                         data = next(generator)
-                        rtl_body += f"\t\t{memory_name}[{addr}] <= {self.mem_data_bits}'h{data:x};\n"
+                        rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {self.mem_data_bits}'h{data:x};\n")
                 except StopIteration:
                     pass # memory content is only partially specified
                 generator.close()
             else:
-                rtl_body += f'\t\t$readmemb("{self.config.reset_content}", mem);\n'
-            rtl_body += f"\tend\n"
+                rtl_body += back_end.indent(f'$readmemb("{self.config.reset_content}", mem);\n')
+            rtl_body += f"end\n"
             rtl_body += f"\n"
 
         return rtl_body
 
-    def generate_single_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
+    def generate_single_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd', target_namespace: 'Module') -> str:
         # Sing-port memory
         prot_config = self.config.port_configs[0]
 
-        # some preparation for inlining...
-        target_namespace = self
         memory_name = netlist.register_symbol(target_namespace, "mem", None)
 
         data_bits = prot_config.data_bits
         addr_bits = prot_config.addr_bits
 
-        rtl_body =  f"\twire [{data_bits-1}:0] {memory_name} [{(1 << addr_bits)-1}:0];\n"
+        rtl_body =  f"wire [{data_bits-1}:0] {memory_name} [{(1 << addr_bits)-1}:0];\n"
 
         rtl_body += self.generate_reset_content(back_end, memory_name)
 
@@ -296,32 +295,28 @@ class Memory(GenericModule):
         if data_out_port is not None:
             if prot_config.registered_input:
                 addr_name = netlist.register_symbol(target_namespace, "addr_reg", None)
-                rtl_body += f"\twire [{addr_bits-1}:0] {addr_name};\n"
+                rtl_body += f"wire [{addr_bits-1}:0] {addr_name};\n"
             else:
                 addr_name = addr
         if data_in_port is not None or (data_out_port is not None and prot_config.registered_input):
-            rtl_body += f"\talways @(posedge {clk}) begin\n"
+            rtl_body += f"always @(posedge {clk}) begin\n"
             if data_in_port is not None:
                 if write_en_port is not None:
-                    rtl_body += f"\t\tif ({write_en}) begin\n"
-                    rtl_body += f"\t\t\t{memory_name}[{addr}] <= {data_in};\n"
-                    rtl_body += f"\t\tend\n"
+                    rtl_body += back_end.indent(f"if ({write_en}) begin\n")
+                    rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {data_in};\n", 2)
+                    rtl_body += back_end.indent(f"end\n")
                 else:
-                    rtl_body += f"\t\t{memory_name}[{addr}] <= {data_in};\n"
+                    rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {data_in};\n")
             if data_out_port is not None and prot_config.registered_input:
-                rtl_body += f"\t\t{addr_name} <= {addr};\n"
+                rtl_body += back_end.indent(f"{addr_name} <= {addr};\n")
             if data_out_port is not None and prot_config.registered_output:
-                rtl_body += f"\t\t{data_out} <= {memory_name}[{addr_name}];\n"
-            rtl_body += f"\tend\n"
+                rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name}];\n")
+            rtl_body += f"end\n"
         if data_out_port is not None and not prot_config.registered_output:
-            rtl_body += f"\t{data_out} <= {memory_name}[{addr_name}];\n"
+            rtl_body += f"{data_out} <= {memory_name}[{addr_name}];\n"
         return rtl_body
 
-    def generate_dual_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
-
-        # some preparation for inlining...
-        target_namespace = self
-
+    def generate_dual_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd', target_namespace: 'Module') -> str:
         memory_name = netlist.register_symbol(target_namespace, "mem", None)
 
         rtl_body = ""
@@ -339,9 +334,9 @@ class Memory(GenericModule):
         mem_ratio = self.secondary_port_configs[0].mem_ratio
 
         if mixed_ratios:
-            rtl_body =  f"\treg [{mem_ratio-1}:0] [{self.mem_data_bits/mem_ratio-1}:0] {memory_name}[0:{self.mem_addr_range-1}];\n"
+            rtl_body =  f"reg [{mem_ratio-1}:0] [{self.mem_data_bits/mem_ratio-1}:0] {memory_name}[0:{self.mem_addr_range-1}];\n"
         else:
-            rtl_body =  f"\treg [{self.mem_data_bits-1}:0] {memory_name}[0:{self.mem_addr_range-1}];\n"
+            rtl_body =  f"reg [{self.mem_data_bits-1}:0] {memory_name}[0:{self.mem_addr_range-1}];\n"
         rtl_body += f"\n"
 
         rtl_body += self.generate_reset_content(back_end, memory_name)
@@ -357,62 +352,67 @@ class Memory(GenericModule):
 
             if data_out_port is not None:
                 if port_config.registered_input:
-                    addr_name = netlist.register_symbol(target_namespace, f"{port_config.prefix}addr_reg", None)
-                    rtl_body += f"\twire [{port_config.addr_bits-1}:0] {addr_name};\n"
+                    addr_name = netlist.register_symbol(target_namespace, f"{port_config.real_prefix}addr_reg", None)
+                    rtl_body += f"wire [{port_config.addr_bits-1}:0] {addr_name};\n"
                 else:
                     addr_name = addr
             if data_in_port is not None or (data_out_port is not None and port_config.registered_input):
-                rtl_body += f"\talways @(posedge {clk}) begin\n"
+                rtl_body += f"always @(posedge {clk}) begin\n"
                 if data_in_port is not None:
                     if write_en_port is not None:
-                        rtl_body += f"\t\tif ({write_en}) begin\n"
+                        rtl_body += back_end.indent(f"if ({write_en}) begin\n")
                         if port_config.mem_ratio == 1:
-                            rtl_body += f"\t\t\t{memory_name}[{addr}] <= {data_in};\n"
+                            rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {data_in};\n", 2)
                         else:
-                            rtl_body += f"\t\t\t{memory_name}[{addr} / {port_config.mem_ratio}][{addr} % {port_config.mem_ratio}] <= {data_in};\n"
-                        rtl_body += f"\t\tend\n"
+                            rtl_body += back_end.indent(f"{memory_name}[{addr} / {port_config.mem_ratio}][{addr} % {port_config.mem_ratio}] <= {data_in};\n", 2)
+                        rtl_body += back_end.indent(f"end\n")
                     else:
                         if port_config.mem_ratio == 1:
-                            rtl_body += f"\t\t{memory_name}[{addr}] <= {data_in};\n"
+                            rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {data_in};\n")
                         else:
-                            rtl_body += f"\t\t{memory_name}[{addr} / {port_config.mem_ratio}][{addr} % {port_config.mem_ratio}] <= {data_in};\n"
+                            rtl_body += back_end.indent(f"{memory_name}[{addr} / {port_config.mem_ratio}][{addr} % {port_config.mem_ratio}] <= {data_in};\n")
                 if data_out_port is not None and port_config.registered_input:
-                    rtl_body += f"\t\t{addr_name} <= {addr};\n"
+                    rtl_body += back_end.indent(f"{addr_name} <= {addr};\n")
                 if data_out_port is not None and port_config.registered_output:
                     if port_config.mem_ratio == 1:
-                        rtl_body += f"\t\t{data_out} <= {memory_name}[{addr_name}];\n"
+                        rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name}];\n")
                     else:
-                        rtl_body += f"\t\t{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n"
-                rtl_body += f"\tend\n"
+                        rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n")
+                rtl_body += f"end\n"
             if data_out_port is not None and not port_config.registered_output:
                 if port_config.mem_ratio == 1:
-                    rtl_body += f"\t{data_out} <= {memory_name}[{addr_name}];\n"
+                    rtl_body += f"{data_out} <= {memory_name}[{addr_name}];\n"
                 else:
-                    rtl_body += f"\t{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n"
+                    rtl_body += f"{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n"
             rtl_body += f"\n"
 
         return rtl_body
 
-    def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
+    def get_inline_block(self, back_end: 'BackEnd', target_namespace: 'Module') -> Generator[InlineBlock, None, None]:
+        yield InlineStatement(self.get_outputs().values(), self.generate_inline_statement(back_end, target_namespace))
+
+    def generate_inline_statement(self, back_end: 'BackEnd', target_namespace: 'Module') -> str:
         self._setup()
-        rtl_header = self._impl.generate_module_header(back_end)
+        #rtl_header = self._impl.generate_module_header(back_end)
 
         # Go through the ports again and make sure they're compatible with the geometry
         if self.get_port_count() == 0:
             raise SyntaxErrorException(f"All memory instances must have at least one port")
         if self.get_port_count() == 1:
-            rtl_body = self.generate_single_port_memory(netlist, back_end)
+            rtl_body = self.generate_single_port_memory(self._impl.netlist, back_end, target_namespace)
         elif self.get_port_count() == 2:
-            rtl_body = self.generate_dual_port_memory(netlist, back_end)
+            rtl_body = self.generate_dual_port_memory(self._impl.netlist, back_end, target_namespace)
         else:
             raise SyntaxErrorException(f"No more than two ports are supported on memory instances")
 
-        ret_val = (
-            str_block(rtl_header, "", "\n\n") +
-            str_block(rtl_body, "", "\n") +
-            "endmodule"
-        )
-        return ret_val
+        #ret_val = (
+        #    str_block(rtl_header, "", "\n\n") +
+        #    str_block(back_end.indent(rtl_body), "", "\n") +
+        #    "endmodule"
+        #)
+        return rtl_body
+
+    #def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
 
     def simulate(self) -> TSimEvent:
         # TODO: load initial content
@@ -525,3 +525,65 @@ class Memory(GenericModule):
                         if not port_config.registered_output:
                             data_out_port <<= data_out_val
 
+
+class Memory(GenericModule):
+    INPUT = 1
+    OUTPUT = 2
+    def construct(self, config: MemoryConfig):
+        from copy import deepcopy
+        self.config = deepcopy(config)
+        self.optional_ports = OrderedDict()
+        for idx, port_config in enumerate(self.config.port_configs):
+            port_prefix = f"port{idx+1}"
+            if port_config is not None:
+                if port_config.prefix is None:
+                    if self.get_port_count() == 1:
+                        port_config.real_prefix = ""
+                    else:
+                        port_config.real_prefix = port_prefix + "_"
+                else:
+                    port_config.real_prefix = port_config.prefix + "_"
+        for port_config in self.config.port_configs:
+            setattr(self, f"{port_config.real_prefix}addr", Input(port_config.addr_type))
+            self.optional_ports[f"{port_config.real_prefix}data_in"] = (port_config.data_type, Memory.INPUT)
+            self.optional_ports[f"{port_config.real_prefix}data_out"] = (port_config.data_type, Memory.OUTPUT)
+            self.optional_ports[f"{port_config.real_prefix}write_en"] = (logic, Memory.INPUT)
+            setattr(self, f"{port_config.real_prefix}clk", AutoInput(logic, keyword_only = True, auto_port_names = (f"{port_config}_clk", f"{port_config}_clock", "clk", "clock"), optional = False))
+
+    def create_named_port(self, name: str) -> Optional[Port]:
+        """
+        Called from the framework when unknown ports are accessed. This allows for dynamic port creation, though the default is to do nothing.
+        Port creation should be as restrictive as possible and for any non-supported name, return None.
+        This allows for regular attribute creation for non-port attributes.
+        NOTE: create_named_port should return the created port object instead of directly adding it to self
+        """
+        if name in self.optional_ports:
+            if self.optional_ports[name][1] == Memory.INPUT:
+                return Input(self.optional_ports[name][0])
+            elif self.optional_ports[name][1] == Memory.OUTPUT:
+                return Output(self.optional_ports[name][0])
+            else:
+                assert False
+        return None
+
+    def get_port_count(self) -> int:
+        return len(self.config.port_configs)
+
+    def body(self):
+        from copy import deepcopy
+        # Replace all data types with their equivalent number types
+        mem_config = deepcopy(self.config)
+        for port_config in mem_config.port_configs:
+            port_config.data_type = Unsigned(port_config.data_type.get_num_bits())
+        real_mem = _Memory(mem_config)
+        # Hook up all of our ports to the internal one
+        for port_name, port in self.get_inputs().items():
+            if port_name.endswith("data_in"):
+                port = port.to_number()
+            setattr(real_mem, port_name, port)
+        for port_name, port in self.get_outputs().items():
+            if port_name.endswith("data_out"):
+                port.from_number(getattr(real_mem, port_name))
+            else:
+                port <<= getattr(real_mem, port_name)
+        port = None # Make sure tracer doesn't generate an unnecessary Wire object
