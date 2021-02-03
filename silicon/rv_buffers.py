@@ -15,26 +15,9 @@ class ForwardBuf(Module):
     reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=False)
 
     def body(self):
-        in_ready = None
-        in_valid = None
-        data_signals = OrderedDict()
-        for names, input_member in self.input_port.get_all_member_junctions_with_names(add_self=False).items():
-            if names == ("valid",):
-                in_valid = input_member
-            elif names == ("ready", ):
-                in_ready = input_member
-            else:
-                if not is_input_port(input_member):
-                    raise SyntaxErrorException(f"data member {get_composite_member_name(names)} signal in input port should be not reversed while evaluating {self}")
-                data_signals[names] = input_member
-        if in_ready is None:
-            raise SyntaxErrorException(f"Input port doesn't have a 'ready' member while evaluating {self}")
-        if in_valid is None:
-            raise SyntaxErrorException(f"Input port doesn't have a 'valid' member while evaluating {self}")
-        if not is_output_port(in_ready):
-            raise SyntaxErrorException(f"ready signal in input port should be reversed while evaluating {self}")
-        if not is_input_port(in_valid):
-            raise SyntaxErrorException(f"valid signal in input port should be not reversed while evaluating {self}")
+        in_ready = self.input_port.ready
+        in_valid = self.input_port.valid
+        data_signals = self.input_port.get_data_members()
 
         self.output_port.set_net_type(self.input_port.get_net_type())
 
@@ -52,9 +35,8 @@ class ForwardBuf(Module):
 
         buf_valid <<= Reg(Select(in_valid & in_ready, Select(out_ready & buf_valid, buf_valid, 0), 1))
 
-        for names, output_member in self.output_port.get_all_member_junctions_with_names(add_self=False).items():
-            if names not in (("valid",), ("ready", )):
-                output_member <<= buf_data[names]
+        for names, output_member in self.output_port.get_data_members().items():
+            output_member <<= buf_data[names]
 
         self.output_port.valid <<= buf_valid
         out_ready <<= self.output_port.ready
@@ -65,7 +47,53 @@ class ForwardBuf(Module):
         del(buf_data)
         del(buf_member)
         del(output_member)
-        del(input_member)
         del(member)
         del(out_ready)
         del(in_valid)
+
+
+class ReverseBuf(Module):
+    input_port = Input()
+    output_port = Output()
+    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
+    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=False)
+
+    def body(self):
+        buf_valid = Wire(logic)
+        buf_load = Wire(logic)
+
+        in_ready = self.input_port.ready
+        in_valid = self.input_port.valid
+        data_signals = self.input_port.get_data_members()
+
+        self.output_port.set_net_type(self.input_port.get_net_type())
+
+        buf_data = OrderedDict()
+        for names, member in data_signals.items():
+            buf_member = Wire(member.get_net_type())
+            buf_data[names] = buf_member
+            exec_str = f"buf_data_{get_composite_member_name(names, '_')} = buf_member"
+            exec(exec_str)
+            buf_member <<= Reg(Select(buf_load, buf_member, member))
+
+        out_ready = self.output_port.ready
+        in_ready <<= Reg(out_ready)
+
+        buf_load <<= in_valid & in_ready & ~out_ready
+
+        buf_valid <<= Reg(Select(out_ready, Select(buf_load, buf_valid, 1), 0))
+
+        self.output_port.valid = Select(out_ready & ~buf_valid, buf_valid, in_valid & in_ready)
+
+        for names, output_member in self.output_port.get_data_members().items():
+            output_member <<= Select(out_ready & ~buf_valid, buf_data[names], data_signals[names])
+
+        # Clean up the namespace
+        del(data_signals)
+        del(buf_data)
+        del(buf_member)
+        del(output_member)
+        del(member)
+        del(out_ready)
+        del(in_valid)
+

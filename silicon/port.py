@@ -817,17 +817,17 @@ class Junction(JunctionBase):
             ret_val.add(self)
         return ret_val
 
-    def get_all_member_junctions_with_names(self, add_self: bool) -> Dict[Tuple[str], 'Junction']:
+    def get_all_member_junctions_with_names(self, add_self: bool) -> Dict[Tuple[str], Tuple['Junction', bool]]:
         """
         Returns all member junctions, whether directly or indirectly within this port
         """
-        def _get_all_member_junctions_with_names(junction: 'Junction', add_self: bool, base_names: Tuple[str] = ()) -> Dict[Tuple[str], 'Junction']:
+        def _get_all_member_junctions_with_names(junction: 'Junction', add_self: bool, base_names: Tuple[str] = (), outer_reverse: bool = False) -> Dict[Tuple[str], 'Junction']:
             ret_val = OrderedDict()
             if junction.is_composite():
-                for name, (member, _) in junction.get_member_junctions().items():
-                    ret_val.update(_get_all_member_junctions_with_names(member, True, base_names + (name,)))
+                for name, (member, reverse) in junction.get_member_junctions().items():
+                    ret_val.update(_get_all_member_junctions_with_names(member, True, base_names + (name,), outer_reverse ^ reverse))
             elif add_self:
-                ret_val[base_names] = junction
+                ret_val[base_names] = (junction, outer_reverse)
             return ret_val
         return _get_all_member_junctions_with_names(self, add_self)
 

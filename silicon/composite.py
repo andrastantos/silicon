@@ -40,7 +40,7 @@ class Composite(NetType):
             if isinstance(val, (NetType, Reverse)):
                 self.add_member(name, val)
 
-    def add_member(self, name: str, member: Union[NetType, Reverse]):
+    def add_member(self, name: str, member: Union[NetType, Reverse]) -> None:
         if name in self.members:
             raise SyntaxErrorException(f"Member {name} already exists on composite type {type(self)}")
         if isinstance(member, NetType):

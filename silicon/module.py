@@ -1166,7 +1166,7 @@ class Module(object):
                 explicit = my_wire.local_name is not None
                 # If this wire was not assigned to a local variable directly (maybe part of a container of sorts)
                 # Give it an auto-generated name.
-                base_name = my_wire.local_name if explicit else "wire"
+                base_name = my_wire.local_name if explicit else "unnamed_wire"
                 base_name = self.symbol_table.register_symbol(base_name, my_wire)
                 xnets = netlist.get_xnets_for_junction(my_wire, base_name)
                 for name, (xnet, wire) in xnets.items():

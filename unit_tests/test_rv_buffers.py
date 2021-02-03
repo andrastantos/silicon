@@ -18,25 +18,28 @@ def test_forward_buf(mode: str = "rtl"):
     class top(Module):
         in1 = Input(Data())
         out1 = Output(Data())
-        #in2 = Input(Data())
-        #out2 = Output(Data())
         clk = Input(logic)
         rst = Input(logic)
 
         def body(self):
-            #x1 = Wire(Data())
-            #x2 = Wire(Data())
-
-            #x1 <<= self.in2
-            #x2 <<= x1
-            #self.out2 <<= x2
-
             fb = ForwardBuf()
             fb.input_port <<= self.in1
-            #self.out1 = ForwardBuf(self.in1)
             self.out1 <<= fb.output_port
+            
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+def test_reverse_buf(mode: str = "rtl"):
+    class top(Module):
+        in1 = Input(Data())
+        out1 = Output(Data())
+        clk = Input(logic)
+        rst = Input(logic)
+
+        def body(self):
+            self.out1 = ReverseBuf(self.in1)
             
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 if __name__ == "__main__":
     test_forward_buf("rtl")
+    #test_reverse_buf("rtl")
