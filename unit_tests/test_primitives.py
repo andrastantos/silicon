@@ -112,6 +112,18 @@ def test_reg():
             
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_reg_with_adaptor():
+    class top(Module):
+        uout1 = Output(Signed(length=5))
+        uin2 = Input(Unsigned(length=4))
+        clk = Input(logic)
+
+        def body(self):
+            registered = Reg(self.uin2)
+            self.uout1 = registered
+            
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 def test_reg3():
     class top(Module):
         sout1 = Output(Signed(length=5))
@@ -153,8 +165,8 @@ def test_reg4():
 if __name__ == "__main__":
     #test_select()
     #test_select_one_first()
-    #test_reg()
+    test_reg()
     #test_reg3()
     #test_mux()
-    test_select_with_none()
+    #test_select_with_none()
     #test_reg4()

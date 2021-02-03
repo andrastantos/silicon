@@ -12,8 +12,8 @@ module top (
 );
 
 	assign out_a_data = in_a_data;
-	assign in_a_ready = out_a_ready;
 	assign out_a_valid = in_a_valid;
+	assign in_a_ready = out_a_ready;
 endmodule
 
 

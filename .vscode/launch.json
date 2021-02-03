@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: UNIT_TEST/test_rv_buffers",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/unit_tests/test_rv_buffers.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/unit_tests"
+        },
+        {
             "name": "Python: UNIT_TEST/test_memory",
             "type": "python",
             "request": "launch",

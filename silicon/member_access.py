@@ -65,6 +65,10 @@ class MemberGetter(object):
             final_key, final_junction = net_type.resolve_key_sequence_for_get(self._keys, self.input_port)
             assert final_key is None, f"We should recurse into subtypes here!!!!"
             self.output_port <<= final_junction
+            # This is very important! In get_inline_block we will get the source of output_port to get to the true implementation.
+            # If we didn't delete the local variable, *it* would become the source and get_inline_block would spiral into an
+            # infinite loop.
+            del(final_junction)
 
         def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
             # Trampoline to the inner implementation for inlining. The only difference is that we'll have to update the referenced port.

@@ -205,7 +205,7 @@ class Simulator(object):
 
             def setup_junction(junction: 'Junction'):
                 if junction.is_composite():
-                    for member_junction in junction.get_member_junctions().values():
+                    for member_junction, _ in junction.get_member_junctions().values():
                         setup_junction(member_junction)
                 else:
                     junction._netlist = self.simulator.netlist

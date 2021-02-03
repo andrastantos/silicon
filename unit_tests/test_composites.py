@@ -306,15 +306,69 @@ def test_struct_sub_module(mode: str = "rtl"):
     else:
         assert False
 
+class Data(Interface):
+    ready = Reverse(logic)
+    valid = logic
+    data = Unsigned(16)
+    data2 = Signed(13)
+
+def test_interface_wire(mode: str = "rtl"):
+    class top(Module):
+        in2 = Input(Data())
+        out2 = Output(Data())
+
+        def body(self):
+            x1 = Wire(Data())
+            #x2 = Wire(Data())
+
+            x1 <<= self.in2
+            #x2 <<= x1
+            #self.out2 <<= x2
+            self.out2 <<= x1
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+def test_interface_wire2(mode: str = "rtl"):
+    class top(Module):
+        in2 = Input(Data())
+        out2 = Output(Data())
+
+        def body(self):
+            x1 = Wire(Data())
+            x2 = Wire(Data())
+
+            x1 <<= self.in2
+            x2 <<= x1
+            self.out2 <<= x2
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+def test_interface_wire3(mode: str = "rtl"):
+    class top(Module):
+        in2 = Input(Data())
+        out2 = Output(Data())
+
+        def body(self):
+            x0 = self.in2
+            x1 = Wire(Data())
+            x2 = Wire(Data())
+            x3 = self.out2
+
+            x1 <<= self.in2
+            x2 <<= x1
+            self.out2 <<= x2
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 
 
 if __name__ == "__main__":
     #test_select_struct()
     #test_select_one_struct()
-    test_select_first_struct("rtl")
+    #test_select_first_struct("rtl")
     #test_select_first_struct("sim")
     #test_reg_struct()
-    #test_struct_of_struct()
+    test_struct_of_struct()
     #test_generic_struct()
     #test_struct_with_method()
     #test_struct_to_number("rtl")
@@ -322,3 +376,6 @@ if __name__ == "__main__":
     #test_struct_sub_module("rtl")
     #test_number_to_struct("rtl")
     #test_number_to_struct("sim")
+    #test_interface_wire("rtl")
+    #test_interface_wire2("rtl")
+    #test_interface_wire3("rtl")

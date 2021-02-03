@@ -114,6 +114,10 @@ class Composite(NetType):
     def get_default_sim_value(self) -> Any:
         assert False, "Simulation should never enquire about default values of Composites"
 
+    def __eq__(self, other):
+        return self is other or type(self) is type(other)
+
+
 class Struct(Composite):
     def __init__(self):
         super().__init__(support_reverse = False)
@@ -150,9 +154,6 @@ class Struct(Composite):
             return first_type
         else:
             return super().result_type(net_types, operation) # Will raise an exception.
-
-    def __eq__(self, other):
-        return self is other or type(self) is type(other)
 
     def get_lhs_name(self, for_junction: Junction, back_end: BackEnd, target_namespace: Module, allow_implicit: bool=True) -> Optional[str]:
         assert back_end.language == "SystemVerilog"

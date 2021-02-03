@@ -286,3 +286,6 @@ def fill_arg_names(function: Callable, args: List[Any], kwargs: Dict[str, Any]) 
 
 def is_power_of_two(n: int) -> bool:
     return (n & (n-1) == 0) and n != 0
+
+def get_composite_member_name(names: Sequence[str], delimiter: str = ".") -> str:
+    return delimiter.join(names)

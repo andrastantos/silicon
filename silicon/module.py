@@ -342,7 +342,7 @@ class Module(object):
                             continue
                         if sub_module_port.is_composite():
                             for sub_module_port_member in sub_module_port.get_all_member_junctions(False):
-                                if is_output_port(sub_module_port):
+                                if is_output_port(sub_module_port_member):
                                     source_str = sub_module_port_member.get_lhs_name(back_end, self)
                                 elif is_input_port(sub_module_port_member):
                                     source_str, _ = sub_module_port_member.get_rhs_expression(back_end, self)
@@ -975,7 +975,7 @@ class Module(object):
 
                     def finalize_slices(junction):
                         if junction.is_composite():
-                            for member in junction.get_member_junctions().values():
+                            for member, _ in junction.get_member_junctions().values():
                                 finalize_slices(member)
                         else:
                             junction.finalize_slices()

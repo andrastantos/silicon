@@ -210,7 +210,7 @@ class Netlist(object):
         def create_xnets_for_junction(for_junction: 'Junction') -> Sequence[XNet]:
             if for_junction.is_composite():
                 xnets = []
-                for member_junction in for_junction.get_member_junctions().values():
+                for member_junction, _ in for_junction.get_member_junctions().values():
                     xnets += create_xnets_for_junction(member_junction)
                 return xnets
             else:
@@ -350,7 +350,7 @@ class Netlist(object):
         if not junction.is_composite():
             return {base_name: (self.get_xnet_for_junction(junction), junction)}
         ret_val = OrderedDict()
-        for member_name, member_junction in junction.get_member_junctions().items():
+        for member_name, (member_junction, _) in junction.get_member_junctions().items():
             ret_val.update(self.get_xnets_for_junction(member_junction, f"{base_name}{MEMBER_DELIMITER}{member_name}"))
         return ret_val
 

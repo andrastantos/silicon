@@ -40,6 +40,8 @@ class Number(NetType):
         return f"Number({signed_str}{self.length} {self.min_val}...{self.max_val})"
 
     def __eq__(self, other):
+        if other is None:
+            return False
         return self is other or (self.min_val == other.min_val and self.max_val == other.max_val and self.length == other.length and self.signed == other.signed)
     
     def __hash__(self):
