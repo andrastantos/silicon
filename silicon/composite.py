@@ -45,11 +45,14 @@ class Composite(NetType):
             raise SyntaxErrorException(f"Member {name} already exists on composite type {type(self)}")
         if isinstance(member, NetType):
             self.members[name] = (member, False)
-        if isinstance(member, Reverse):
+        elif isinstance(member, Reverse):
             if self._support_reverse:
                 self.members[name] = (member.net_type, True)
             else:
                 raise SyntaxErrorException(f"Composite type {type(self)} doesn't support reverse members")
+        else:
+            raise SyntaxErrorException(f"Composite type members must be either NetTypes or Reverse(NetType)-s. {member} is of type {type(member)}")
+
 
     def get_members(self) -> Dict[str, Tuple[Union[NetType, bool]]]:
         return self.members
