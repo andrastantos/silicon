@@ -68,7 +68,11 @@ class InlineComposite(InlineBlock):
     def inline(self, scope: 'Module', netlist: 'Netlist', back_end: 'BackEnd') -> Optional[str]:
         ret_val = ""
         for member in self.member_inlines:
-            ret_val += member.inline(scope, netlist, back_end)
+            member_inline = member.inline(scope, netlist, back_end)
+            if member_inline is None:
+                ret_val = None
+            if ret_val != None:
+                ret_val += member_inline
         return ret_val
 
 class GlobalSymbolTable(object):
