@@ -1,4 +1,4 @@
-$date 2021-01-31 09:16:37.381021 $end
+$date 2021-02-04 09:27:37.220132 $end
 $timescale 1 ns $end
 $scope module mc6845_tb $end
 $var wire 1 ! rst $end
@@ -7,7 +7,7 @@ $var wire 1 # n_cs $end
 $var wire 1 $ data_in $end
 $var wire 1 % wr_idx $end
 $var wire 1 & xxxxx $end
-$var wire 1 ' wire $end
+$var wire 1 ' unnamed_wire $end
 $var wire 1 ( r_feedback $end
 $var wire 1 ) r_delayed $end
 $var wire 1 * r_direct $end
@@ -36,7 +36,7 @@ $end
 0"
 #50
 1"
-0#
 1*
 0)
+0#
 1%

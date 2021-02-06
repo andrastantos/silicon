@@ -63,7 +63,9 @@ class XNet(object):
         assert is_module(scope)
         if scope not in self.scoped_names:
             self.scoped_names[scope] = dict()
-        self.scoped_names[scope][name] = XNet.NameStatus(is_explicit = is_explicit, is_input = is_input)
+        # Only add implicit names if we don't already have an explicit one
+        if len(self.scoped_names[scope]) == 0 or is_explicit:
+            self.scoped_names[scope][name] = XNet.NameStatus(is_explicit = is_explicit, is_input = is_input)
     def use_name(self, scope: 'Module', name: str) -> None:
         assert is_module(scope)
         self.scoped_names[scope][name].is_used = True

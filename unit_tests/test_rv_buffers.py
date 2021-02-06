@@ -41,5 +41,5 @@ def test_reverse_buf(mode: str = "rtl"):
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 if __name__ == "__main__":
-    test_forward_buf("rtl")
-    #test_reverse_buf("rtl")
+    #test_forward_buf("rtl")
+    test_reverse_buf("rtl")

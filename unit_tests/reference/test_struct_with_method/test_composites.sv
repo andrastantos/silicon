@@ -19,6 +19,7 @@ module AlphaBender (
 	assign outp_r = (in1_r * alpha + in2_r * (8'hff - alpha) + 7'h7f)[19:8];
 	assign outp_g = (in1_g * alpha + in2_g * (8'hff - alpha) + 7'h7f)[19:8];
 	assign outp_b = (in1_b * alpha + in2_b * (8'hff - alpha) + 7'h7f)[19:8];
+
 endmodule
 
 

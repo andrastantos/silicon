@@ -1,0 +1,24 @@
+digraph "UseFSM.my_fsm at /home/tantos/personal/silicon/unit_tests/test_fsm.py:26" {
+	rankdir=LR size="8,5"
+	reset [height=0.2 shape=point xlabel=reset]
+	rankdir=LR size="8,5"
+	__others__ [fillcolor=gray height=0.2 shape=point style=dashed xlabel=others]
+	idle [label=idle shape=circle]
+	__others__ -> idle [style=dashed]
+	node [shape=circle]
+	reset -> idle [label="1'h1"]
+	idle -> get_first_data [label="data_in_valid &  ~ data_last"]
+	get_data -> get_wait [label=" ~ data_in_valid"]
+	get_data -> get_data [label="data_in_valid &  ~ data_last"]
+	get_wait -> get_wait [label=" ~ data_in_valid"]
+	get_wait -> get_data [label="data_in_valid &  ~ data_last"]
+	get_data -> send_data [label="data_in_valid & data_last"]
+	get_wait -> send_data [label="data_in_valid & data_last"]
+	idle -> send_data [label="data_in_valid & data_last"]
+	send_data -> idle [label=" ~ data_in_valid"]
+	send_data -> get_first_data [label="data_in_valid &  ~ data_last"]
+	send_data -> send_data [label="data_in_valid & data_last"]
+	get_first_data -> get_wait [label=" ~ data_in_valid"]
+	get_first_data -> get_data [label="data_in_valid &  ~ data_last"]
+	get_first_data -> send_data [label="data_in_valid & data_last"]
+}
