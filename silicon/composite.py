@@ -150,8 +150,14 @@ class Struct(Composite):
             if not isinstance(net_type, Struct) and net_type is not None:
                 raise SyntaxErrorException("Can only determine union type if all constituents are Structs")
         if operation == "SELECT":
-            first_type = net_types[0]
-            for net_type in net_types[1:]:
+            start_idx = 0
+            first_type = None
+            while first_type is None:
+                first_type = net_types[start_idx]
+                start_idx += 1
+                if start_idx == len(net_types):
+                    raise SyntaxErrorException(f"Can't determine net type for SELECT: none of the value ports have types")
+            for net_type in net_types[start_idx:]:
                 if not first_type == net_type:
                     raise SyntaxErrorException("SELECT is only supported on structs of the same type")
             return first_type

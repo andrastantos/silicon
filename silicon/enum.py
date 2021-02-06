@@ -222,10 +222,6 @@ class Enum(Number):
             return sim_value
         else:
             raise SimulationException(f"Value {sim_value} can't be represented by Enum type {self.get_type_name()}")
-    def is_equivalent(self, other) -> bool:
-        if not isinstance(other, Enum):
-            return False
-        return super().is_equivalent(other)
     
     @classmethod
     def result_type(cls, net_types: Sequence[Optional['NetType']], operation: str) -> 'NetType':
@@ -236,7 +232,6 @@ class Enum(Number):
                 if all(net_type.base_type is enum_type for net_type in net_types):
                     return first(net_types)
         return super().result_type(net_types, operation)
-
 
     def __eq__(self, other):
         return self is other or type(self) is type(other)

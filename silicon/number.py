@@ -40,7 +40,7 @@ class Number(NetType):
         return f"Number({signed_str}{self.length} {self.min_val}...{self.max_val})"
 
     def __eq__(self, other):
-        if other is None:
+        if not isinstance(other, Number):
             return False
         return self is other or (self.min_val == other.min_val and self.max_val == other.max_val and self.length == other.length and self.signed == other.signed)
     
@@ -394,14 +394,6 @@ class Number(NetType):
         if sim_value > self.max_val or sim_value < self.min_val:
             raise SimulationException(f"Can't assign to net {parent_junction} a value {sim_value} that's outside of the representable range.")
         return sim_value
-
-    def is_equivalent(self, other) -> bool:
-        """
-        Returns True if the other net_type object is equivalent to this one.
-        """
-        if not isinstance(other, Number):
-            return False
-        return self.min_val == other.min_val and self.max_val == other.max_val
 
     def generate_const_val(self, value: Optional[int], back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"

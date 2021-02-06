@@ -1035,7 +1035,7 @@ class Module(object):
                     return False
                 if my_junction.is_typeless():
                     return True
-                return my_junction.get_net_type().is_equivalent(other_junction.get_net_type())
+                return my_junction.get_net_type() == other_junction.get_net_type()
 
             ports_are_ok = all(
                 are_junctions_equivalent(my_port_name, my_port, other_port_name, other_port)

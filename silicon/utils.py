@@ -197,7 +197,7 @@ def adapt(input: 'Junction', output_type: 'NetType', implicit: bool) -> 'Junctio
     Creates an adaptor instance if needed to convert input to output_type.
     Returns the generated output port. If such adaptation is not possible, raises an exception
     """
-    if output_type.is_equivalent(input.get_net_type()):
+    if output_type == input.get_net_type():
         return input
     try:
         ret_val = output_type.adapt_from(input, implicit)

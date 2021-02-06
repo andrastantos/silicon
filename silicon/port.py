@@ -247,25 +247,6 @@ class Junction(JunctionBase):
                 ret_val += member_junction.generate_interface(back_end, f"{port_name}{MEMBER_DELIMITER}{member_name}")
             return ret_val
 
-
-
-    def is_equivalent(self, other: 'Junction') -> bool:
-        """
-        Returns True if the other port object is equivalent to this one.
-
-        This function is used to:
-        1. determine if modules have the same interface -> thus can potentially share the same body as well (there are other checks to determine that too)
-        2. determine if two ports can be bound together without adaptors being inserted.
-
-        Neither of these contexts should execute with typeless ports (in fact not even with generic ports, but that check is a bit too strong here).
-        """
-        if self.is_typeless() and other.is_typeless():
-            return True
-        if self.is_typeless() != other.is_typeless():
-            return False
-        return self.get_net_type().is_equivalent(other.get_net_type())
-
-    
     def __iter__(self) -> Any:
         if self.is_typeless():
             raise SyntaxErrorException(f"Can't iterate through the elements of a typeless port {self}")

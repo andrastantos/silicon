@@ -34,11 +34,6 @@ class NetType(object):
         raise NotImplementedError
     def generate_net_type_ref(self, for_junction: 'Junction', back_end: 'BackEnd') -> str:
         raise NotImplementedError
-    def is_equivalent(self, other: 'NetType') -> bool:
-        """
-        Returns True if the other net_type object is equivalent to this one.
-        """
-        return type(self) == type(other)
     def is_abstract(self) -> bool:
         """
         Returns True if the type is abstract, that is it can't be the type of an actual net.
@@ -152,6 +147,13 @@ class NetType(object):
         TODO: maybe Number should use this technique to inject legnth/min/max/signed into the Junction?
         """
         self.set_behaviors(junction)
+
+
+    def __eq__(self, other) -> bool:
+        """
+        Returns True if the other net_type object is equivalent to this one.
+        """
+        return type(self) == type(other)
 
     def __ne__(self, other):
         # One usually overrides only __eq__, so provide a default, compatible __ne__ implementation
