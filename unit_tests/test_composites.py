@@ -212,7 +212,7 @@ def test_struct_to_number(mode: str = "rtl"):
         outp = Output()
         
         def body(self):
-            self.outp = self.in1.to_number()
+            self.outp = explicit_adapt(self.in1, Unsigned(length=self.in1.get_num_bits()))
 
         def simulate(self):
             def test(r,g,b):
@@ -251,7 +251,7 @@ def test_number_to_struct(mode: str = "rtl"):
         outp = Output(Pixel(pixel_width))
         
         def body(self):
-            self.outp.convert_from(self.in1)
+            self.outp <<= explicit_adapt(self.in1, self.outp.get_net_type())
 
         def simulate(self):
             def test(r,g,b):
@@ -368,13 +368,13 @@ if __name__ == "__main__":
     #test_select_first_struct("rtl")
     #test_select_first_struct("sim")
     #test_reg_struct()
-    test_struct_of_struct()
+    #test_struct_of_struct()
     #test_generic_struct()
     #test_struct_with_method()
     #test_struct_to_number("rtl")
     #test_struct_to_number("sim")
     #test_struct_sub_module("rtl")
-    #test_number_to_struct("rtl")
+    test_number_to_struct("rtl")
     #test_number_to_struct("sim")
     #test_interface_wire("rtl")
     #test_interface_wire2("rtl")

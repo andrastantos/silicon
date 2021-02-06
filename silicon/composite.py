@@ -7,7 +7,7 @@ from .exceptions import SyntaxErrorException, SimulationException
 from .module import Module, GenericModule, InlineExpression, InlineBlock, InlineStatement
 from .port import Input, Output, Port, Junction
 from .tracer import no_trace
-from .utils import TSimEvent, MEMBER_DELIMITER
+from .utils import TSimEvent, MEMBER_DELIMITER, adapt
 from collections import namedtuple, OrderedDict
 from copy import copy
 from .number import Unsigned, Number
@@ -274,14 +274,28 @@ class Struct(Composite):
             """
             return True
 
-    @behavior
-    def to_number(self) -> Junction:
-        return Struct.ToNumber(self)
-    @behavior
-    def from_number(self, input: Junction) -> None:
-        if not isinstance(input.get_net_type(), Number):
-            raise SyntaxErrorException(f"from_number can only be used to convert from Numbers. For generic type conversion, use 'convert_from'")
-        self <<= Struct.FromNumber(self.get_net_type())(input.to_number())
+    def adapt_to(self, output_type: 'NetType', input: 'Junction', implicit: bool) -> Optional['Junction']:
+        assert input.get_net_type() is self
+        if output_type == self:
+            return input
+        # We don't support implicit conversion
+        if implicit:
+            return None
+        # We only support conversion from Numbers
+        return Struct.ToNumber(input)
+
+    def adapt_from(self, input: 'Junction', implicit: bool) -> 'Junction':
+        input_type = input.get_net_type()
+        if input_type == self:
+            return input
+        # We don't support implicit conversion
+        if implicit:
+            return None
+        # We support anything that can convert to a number
+        input_as_num = adapt(input, Unsigned(length=input_type.get_num_bits()), implicit)
+        if input_as_num is None:
+            return None
+        return Struct.FromNumber(self)(input_as_num)
 
 class Interface(Composite):
     def __init__(self):

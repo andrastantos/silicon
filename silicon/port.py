@@ -751,10 +751,6 @@ class Junction(JunctionBase):
     def active_context(self) -> str:
         return self._context
 
-    def adapt_to(self, output_type: 'NetType', implicit: bool) -> 'Junction':
-        return self.get_net_type().adapt_to(output_type, self, implicit)
-
-
     def set_interface_name(self, name: str) -> None:
         self.interface_name = name
         for member_name, (member_junction, _) in self.get_member_junctions().items():
@@ -811,12 +807,6 @@ class Junction(JunctionBase):
                 ret_val[base_names] = (junction, outer_reverse)
             return ret_val
         return _get_all_member_junctions_with_names(self, add_self)
-
-    def convert_from(self, input: 'Junction') -> None:
-        if self.get_net_type() is input.get_net_type():
-            self <<= input
-        else:
-            self.from_number(input.to_number())
 
     def get_lhs_name(self, back_end: 'BackEnd', target_namespace: 'Module', allow_implicit: bool=True) -> Optional[str]:
         return self.get_net_type().get_lhs_name(self, back_end, target_namespace, allow_implicit)
@@ -937,9 +927,6 @@ class Output(Port):
         """
         return False
 
-    def adapt_from(self, input_type: 'NetType', implicit: bool) -> 'Junction':
-        return self.get_net_type().adapt_from(input_type, self, implicit)
-
     '''
     class OutputSliceGetter(object):
         def __ilshift__(self, other: Any) -> 'Junction':
@@ -990,9 +977,6 @@ class Wire(Junction):
 
     def has_driver(self, allow_non_auto_inputs: bool = False) -> bool:
         return True
-
-    def adapt_from(self, input_type: 'NetType', implicit: bool) -> 'Junction':
-        return self.get_net_type().adapt_from(input_type, self, implicit)
 
     @classmethod
     def get_member_junction_kind(cls, is_reversed: bool) -> Type:

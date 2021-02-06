@@ -85,8 +85,9 @@ from .utils import str_block, is_power_of_two
 from .exceptions import SyntaxErrorException
 from typing import Optional, Sequence, Generator
 from .number import logic, Unsigned
-from .utils import TSimEvent
+from .utils import TSimEvent, explicit_adapt
 from textwrap import indent
+from .number import Unsigned
 
 @dataclass
 class MemoryPortConfig:
@@ -579,11 +580,11 @@ class Memory(GenericModule):
         # Hook up all of our ports to the internal one
         for port_name, port in self.get_inputs().items():
             if port_name.endswith("data_in"):
-                port = port.to_number()
+                port = explicit_adapt(port, Unsigned(length=port.get_num_bits()))
             setattr(real_mem, port_name, port)
         for port_name, port in self.get_outputs().items():
             if port_name.endswith("data_out"):
-                port.from_number(getattr(real_mem, port_name))
+                port <<= explicit_adapt(getattr(real_mem, port_name), port.get_net_type())
             else:
                 port <<= getattr(real_mem, port_name)
         port = None # Make sure tracer doesn't generate an unnecessary Wire object

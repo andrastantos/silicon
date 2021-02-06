@@ -206,7 +206,7 @@ def adapt(input: 'Junction', output_type: 'NetType', implicit: bool) -> 'Junctio
         return ret_val
     except:
         pass
-    ret_val = input.adapt_to(output_type, implicit)
+    ret_val = input.get_net_type().adapt_to(output_type, input, implicit)
     if ret_val is None:
         raise SyntaxErrorException(f"Can't generate adaptor from {input.get_net_type()} to {output_type} for port {input}")
     return ret_val
