@@ -14,6 +14,9 @@ class KeyKind(PyEnum):
 class Behavior(object):
     def __init__(self, method):
         self.method = method
+    def apply(self, attr_name, instance):
+        setattr(instance, attr_name, MethodType(self.method, instance))
+
 def behavior(method):
     return Behavior(method)
 
@@ -28,7 +31,7 @@ class NetType(object):
         for attr_name in dir(self):
             attr_value = getattr(self,attr_name)
             if isinstance(attr_value, Behavior):
-                setattr(instance, attr_name, MethodType(attr_value.method, instance))
+                attr_value.apply(attr_name, instance)
 
     def generate_type_ref(self, back_end: 'BackEnd') -> str:
         raise NotImplementedError
