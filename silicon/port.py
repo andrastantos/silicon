@@ -108,6 +108,7 @@ class Junction(JunctionBase):
         # Only allow the net_type to be set if it's not set yet, or if it's an abstract type (that is to allow specialization of a port)
         # TODO: For now we also allow the net_type to be set from one abstract type to another one, but that can probably be tightened later
         #       For example, we could say that the new prot type must be an instance of the old port type...
+        #@@@@@@@@@@@@@@@
         if self._net_type == net_type:
             return
         assert not self.is_specialized()

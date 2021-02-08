@@ -197,6 +197,7 @@ def adapt(input: 'Junction', output_type: 'NetType', implicit: bool) -> 'Junctio
     Creates an adaptor instance if needed to convert input to output_type.
     Returns the generated output port. If such adaptation is not possible, raises an exception
     """
+    #@@@@@@@@@@@@@@@
     if output_type == input.get_net_type():
         return input
     try:
@@ -247,6 +248,15 @@ def get_common_net_type(junctions: Sequence['Junction'], partial_results: bool =
         junction_list_as_str = " ".join(str(junction) for junction in junctions)
         raise SyntaxErrorException(f"Ports {junction_list_as_str} don't have a common superclass.")
     return superclass
+
+def print_caller(frame_cnt: int = 1):
+    import inspect as inspect
+    current_frame = inspect.currentframe()
+    caller_frame = current_frame.f_back
+    while frame_cnt > 0:
+        caller_frame = caller_frame.f_back
+        frame_cnt-=1
+    print(f"@@@@@@@ {caller_frame.f_code.co_filename}:{caller_frame.f_lineno}")
 
 def get_caller_local_junctions(frame_cnt: int = 1) -> Dict[str, 'Junction']:
     import inspect as inspect

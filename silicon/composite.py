@@ -158,6 +158,7 @@ class Struct(Composite):
                 if start_idx == len(net_types):
                     raise SyntaxErrorException(f"Can't determine net type for SELECT: none of the value ports have types")
             for net_type in net_types[start_idx:]:
+                #@@@@@@@@@@@@@@@
                 if not first_type == net_type:
                     raise SyntaxErrorException("SELECT is only supported on structs of the same type")
             return first_type
@@ -276,6 +277,7 @@ class Struct(Composite):
 
     def adapt_to(self, output_type: 'NetType', input: 'Junction', implicit: bool) -> Optional['Junction']:
         assert input.get_net_type() is self
+        #@@@@@@@@@@@@@@@
         if output_type == self:
             return input
         # We don't support implicit conversion
@@ -286,6 +288,7 @@ class Struct(Composite):
 
     def adapt_from(self, input: 'Junction', implicit: bool) -> 'Junction':
         input_type = input.get_net_type()
+        #@@@@@@@@@@@@@@@
         if input_type == self:
             return input
         # We don't support implicit conversion

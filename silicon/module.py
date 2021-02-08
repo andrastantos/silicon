@@ -1035,6 +1035,7 @@ class Module(object):
                     return False
                 if my_junction.is_typeless():
                     return True
+                #@@@@@@@@@@@@@@@
                 return my_junction.get_net_type() == other_junction.get_net_type()
 
             ports_are_ok = all(
@@ -1070,6 +1071,7 @@ class Module(object):
             if len(self._construct_kwargs) != len(other._impl._construct_kwargs):
                 return False
             all_construct_kwargs_are_ok = all(
+                #@@@@@@@@@@@@@@@
                 my_arg_name in other._impl._construct_kwargs and my_arg == other._impl._construct_kwargs[my_arg_name] for my_arg_name, my_arg in self._construct_kwargs.items()
             )
             if not all_construct_kwargs_are_ok:
