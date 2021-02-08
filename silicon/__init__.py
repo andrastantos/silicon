@@ -1,7 +1,6 @@
 from .net_type import *
 from .port import *
 from .module import *
-from .vector import *
 from .netlist import *
 from .constant import *
 from .number import *
