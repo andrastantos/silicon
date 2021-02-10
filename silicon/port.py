@@ -10,7 +10,15 @@ from collections import OrderedDict
 from enum import Enum
 
 class JunctionBase(object):
-    pass
+    def __init__(self):
+        cls = self.__class__
+        self.__class__ = cls.__class__(cls.__name__ + "Instance", (cls, ), {})
+    @classmethod
+    def same_type_as(cls, other):
+        if not type(other) is type:
+            other = type(other)
+        return cls.__mro__[1] is other.__mro__[1]
+
 
 class EdgeType(Enum):
     NoEdge = 0
@@ -19,8 +27,8 @@ class EdgeType(Enum):
     Undefined = 3
 
 class Junction(JunctionBase):
-    
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False):
+        super().__init__()
         assert parent_module is None or is_module(parent_module)
         from .module import Module
         self.source: Optional['Port'] = None

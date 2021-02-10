@@ -1029,7 +1029,8 @@ class Module(object):
                     return False
                 if my_junction_name != other_junction_name:
                     return False
-                if type(my_junction) != type(other_junction):
+                # We can't really compare types directly, because each junction has a unique base-type
+                if not my_junction.same_type_as(other_junction):
                     return False
                 if my_junction.is_typeless() != other_junction.is_typeless():
                     return False
