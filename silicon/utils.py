@@ -184,21 +184,20 @@ def str_block(block: Optional[str], header: str, footer: str):
         return ""
 
 
-def implicit_adapt(input: 'Junction', output_type: 'NetType') -> 'Junction':
+def implicit_adapt(input: 'Junction', output_type: type) -> 'Junction':
     return adapt(input, output_type, implicit=True)
 
 
-def explicit_adapt(input: 'Junction', output_type: 'NetType') -> 'Junction':
+def explicit_adapt(input: 'Junction', output_type: type) -> 'Junction':
     return adapt(input, output_type, implicit=False)
 
 
-def adapt(input: 'Junction', output_type: 'NetType', implicit: bool) -> 'Junction':
+def adapt(input: 'Junction', output_type: type, implicit: bool) -> 'Junction':
     """
     Creates an adaptor instance if needed to convert input to output_type.
     Returns the generated output port. If such adaptation is not possible, raises an exception
     """
-    #@@@@@@@@@@@@@@@
-    if output_type == input.get_net_type():
+    if input.same_type_as(output_type):
         return input
     try:
         ret_val = output_type.adapt_from(input, implicit)

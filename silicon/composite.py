@@ -82,43 +82,31 @@ class Composite(NetType):
         """ Sort the set of blobs as required by the back-end """
         return self.sort_source_keys(keys, back_end)
 
-    def generate_type_ref(self, back_end: 'BackEnd') -> str:
-        assert back_end.language == "SystemVerilog"
-        return str(type(self).__name__)
-
-    def generate_net_type_ref(self, for_port: 'Junction', back_end: 'BackEnd') -> str:
-        assert back_end.language == "SystemVerilog"
-        return f"{self.generate_type_ref(back_end)}.{for_port.generate_junction_ref(back_end)}_port"
-
-    def get_num_bits(self) -> int:
+    @classmethod
+    def get_num_bits(cls) -> int:
         return sum(member_type.get_num_bits() for member_type, member_reverse in self.get_members().values())
 
-    @property
-    def vcd_type(self) -> str:
-        return None
-
-    def generate_assign(self, sink_name: str, source_expression: str, xnet: 'XNet', back_end: 'BackEnd') -> str:
+    @classmethod
+    def generate_assign(cls, sink_name: str, source_expression: str, back_end: 'BackEnd') -> str:
         ret_val = ""
-        for (member_name, (member_type, member_reverse)) in self.get_members().items():
+        for (member_name, (member_type, member_reverse)) in cls.get_members().items():
             if member_reverse:
-                ret_val += member_type.generate_assign(f"{source_expression}{MEMBER_DELIMITER}{member_name}", f"{sink_name}{MEMBER_DELIMITER}{member_name}", None, back_end) + "\n"
+                ret_val += member_type.generate_assign(f"{source_expression}{MEMBER_DELIMITER}{member_name}", f"{sink_name}{MEMBER_DELIMITER}{member_name}", back_end) + "\n"
             else:
-                ret_val += member_type.generate_assign(f"{sink_name}{MEMBER_DELIMITER}{member_name}", f"{source_expression}{MEMBER_DELIMITER}{member_name}", None, back_end) + "\n"
+                ret_val += member_type.generate_assign(f"{sink_name}{MEMBER_DELIMITER}{member_name}", f"{source_expression}{MEMBER_DELIMITER}{member_name}", back_end) + "\n"
         return ret_val
 
-    def setup_junction(self, junction: 'Junction') -> None:
+    def setup_junction(self) -> None:
         for (member_name, (member_type, member_reverse)) in self.get_members().items():
-            junction.create_member_junction(member_name, member_type, member_reverse)
-        super().setup_junction(junction)
-
-    def get_unconnected_sim_value(self) -> Any:
+            self.create_member_junction(member_name, member_type, member_reverse)
+        super().setup_junction()
+    @classmethod
+    def get_unconnected_sim_value(cls) -> Any:
         assert False, "Simulation should never enquire about unconnected values of Composites"
-    
-    def get_default_sim_value(self) -> Any:
+    @classmethod
+    def get_default_sim_value(cls) -> Any:
         assert False, "Simulation should never enquire about default values of Composites"
 
-    def __eq__(self, other):
-        return self is other or type(self) is type(other)
 
 
 class Struct(Composite):
@@ -158,17 +146,16 @@ class Struct(Composite):
                 if start_idx == len(net_types):
                     raise SyntaxErrorException(f"Can't determine net type for SELECT: none of the value ports have types")
             for net_type in net_types[start_idx:]:
-                #@@@@@@@@@@@@@@@
-                if not first_type == net_type:
+                if not first_type.same_type_as(net_type):
                     raise SyntaxErrorException("SELECT is only supported on structs of the same type")
             return first_type
         else:
             return super().result_type(net_types, operation) # Will raise an exception.
 
-    def get_lhs_name(self, for_junction: Junction, back_end: BackEnd, target_namespace: Module, allow_implicit: bool=True) -> Optional[str]:
+    def get_lhs_name(self, back_end: BackEnd, target_namespace: Module, allow_implicit: bool=True) -> Optional[str]:
         assert back_end.language == "SystemVerilog"
         ret_val += "{"
-        xnets = for_junction._impl.netlist.get_xnets_for_junction(for_junction)
+        xnets = self.parent_module._impl.netlist.get_xnets_for_junction(self)
         for idx, (xnet, _) in enumerate(xnets.values()):
             name = xnet.get_lhs_name(target_namespace, allow_implicit=allow_implicit)
             if name is None:
@@ -183,7 +170,7 @@ class Struct(Composite):
         input_port = Input()
         output_port = Output()
         def body(self):
-            new_net_type = Unsigned(self.input_port.get_net_type().get_num_bits())
+            new_net_type = Unsigned(self.input_port.get_num_bits())
             assert not self.output_port.is_specialized()
             self.output_port.set_net_type(new_net_type)
 
@@ -231,8 +218,8 @@ class Struct(Composite):
         def construct(self, output_type: NetType):
             self.output_port.set_net_type(output_type)
         def body(self):
-            in_bits = self.input_port.get_net_type().get_num_bits()
-            out_bits = self.output_port.get_net_type().get_num_bits()
+            in_bits = self.input_port.get_num_bits()
+            out_bits = self.output_port.get_num_bits()
             if in_bits > out_bits:
                 raise SyntaxErrorException(f"Can't convert Number of {in_bits} bits into a Struct {type(self)}, which needs only {out_bits} bits.")
 
@@ -275,37 +262,41 @@ class Struct(Composite):
             """
             return True
 
-    def adapt_to(self, output_type: 'NetType', input: 'Junction', implicit: bool) -> Optional['Junction']:
-        assert input.get_net_type() is self
-        #@@@@@@@@@@@@@@@
-        if output_type == self:
-            return input
+    def adapt_to(self, output_type: type, implicit: bool) -> Optional['Junction']:
+        if type(self).same_type_as(output_type):
+            return self
         # We don't support implicit conversion
         if implicit:
             return None
         # We only support conversion from Numbers
-        return Struct.ToNumber(input)
-
-    def adapt_from(self, input: 'Junction', implicit: bool) -> 'Junction':
-        input_type = input.get_net_type()
-        #@@@@@@@@@@@@@@@
-        if input_type == self:
+        if not issubclass(output_type, Number):
+            return None
+        if output_type.get_num_bits() < self.get_num_bits():
+            return None
+        if output_type.signed and output_type.get_num_bits() == self.get_num_bits():
+            return None
+        return Struct.ToNumber(self)
+    @classmethod
+    def adapt_from(cls, input: 'Junction', implicit: bool) -> 'Junction':
+        if type(input).same_type_as(cls):
             return input
         # We don't support implicit conversion
         if implicit:
             return None
         # We support anything that can convert to a number
-        input_as_num = adapt(input, Unsigned(length=input_type.get_num_bits()), implicit)
+        input_as_num = adapt(input, Unsigned(length=input.get_num_bits()), implicit)
         if input_as_num is None:
             return None
-        return Struct.FromNumber(self)(input_as_num)
+        return Struct.FromNumber(cls)(input_as_num)
 
 class Interface(Composite):
     def __init__(self):
         super().__init__(support_reverse = True)
-    def get_unconnected_value(self, back_end: 'BackEnd') -> str:
+    @classmethod
+    def get_unconnected_value(cls, back_end: 'BackEnd') -> str:
         raise SyntaxErrorException(f"Unconnected interfaces are not supported")
-    def get_default_value(self, back_end: 'BackEnd') -> str:
+    @classmethod
+    def get_default_value(cls, back_end: 'BackEnd') -> str:
         raise SyntaxErrorException(f"Unconnected interfaces are not supported")
 
 

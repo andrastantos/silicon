@@ -48,17 +48,27 @@ class XNet(object):
             port = self.source
             if port.is_typeless():
                 return back_end.get_unconnected_value(), 0
-            return port.get_net_type().get_unconnected_value(back_end), 0
+            return port.get_unconnected_value(back_end), 0
         else:
             return name, 0 # This will put the returned value into self.assigned_names
+
     def get_lhs_name(self, scope: 'Module', *, allow_implicit: bool = True) -> Optional[str]:
+        # This is very important that we override the function of the same name provided by the NetType baseclass!
         assert scope is None or is_module(scope)
         name = self.get_best_name(scope, allow_implicit=allow_implicit)
         if name is not None:
             self.assign_name(scope, name)
         return name
-    def generate_assign(self, sink_name: str, source_expression: str, back_end: 'BackEnd') -> str:
-        return self.get_net_type().generate_assign(sink_name, source_expression, self, back_end)
+    def is_typeless(self) -> bool:
+        """
+        Returns True if port has no assigned type. False otherwise.
+        """
+        # A port has a type, if it inherits from NetType
+        return isinstance(self, NetType)
+    def get_unconnected_sim_value(self) -> Any:
+        if self.is_typeless():
+            return None
+        return super().get_unconnected_sim_value()
     def add_name(self, scope: 'Module', name: str, *, is_explicit: bool, is_input: bool) -> None:
         assert is_module(scope)
         if scope not in self.scoped_names:
@@ -161,9 +171,6 @@ class XNet(object):
     @property
     def sim_value(self) -> Any:
         return self.sim_state.value
-
-    def get_num_bits(self) -> int:
-        return self.get_net_type().get_num_bits()
 
 class Netlist(object):
     def __init__(self, top_level: 'Module'):

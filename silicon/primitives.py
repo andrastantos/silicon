@@ -67,8 +67,7 @@ class Select(Module):
         if self.has_default:
             raise SyntaxErrorException("Default values for 'Select' modules are not supported: generation of inline verilog is rather difficult for them.")
         new_net_type = self.generate_output_type()
-        #@@@@@@@@@@@@@@@
-        assert not self.output_port.is_specialized() or self.output_port.get_net_type() == new_net_type
+        assert not self.output_port.is_specialized() or self.output_port.same_type_as(new_net_type)
         if not self.output_port.is_specialized():
             self.output_port.set_net_type(new_net_type)
 
@@ -258,8 +257,7 @@ class _SelectOneHot(Module):
         if len(self.value_ports) == 0:
             raise SyntaxErrorException(f"Select must have at least one value port {self}")
         new_net_type = self.generate_output_type()
-        #@@@@@@@@@@@@@@@
-        assert not self.output_port.is_specialized() or self.output_port.get_net_type() == new_net_type
+        assert not self.output_port.is_specialized() or self.output_port.same_type_as(new_net_type)
         if not self.output_port.is_specialized():
             self.output_port.set_net_type(new_net_type)
 
@@ -521,8 +519,7 @@ class Reg(Module):
         new_net_type = self.input_port.get_net_type() if self.input_port.is_specialized() else None
         if new_net_type is None:
             raise SyntaxErrorException(f"Can't figure out output port type for Reg {self}")
-        #@@@@@@@@@@@@@@@
-        assert not self.output_port.is_specialized() or self.output_port.get_net_type() == new_net_type
+        assert not self.output_port.is_specialized() or self.output_port.same_type_as(new_net_type)
         if not self.output_port.is_specialized():
             self.output_port.set_net_type(new_net_type)
 
@@ -533,16 +530,14 @@ class Reg(Module):
     def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
         assert len(self.get_outputs()) == 1
         if self.output_port.is_composite():
-            #@@@@@@@@@@@@@@@
-            if self.input_port.get_net_type() != self.output_port.get_net_type():
+            if not self.input_port.same_type_as(self.output_port):
                 raise SyntaxErrorException(f"Can only register composite types if the input and output types are the same.")
             
             input_members = self.input_port.get_all_member_junctions(add_self=False)
             output_members = self.output_port.get_all_member_junctions(add_self=False)
 
             if not self.reset_value_port.is_typeless():
-                #@@@@@@@@@@@@@@@
-                if self.input_port.get_net_type() != self.reset_value_port.get_net_type():
+                if not self.input_port.same_type_as(self.reset_value_port):
                     raise SyntaxErrorException(f"Can only register composite types if the input and reset_value_port types are the same.")
                 reset_value_members = self.input_port.get_all_member_junctions(add_self=False)
             else:
@@ -574,7 +569,7 @@ class Reg(Module):
             if reset_value_port.has_driver():
                 rst_val_expression, _ = reset_value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), back_end.get_operator_precedence("?:"))
             else:
-                rst_val_expression = output_port.get_net_type().get_default_value(back_end)
+                rst_val_expression = output_port.get_default_value(back_end)
             input_expression, _ = input_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("?:"))
             rst_sensitivty_expression, _ = back_end.wrap_expression(rst_expression, rst_precedence, back_end.get_operator_precedence("()"))
             rst_test_expression, _ = back_end.wrap_expression(rst_expression, rst_precedence, back_end.get_operator_precedence("?:"))
@@ -590,7 +585,7 @@ class Reg(Module):
             if self.reset_value_port.has_driver():
                 self.output_port <<= self.reset_value_port
             else:
-                self.output_port <<= self.output_port.get_net_type().get_default_sim_value()
+                self.output_port <<= self.output_port.get_default_sim_value()
 
         has_reset = self.reset_port.has_driver()
         has_async_reset = not self.sync_reset and has_reset

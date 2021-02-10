@@ -223,7 +223,7 @@ class not_gate(UnaryGate):
         if input_val is None:
             return None
         # Pythons binary negation operator is pretty lame: it apparently computes -x-1, which is not quite the same when doing fixed-width binary numbers
-        all_ones = (1 << input.get_net_type().get_num_bits()) - 1
+        all_ones = (1 << input.get_num_bits()) - 1
         return _sim_value(input_val) ^ all_ones
     def generate_op(self, back_end: 'BackEnd') -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"

@@ -21,8 +21,9 @@ class Number(NetType):
     just too obnoxious to use
     """
 
-    # The associated VCD type (one of VAR_TYPES inside vcd.writer.py)
-    vcd_type: str = 'wire'
+    @classmethod
+    def get_vcd_type(cls) -> str:
+        return 'wire'
 
     def __init__(self, length: Optional[int] = None, signed: Optional[bool] = None, min_val: Optional[int] = None, max_val: Optional[int] = None):
         self.min_val = min_val
@@ -39,10 +40,16 @@ class Number(NetType):
         signed_str = 's' if self.signed else 'u'
         return f"Number({signed_str}{self.length} {self.min_val}...{self.max_val})"
 
-    def __eq__(self, other):
-        if not isinstance(other, Number):
+    @classmethod
+    def same_type_as(cls, other):
+        """
+        Returns True if the other net_type object is equivalent to this one.
+        """
+        if not isinstance(other, type):
+            other = type(other)
+        if not issubclass(other, Number):
             return False
-        return self is other or (self.min_val == other.min_val and self.max_val == other.max_val and self.length == other.length and self.signed == other.signed)
+        return cls is other or (cls.min_val == other.min_val and cls.max_val == other.max_val and cls.length == other.length and cls.signed == other.signed)
     
     def __hash__(self):
         return hash(self.min_val, self.max_val)
@@ -129,9 +136,9 @@ class Number(NetType):
             """
             return True
 
-    def get_lhs_name(self, for_junction: Junction, back_end: 'BackEnd', target_namespace: Module, allow_implicit: bool=True) -> Optional[str]:
+    def get_lhs_name(self, back_end: 'BackEnd', target_namespace: Module, allow_implicit: bool=True) -> Optional[str]:
         assert back_end.language == "SystemVerilog"
-        xnet = target_namespace._impl.netlist.get_xnet_for_junction(for_junction)
+        xnet = target_namespace._impl.netlist.get_xnet_for_junction(self)
         name = xnet.get_lhs_name(target_namespace, allow_implicit=allow_implicit)
         if name is None:
             return None
@@ -145,23 +152,24 @@ class Number(NetType):
         else:
             return expr, prec
 
-    def generate_type_ref(self, back_end: 'BackEnd') -> str:
+    @classmethod
+    def generate_type_ref(cls, back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
-        assert not self.is_abstract(), "Can't generate RTL for abstract Numbers"
-        if self.signed:
-            if self.length > 1:
-                return f"logic signed [{self.length - 1}:0]"
+        assert not cls.is_abstract(), "Can't generate RTL for abstract Numbers"
+        if cls.signed:
+            if cls.length > 1:
+                return f"logic signed [{cls.length - 1}:0]"
             else:
                 return f"logic signed"
         else:
-            if self.length > 1:
-                return f"logic [{self.length - 1}:0]"
+            if cls.length > 1:
+                return f"logic [{cls.length - 1}:0]"
             else:
                 return f"logic"
 
-    def generate_net_type_ref(self, for_junction: 'Junction', back_end: 'BackEnd') -> str:
+    def generate_port_ref(self, back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
-        return f"{for_junction.generate_junction_ref(back_end)} {self.generate_type_ref(back_end)}"
+        return f"{self.generate_junction_ref(back_end)} {self.generate_type_ref(back_end)}"
 
     class MemberSetter(Module):
         output_port = Output()
@@ -272,37 +280,39 @@ class Number(NetType):
 
 
     class Iterator(object):
-        def __init__(self, net_type: 'Number', junction: Junction):
+        def __init__(self, junction: Junction):
             self.parent_junction = junction
             self.idx = 0
-            self.length = net_type.get_length()
+            self.length = junction.length
         def __next__(self):
             if self.idx == self.length:
                 raise StopIteration
             ret_val = self.parent_junction[self.idx]
             self.idx += 1
             return ret_val
-    def get_iterator(self, parent_junction: Junction) -> Any:
+
+    def __iter__(self) -> Any:
         """
         Returns an iterator for the type (such as one that iterates through all the bits of a number)
         """
-        return Number.Iterator(self, parent_junction)
-    def get_length(self) -> int:
+        return Number.Iterator(self)
+
+    def __len__(self) -> int:
         return self.length
     
-    def get_slice(self, key: Any, junction: Junction) -> Any:
-        if junction.active_context() == "simulation":
-            return Number.Accessor.static_sim(junction.sim_value, Number.Key(key))
+    def get_slice(self, key: Any) -> Any:
+        if self.active_context() == "simulation":
+            return Number.Accessor.static_sim(self.sim_value, Number.Key(key))
         else:
-            return Number.Accessor(slice=key, number=self)(junction)
+            return Number.Accessor(slice=key, number=self.get_net_type2())(self)
     
-    def set_member_access(self, key: Any, value: Any, junction: Junction) -> None:
+    def set_member_access(self, key: Any, value: Any) -> None:
         # The junction conversion *has* to happen before the creation of the Concatenator.
         # Otherwise, the auto-created converter object (such as Constant) will be evaluated in the wrong order
         # and during the evaluation of the Concatenator, the inlined expression forwarding logic will break.
         from .utils import convert_to_junction
         real_junction = convert_to_junction(value)
-        junction.raw_input_map.append((key, real_junction))
+        self.raw_input_map.append((key, real_junction))
     @classmethod
     def resolve_key_sequence_for_get(cls, keys: Sequence[Tuple[Any, KeyKind]], for_junction: Junction) -> Tuple[Optional[Sequence[Tuple[Any, KeyKind]]], Junction]:
         # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing
@@ -335,8 +345,9 @@ class Number(NetType):
             assert sub_key[1] is KeyKind.Index, "Number doesn't support member access, only slices"
             key = _slice_of_slice(key, sub_key[0])
         return key
-    def is_abstract(self) -> bool:
-        return self.length is None and self.min_val is None and self.max_val is None
+    @classmethod
+    def is_abstract(cls) -> bool:
+        return cls.length is None and cls.min_val is None and cls.max_val is None
 
     def _calc_metrics(self):
         if self.is_abstract():
@@ -374,12 +385,10 @@ class Number(NetType):
                 raise SyntaxErrorException("Length and min_val are both specified, but are incompatible")
             if self.max_val > len_max_val:
                 raise SyntaxErrorException("Length and max_val are both specified, but are incompatible")
-
-    def get_unconnected_sim_value(self) -> Any:
-        return None
-    def get_default_sim_value(self) -> Any:
+    @classmethod
+    def get_default_sim_value(cls) -> Any:
         return 0
-    def validate_sim_value(self, sim_value: Any, parent_junction: Junction) -> Any:
+    def validate_sim_value(self, sim_value: Any) -> Any:
         """
         Validates the new sim value before assignment.
 
@@ -392,7 +401,7 @@ class Number(NetType):
         if sim_value is None:
             return sim_value
         if sim_value > self.max_val or sim_value < self.min_val:
-            raise SimulationException(f"Can't assign to net {parent_junction} a value {sim_value} that's outside of the representable range.")
+            raise SimulationException(f"Can't assign to net {self} a value {sim_value} that's outside of the representable range.")
         return sim_value
 
     def generate_const_val(self, value: Optional[int], back_end: 'BackEnd') -> str:
@@ -405,28 +414,19 @@ class Number(NetType):
         else:
             return f"-{length}'sh{format(-value, 'x')}"
 
-    def get_num_bits(self) -> int:
+    @classmethod
+    def get_num_bits(cls) -> int:
         return self.length
 
-    def convert_to_vcd_type(self, value: Optional[int]) -> Any:
+    def convert_to_vcd_type(self) -> Any:
         """
         Converts the given native python value into the corresponding VCD-compatible value
         Must be overwritten for all sub-classes
         """
+        value = self.sim_state.value
         if value is None:
             return 'X'
         return value
-
-    def get_junction_member(self, junction: Junction, name:str) -> Any:
-        if name == "signed":
-            return self.signed
-        if name == "length":
-            return self.length
-        if name == "min_val":
-            return self.min_val
-        if name == "max_val":
-            return self.max_val
-        raise AttributeError
 
     from .module import GenericModule
     class SizeAdaptor(GenericModule):
@@ -475,19 +475,20 @@ class Number(NetType):
             """
             return True
 
-    def adapt_from(self, input: Junction, implicit: bool) -> Junction:
+    @classmethod
+    def adapt_from(cls, input: Junction, implicit: bool) -> Junction:
         input_type = input.get_net_type()
         if not isinstance(input_type, Number):
             return None
         if input_type.is_abstract():
             return None
-        if self.is_abstract():
+        if cls.is_abstract():
             return None
-        if self.min_val > input_type.min_val or self.max_val < input_type.max_val:
+        if cls.min_val > input_type.min_val or cls.max_val < input_type.max_val:
             return None
-        if self.length >= input_type.length and self.signed == input_type.signed:
+        if cls.length >= input_type.length and cls.signed == input_type.signed:
             return input
-        return Number.SizeAdaptor(input_type = input_type, output_type = self)(input)
+        return Number.SizeAdaptor(input_type = input_type, output_type = cls)(input)
 
     """
     ============================================================================================

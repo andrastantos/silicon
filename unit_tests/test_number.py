@@ -128,6 +128,16 @@ def test_assign():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_simple_assign():
+    class top(Module):
+        in1 = Input(Number(min_val=0,max_val=15))
+        out1 = Output(Number(min_val=0,max_val=15))
+
+        def body(self):
+            self.out1 = self.in1
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 def test_concatenate():
     class top(Module):
         uout1 = Output(Unsigned(length=16))
@@ -439,7 +449,8 @@ if __name__ == "__main__":
     #test_local_slice()
     #test_wire_to_wire_loop()
     #test_partial_assign()
-    test_precedence()
+    #test_precedence()
+    test_simple_assign()
     pass
 
 '''

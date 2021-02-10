@@ -58,8 +58,8 @@ class MemberGetter(object):
         def body(self) -> None:
             if not self.input_port.is_specialized():
                 raise SyntaxErrorException(f"Input port type is not specified for slice {self}")
-            if not hasattr(self.input_port.get_net_type(), "get_slice"):
-                raise SyntaxErrorException(f"Net type {self.input_port.get_net_type()} doesn't support slice operations")
+            if not hasattr(self.input_port, "get_slice"):
+                raise SyntaxErrorException(f"Net type {self.input_port.get_net_type2()} doesn't support slice operations")
 
             net_type = self.input_port.get_net_type()
             final_key, final_junction = net_type.resolve_key_sequence_for_get(self._keys, self.input_port)
@@ -117,11 +117,10 @@ class MemberGetter(object):
     def __ilshift__(self, other: Any) -> 'Junction':
         if self._parent_junction.is_typeless():
             raise SyntaxErrorException("Can't set slice on a typeless port")
-        net_type = self._parent_junction.get_net_type()
-        if not hasattr(net_type, "set_member_access"):
+        if not hasattr(self._parent_junction, "set_member_access"):
             raise TypeError()
         keys = self._keys
-        net_type.set_member_access(keys, other, self._parent_junction)
+        self._parent_junction.set_member_access(keys, other)
         return self
 
     def allow_auto_bind(self) -> bool:
@@ -317,16 +316,16 @@ class MemberGetter(object):
             return 
         if self._parent_junction.is_typeless():
             raise SyntaxErrorException("Can't set slice on a typeless port")
-        net_type = self._parent_junction.get_net_type()
-        if not hasattr(net_type, "set_member_access"):
+        if not hasattr(self._parent_junction, "set_member_access"):
             raise TypeError()
-        net_type.set_member_access(keys, value, self._parent_junction)
+        self._parent_junction.set_member_access(keys, value)
     
     def __setattr__(self, name: str, value: Any) -> None:
         # We have to be tricky here! This thing gets invoked every time an attribute gets set, whether it exists or not.
         if name in dir(self) or name == "_initialized" or "_initialized" not in dir(self):
             super().__setattr__(name, value)
         else:
+            assert False, f"FIXME! THIS IS NOT TESTED APPARENTLY. set_slice is never defined by anything and so we would eventually raise a TypeError."
             if self._parent_junction.is_typeless():
                 raise SyntaxErrorException("Can't set slice on a typeless port")
             net_type = self._parent_junction.get_net_type()

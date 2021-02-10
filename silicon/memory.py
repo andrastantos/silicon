@@ -184,12 +184,12 @@ class _Memory(GenericModule):
                 raise SyntaxErrorException("Unregistered inputs are only supported for read ports on inferred memories")
 
             if data_in_port is not None:
-                data_in_bits = data_in_port.get_net_type().get_num_bits()
+                data_in_bits = data_in_port.get_num_bits()
                 if data_conf_bits is not None and data_conf_bits < data_in_bits:
                     raise SyntaxErrorException(f"Memory was specified as {data_conf_bits} wide in config, yet data input port is {data_in_bits} wide")
             if data_out_port is not None:
                 if not data_out_port.is_abstract():
-                    data_out_bits = data_out_port.get_net_type().get_num_bits()
+                    data_out_bits = data_out_port.get_num_bits()
                     if data_conf_bits is not None and data_conf_bits < data_out_bits:
                         raise SyntaxErrorException(f"Memory was specified as {data_conf_bits} wide in config, yet data output port is {data_out_bits} wide")
 
@@ -204,7 +204,7 @@ class _Memory(GenericModule):
             else:
                 assert False, "We should have caught this above"
 
-            addr_bits = addr_port.get_net_type().get_num_bits()
+            addr_bits = addr_port.get_num_bits()
             if addr_conf_bits is not None and addr_bits > addr_conf_bits:
                 raise SyntaxErrorException(f"Memory was specified with address width of {addr_conf_bits} in config, yet address input port is {addr_bits} wide")
             if addr_conf_bits is not None:

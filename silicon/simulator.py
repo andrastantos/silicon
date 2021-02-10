@@ -39,8 +39,7 @@ class SimXNetState(object):
         #self.listeners: Set[Generator] = OrderedSet() # All the modules that registered to get call-backs on value-change of this port
         self.listeners: Set[Generator] = set() # All the modules that registered to get call-backs on value-change of this port
         #self.value: Any = None # Current (potentially cached) value
-        net_type = parent_xnet.get_net_type()
-        self.value: Any = net_type.get_unconnected_sim_value() if net_type is not None else None
+        self.value: Any = parent_xnet.get_unconnected_sim_value()
         self.previous_value: Any = None # Previous value
         self.sim_context: 'Simulator.SimulatorContext' = sim_context
         self.parent_xnet = parent_xnet
@@ -73,9 +72,7 @@ class SimXNetState(object):
         self.listeners.clear()
 
     def record_change(self, when: int):
-        if self._vcd_value_converter is None:
-            self._vcd_value_converter = self.parent_xnet.source.get_net_type().convert_to_vcd_type
-        vcd_val = self._vcd_value_converter(self.value)
+        vcd_val = self.parent_xnet.convert_to_vcd_type()
         writer = self.sim_context.vcd_writer
         for vcd_var in self.vcd_vars:
             writer.change(vcd_var, when, vcd_val)
@@ -203,17 +200,17 @@ class Simulator(object):
             for xnet in self.simulator.netlist.xnets:
                 xnet.sim_state = SimXNetState(self, xnet)
 
-            def setup_junction(junction: 'Junction'):
+            def setup_junction_for_sim(junction: 'Junction'):
                 if junction.is_composite():
                     for member_junction, _ in junction.get_member_junctions().values():
-                        setup_junction(member_junction)
+                        setup_junction_for_sim(member_junction)
                 else:
                     junction._netlist = self.simulator.netlist
                     junction._xnet = junction._netlist.junction_to_xnet_map[junction]
 
             for module in self.simulator.netlist.modules:
                 for junction in module.get_junctions().values():
-                    setup_junction(junction)
+                    setup_junction_for_sim(junction)
                     # Schedule an event to call all 'simulate' methods. This will start the simulation.
             for module in self.simulator.netlist.modules:
                 # We extract all generators from the 'simulate' methods and run them to the first yield.
@@ -246,7 +243,7 @@ class Simulator(object):
                                 xnet.sim_state.vcd_vars.append(self.vcd_writer.register_var(
                                     scope = scope,
                                     name = name,
-                                    var_type = port.vcd_type,
+                                    var_type = port.get_vcd_type(),
                                     size = port.get_num_bits()
                                 ))
             pass

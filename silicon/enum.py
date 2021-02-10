@@ -28,7 +28,9 @@ class Enum(Number):
 
         #self.possible_values = set(e.value for e in base_type)
 
-    vcd_type: str = 'string'
+    @classmethod
+    def get_vcd_type(cls) -> str:
+        return 'string'
 
     class EnumConverter(object):
         def __init__(self, value):
@@ -123,29 +125,32 @@ class Enum(Number):
     def __repr__(self) -> str:
         return f"Enum({self.get_type_name()})"
 
-    def get_type_name(self) -> Optional[str]:
+    @classmethod
+    def get_type_name(cls) -> Optional[str]:
         """
         Returns a unique name for the type. This name is used to identify the type, in other words, if two type object instances return the same string from get_type_name, they are considered to be the same type.
         Gets frequently overridden in subclasses to provide unique behavior.
 
         This function is only used to call 'generate' on types that need it (such as interfaces).
         """
-        return self.base_type.__name__
-
-    def generate(self, netlist: Netlist, back_end: 'BackEnd') -> str:
+        return cls.base_type.__name__
+    @classmethod
+    def generate(cls, netlist: Netlist, back_end: 'BackEnd') -> str:
         base_type = super().generate_type_ref(back_end)
-        values = ",\n".join(f"{e.name}={e.value}" for e in self.base_type)
-        return f"typedef enum {base_type} {{\n{back_end.indent(values)}\n}} {self.get_type_name()};"
-    def generate_type_ref(self, back_end: 'BackEnd') -> str:
-        return self.get_type_name()
+        values = ",\n".join(f"{e.name}={e.value}" for e in cls.base_type)
+        return f"typedef enum {base_type} {{\n{back_end.indent(values)}\n}} {cls.get_type_name()};"
+    @classmethod
+    def generate_type_ref(cls, back_end: 'BackEnd') -> str:
+        return cls.get_type_name()
 
     # Numbers implementation seems to be sufficient
-    #def generate_net_type_ref(self, for_junction: 'Junction', back_end: 'BackEnd') -> str:
+    #def generate_port_ref(self, back_end: 'BackEnd') -> str:
     def generate_const_val(self, value: Optional[PyEnum], back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
         return value.name
 
-    def convert_to_vcd_type(self, value: Optional[Union['Enum', 'EnumConverter']]) -> Any:
+    def convert_to_vcd_type(self) -> Any:
+        value = self.sim_state.value
         if value is None:
             return None
         return value.value.name
@@ -181,38 +186,39 @@ class Enum(Number):
                         val_as_enum = self.output.get_net_type().base_type(self.input.sim_value)
                         self.output <<= val_as_enum
                     except ValueError:
-                        raise SimulationException(f"Enum {self.output.get_net_type().get_type_name()} cannot be assigned a numberic value {self.input.sim_value}.")
+                        raise SimulationException(f"Enum {self.output.get_type_name()} cannot be assigned a numberic value {self.input.sim_value}.")
         def is_combinational(self) -> bool:
             """
             Returns True if the module is purely combinational, False otherwise
             """
             return True
 
-    def adapt_from(self, input: 'Junction', implicit: bool) -> 'Junction':
+    @classmethod
+    def adapt_from(cls, input: 'Junction', implicit: bool) -> 'Junction':
+        if isinstance(input, cls):
+            return input
         input_type = input.get_net_type()
         if not isinstance(input_type, Enum):
             if implicit:
                 return None
             if not isinstance(input_type, Number):
                 return None
-            return Enum.EnumAdaptor(input_type, self)(input)
+            return Enum.EnumAdaptor(input_type, cls)(input)
         # Not only we have to have both junctions being Enums, we have to make sure they're instances of the *same* Enum...
-        if self.base_type is not input_type.base_type:
+        if cls.base_type is not input_type.base_type:
             if implicit:
                 return None
-            return Enum.EnumAdaptor(input_type, self)(input)
+            return Enum.EnumAdaptor(input_type, cls)(input)
         return input
 
     # For now, these we'll leave intact, but that means that enums are closer to Numbers we might want them to be....
     # We might also open up a bunch of cases where we silently should convert to Numbers, but we don't
-    #def get_iterator(self, parent_junction: Junction) -> Any:
-    #def get_slice(self, key: Any, junction: Junction) -> Any:
-    #def set_slice(self, key: Any, value: Any, junction: Junction) -> None:
     #def resolve_key_sequence_for_get(self, keys: Sequence[Any]) -> Any:
     #    raise SyntaxErrorException("Enum types don't support subscription or member accesses")
-    def get_default_sim_value(self) -> Any:
-        return first(self.base_type)
-    def validate_sim_value(self, sim_value: Any, parent_junction: 'Junction') -> Any:
+    @classmethod
+    def get_default_sim_value(cls) -> Any:
+        return first(cls.base_type)
+    def validate_sim_value(self, sim_value: Any) -> Any:
         if isinstance(sim_value, int):
             try:
                 return self.base_type(sim_value)
@@ -233,8 +239,12 @@ class Enum(Number):
                     return first(net_types)
         return super().result_type(net_types, operation)
 
-    def __eq__(self, other):
-        return self is other or type(self) is type(other)
+    @classmethod
+    def same_type_as(cls, other):
+        # We need the original implementation from NetType because Number, our immedaite basetype overrides it
+        if not isinstance(other, type):
+            other = type(other)
+        return cls is other
 
 def enum_to_const(value: Enum) -> Tuple[NetType, Enum]:
     return Enum(type(value)), value

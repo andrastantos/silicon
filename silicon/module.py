@@ -380,7 +380,7 @@ class Module(object):
                     if names is not None:
                         for name in names:
                             if name not in interface_port_names:
-                                rtl_wire_definitions += f"{xnet.get_net_type().generate_type_ref(back_end)} {name};\n"
+                                rtl_wire_definitions += f"{xnet.generate_type_ref(back_end)} {name};\n"
                     names = xnet.get_explicit_names(self, add_used=True, add_assigned=False, exclude_assigned=True)
                     if names is not None:
                         for name in names:
@@ -535,13 +535,6 @@ class Module(object):
                         if port_object.get_parent_module() is not None:
                             raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with parent module already assigned")
                         instance_port: Port = deepcopy(port_object)
-                        # We need to use deepcopy to get all the important
-                        # members, such as source/sinks/BoolMarker objects
-                        # de-duplicated. However we don't want to create
-                        # a bunch of duplicate types, so override the reference
-                        # to the newly created net_type
-                        del instance_port._net_type
-                        instance_port._net_type = port_object._net_type
                         instance_port.set_parent_module(self._true_module)
                         setattr(self._true_module, port_name, instance_port)
                         #print("Creating instance port with name: {} and type {}".format(port_name, port_object))
@@ -1035,8 +1028,7 @@ class Module(object):
                     return False
                 if my_junction.is_typeless():
                     return True
-                #@@@@@@@@@@@@@@@
-                return my_junction.get_net_type() == other_junction.get_net_type()
+                return my_junction.same_type_as(other_junction)
 
             ports_are_ok = all(
                 are_junctions_equivalent(my_port_name, my_port, other_port_name, other_port)
@@ -1070,9 +1062,14 @@ class Module(object):
 
             if len(self._construct_kwargs) != len(other._impl._construct_kwargs):
                 return False
+
+            def compare_construct_args(one, other):
+                if hasattr(one, "same_type_as"):
+                    return one.same_type_as(other)
+                return one == other
+
             all_construct_kwargs_are_ok = all(
-                #@@@@@@@@@@@@@@@
-                my_arg_name in other._impl._construct_kwargs and my_arg == other._impl._construct_kwargs[my_arg_name] for my_arg_name, my_arg in self._construct_kwargs.items()
+                my_arg_name in other._impl._construct_kwargs and compare_construct_args(my_arg, other._impl._construct_kwargs[my_arg_name]) for my_arg_name, my_arg in self._construct_kwargs.items()
             )
             if not all_construct_kwargs_are_ok:
                 return False

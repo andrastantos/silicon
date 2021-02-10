@@ -10,65 +10,87 @@ class KeyKind(PyEnum):
     Index = 0
     Member = 1
 
-# A decorator for behaviors
-class Behavior(object):
-    def __init__(self, method):
-        self.method = method
-    def apply(self, attr_name, instance):
-        setattr(instance, attr_name, MethodType(self.method, instance))
-
 def behavior(method):
-    return Behavior(method)
+    return method
 
 class NetType(object):
     def __init__(self):
-        self.parent_junction = None
-        pass
-
-    def set_behaviors(self, instance: 'Junction'):
-        if instance.get_net_type() is not self:
-            raise SyntaxErrorException("Can only set behaviors on a Junction that has the same net-type")
-        for attr_name in dir(self):
-            attr_value = getattr(self,attr_name)
-            if isinstance(attr_value, Behavior):
-                attr_value.apply(attr_name, instance)
-
+        raise SyntaxErrorException("NetTypes instances should never be created")
+    @classmethod
     def generate_type_ref(self, back_end: 'BackEnd') -> str:
+        """
+        Called during RTL generation on the XNet object to generate the type reference in a wire definition.
+        For example 'logic [3:0]' or similar
+        """
         raise NotImplementedError
-    def generate_net_type_ref(self, for_junction: 'Junction', back_end: 'BackEnd') -> str:
+
+    def generate_port_ref(self, back_end: 'BackEnd') -> str:
+        """
+        Called during RTL generation to create a port reference for a module.
+        For example 'input logic [3:0] or similar
+        """
         raise NotImplementedError
-    def is_abstract(self) -> bool:
+    @classmethod
+    def is_abstract(cls) -> bool:
         """
         Returns True if the type is abstract, that is it can't be the type of an actual net.
         """
         return False
-    def get_type_name(self) -> Optional[str]:
+    @classmethod
+    def get_type_name(cls) -> Optional[str]:
         """
-        Returns a unique name for the type. This name is used to identify the type, in other words, if two type object instances return the same string from get_type_name, they are considered to be the same type.
-        Gets frequently overridden in subclasses to provide unique behavior.
+        Returns a unique name for the type. This name is used to identify the type, in other words,
+        if two type object instances return the same string from get_type_name, they are considered
+        to be the same type. Gets frequently overridden in subclasses to provide unique behavior.
 
         This function is only used to call 'generate' on types that need it (such as interfaces).
         """
-        return type(self).__name__
-    def generate(self, netlist: Netlist, back_end: 'BackEnd') -> str:
+        return cls.__name__
+    @classmethod
+    def generate(cls, netlist: Netlist, back_end: 'BackEnd') -> str:
         """
         Generates definition (if needed) for the type.
         """
         return ""
-
-    def get_unconnected_value(self, back_end: 'BackEnd') -> str:
+    @classmethod
+    def get_unconnected_value(cls, back_end: 'BackEnd') -> str:
+        """
+        Returns the unconnected value for the type.
+        """
         assert back_end.language == "SystemVerilog"
-        return f"{self.get_num_bits()}'x"
-    def get_default_value(self, back_end: 'BackEnd') -> str:
+        return f"{cls.get_num_bits()}'x"
+    @classmethod
+    def get_default_value(cls, back_end: 'BackEnd') -> str:
+        """
+        Returns the default value for the type.
+        Used mostly for unconnected optional AutoInput ports.
+        For example Reg uses this as the reset value if no reset_value is connected.
+        """
         assert back_end.language == "SystemVerilog"
-        return f"{self.get_num_bits()}'0"
-    def generate_assign(self, sink_name: str, source_expression: str, xnet: 'XNet', back_end: 'BackEnd') -> str:
+        return f"{cls.get_num_bits()}'0"
+    @classmethod
+    def generate_assign(cls, sink_name: str, source_expression: str, back_end: 'BackEnd') -> str:
+        """
+        Returns a string-assignment for a sink from the source.
+        Normally very simply, but for composite types, it gets a bit more involved.
+        """
+        assert back_end.language == "SystemVerilog"
         return f"assign {sink_name} = {source_expression};"
-    def get_unconnected_sim_value(self) -> Any:
-        raise None
-    def get_default_sim_value(self) -> Any:
+    @classmethod
+    def get_unconnected_sim_value(cls) -> Any:
+        """
+        Returns the unconnected value for the type for simulation purposes.
+        """
+        return None
+    @classmethod
+    def get_default_sim_value(cls) -> Any:
+        """
+        Returns the default value for the type for simulation purposes.
+        Used mostly for unconnected optional AutoInput ports.
+        For example Reg uses this as the reset value if no reset_value is connected.
+        """
         raise NotImplementedError
-    def validate_sim_value(self, sim_value: Any, parent_junction: 'Junction') -> Any:
+    def validate_sim_value(self, sim_value: Any) -> Any:
         """
         Validates the new sim value before assignment.
 
@@ -79,34 +101,44 @@ class NetType(object):
         Returns potentially modified sim_value for assignment.
         """
         return sim_value
-    def get_num_bits(self) -> int:
+    @classmethod
+    def get_num_bits(cls) -> int:
+        """
+        Returns the number of bits needed to represent values of this type
+        """
         raise NotImplementedError
-    def adapt_from(self, input: 'Junction', implicit: bool) -> Optional['Junction']:
+    @classmethod
+    def adapt_from(cls, input: 'Junction', implicit: bool) -> Optional['Junction']:
         """
-        Return None if adaptation is not supported
-        """
-        return None
-    def adapt_to(self, output_type: 'NetType', input: 'Junction', implicit: bool) -> Optional['Junction']:
-        """
-        Return None if adaptation is not supported
+        Adapts 'input' to our type, if possible. Might instantiate adaptor modules.
+        Returns None if adaptation is not supported, or the Junction represented the
+        result of the adaptation.
         """
         return None
-    @property
-    def vcd_type(self) -> str:
+    def adapt_to(self, output_type: type, implicit: bool) -> Optional['Junction']:
+        """
+        Adapts to the given output type, if possible. Might instantiate adaptor modules.
+        Returns None if adaptation is not supported, or the Junction represented the
+        result of the adaptation.
+
+        If 'implicit' is set to True, it means the adaptation become necessary during automatic
+        type-propagation (that is a source is driving a sink of different type). In general
+        implicit conversions should be way more restrictive as possible: Python doesn't really
+        support implicit conversion and we should follow that tradition. Exceptions would be
+        implicitly adapting from a shorted numberic type to a longer one (zero- or sign-extend).
+        """
+        return None
+    @classmethod
+    def get_vcd_type(cls) -> str:
         """
         Returns the associated VCD type (one of VAR_TYPES inside vcd.writer.py)
         Must be overwritten for all sub-classes
         """
         raise NotImplementedError
-    def convert_to_vcd_type(self, value: Any) -> Any:
+    def convert_to_vcd_type(self) -> Any:
         """
-        Converts the given native python value into the corresponding VCD-compatible value
-        Must be overwritten for all sub-classes
-        """
-        raise NotImplementedError
-    def get_iterator(self, parent_junction: 'Junction') -> Any:
-        """
-        Returns an iterator for the type (such as one that iterates through all the bits of a number)
+        Converts the native python value of the instance (available in self.sim_state.value) into
+        the corresponding VCD-compatible value.
         Must be overwritten for all sub-classes
         """
         raise NotImplementedError
@@ -141,23 +173,41 @@ class NetType(object):
 
     @classmethod
     def create_member_setter(cls) -> 'Module':
+        """
+        Returns a module that is capable of setting members of the type.
+        This module will receive all the members as inputs and will return
+        a Junction of the type as its outputs.
+
+        This method gets called for cases such as:
+        a[0] = 2
+        a[2] = in1
+        a[1] = in2 & in3
+        """
         raise NotImplementedError
 
-    def setup_junction(self, junction: 'Junction') -> None:
+    def setup_junction(self) -> None:
         """
         Called during junction type assignment to give the type a chance to set whatever needs to be set on a junction.
-        This includes things, such as imbuning junctions with behaviors.
-        TODO: maybe Number should use this technique to inject legnth/min/max/signed into the Junction?
+
+        This is needed because net types are usually injected into the inheritance chain later on, so __init__ for NetTypes
+        is not called and certainly wouldn't be called at the right time.
+
+        This function is the chance to set properties on the *instance* as needed.
         """
-        self.set_behaviors(junction)
+        pass
 
 
-    def __eq__(self, other) -> bool:
+    @classmethod
+    def same_type_as(cls, other):
         """
-        Returns True if the other net_type object is equivalent to this one.
+        Returns True if the other NetType class or instance is equivalent to this one.
         """
-        return type(self) == type(other)
+        if not isinstance(other, type):
+            other = type(other)
+        return cls is other
 
+    def __eq__(self, otheR):
+        assert False
     def __ne__(self, other):
-        # One usually overrides only __eq__, so provide a default, compatible __ne__ implementation
-        return not self == other
+        assert False
+
