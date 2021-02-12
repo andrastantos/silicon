@@ -1,6 +1,6 @@
 from typing import Optional, Any, Tuple, Generator, Union, Dict, Set, Sequence
 from .exceptions import SyntaxErrorException, SimulationException
-from .net_type import NetType, KeyKind, behavior
+from .net_type import NetType, KeyKind
 from .module import GenericModule, Module, InlineBlock, InlineExpression, has_port
 from .port import Input, Output, Junction, Port
 from .tracer import no_trace

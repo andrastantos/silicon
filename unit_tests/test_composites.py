@@ -163,6 +163,21 @@ def test_struct_with_method():
     pixel_width = 12
 
     class Pixel(Struct):
+
+        class Behaviors(Struct.Behaviors):
+            def blend(self, other, alpha):
+                
+                def blend_mono(in1, in2):
+                    pix1 = in1 * alpha
+                    pix2 = in2 * (255-alpha)
+                    top = self.get_net_type().length + 8 - 1
+                    return (pix1 + pix2 + 127)[top:8]
+                result = Wire(Pixel(self.get_net_type().length))
+                result.r = blend_mono(self.r, other.r)
+                result.g = blend_mono(self.g, other.g)
+                result.b = blend_mono(self.b, other.b)
+                return result
+
         def __init__(self, length: int):
             super().__init__()
             self.length = length
@@ -170,19 +185,6 @@ def test_struct_with_method():
             self.add_member("g", Unsigned(length))
             self.add_member("b", Unsigned(length))
 
-        @behavior
-        def blend(self, other, alpha):
-            
-            def blend_mono(in1, in2):
-                pix1 = in1 * alpha
-                pix2 = in2 * (255-alpha)
-                top = self.get_net_type().length + 8 - 1
-                return (pix1 + pix2 + 127)[top:8]
-            result = Wire(Pixel(self.get_net_type().length))
-            result.r = blend_mono(self.r, other.r)
-            result.g = blend_mono(self.g, other.g)
-            result.b = blend_mono(self.b, other.b)
-            return result
 
     class AlphaBender(Module):
         in1 = Input(Pixel(pixel_width))
@@ -370,11 +372,11 @@ if __name__ == "__main__":
     #test_reg_struct()
     #test_struct_of_struct()
     #test_generic_struct()
-    #test_struct_with_method()
+    test_struct_with_method()
     #test_struct_to_number("rtl")
     #test_struct_to_number("sim")
     #test_struct_sub_module("rtl")
-    test_number_to_struct("rtl")
+    #test_number_to_struct("rtl")
     #test_number_to_struct("sim")
     #test_interface_wire("rtl")
     #test_interface_wire2("rtl")

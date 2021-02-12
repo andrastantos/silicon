@@ -1,6 +1,6 @@
 from typing import Tuple, Union, Any, Dict, Set, Optional, Generator, Sequence
 
-from .net_type import NetType, KeyKind, behavior
+from .net_type import NetType, KeyKind
 from .netlist import Netlist
 from .back_end import BackEnd
 from .exceptions import SyntaxErrorException, SimulationException

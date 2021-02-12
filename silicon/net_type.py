@@ -10,28 +10,10 @@ class KeyKind(PyEnum):
     Index = 0
     Member = 1
 
-# A decorator for behaviors
-class Behavior(object):
-    def __init__(self, method):
-        self.method = method
-    def apply(self, attr_name, instance):
-        setattr(instance, attr_name, MethodType(self.method, instance))
-
-def behavior(method):
-    return Behavior(method)
-
 class NetType(object):
     def __init__(self):
         self.parent_junction = None
         pass
-
-    def set_behaviors(self, instance: 'Junction'):
-        if instance.get_net_type() is not self:
-            raise SyntaxErrorException("Can only set behaviors on a Junction that has the same net-type")
-        for attr_name in dir(self):
-            attr_value = getattr(self,attr_name)
-            if isinstance(attr_value, Behavior):
-                attr_value.apply(attr_name, instance)
 
     def generate_type_ref(self, back_end: 'BackEnd') -> str:
         raise NotImplementedError
@@ -146,11 +128,28 @@ class NetType(object):
     def setup_junction(self, junction: 'Junction') -> None:
         """
         Called during junction type assignment to give the type a chance to set whatever needs to be set on a junction.
-        This includes things, such as imbuning junctions with behaviors.
-        TODO: maybe Number should use this technique to inject legnth/min/max/signed into the Junction?
-        """
-        self.set_behaviors(junction)
+        This includes things, such as creating member junctions for composites.
 
+        NOTE: by the time setup_junction is called, behaviors (if any) have already been inserted into the class inheritance.
+        """
+        pass
+
+    def get_behaviors(self) -> Optional[object]:
+        """
+        Returns an instance contining behavior methods and injected attributes
+
+        Default implementation attempts to instantiate a 'Behaviors' class with no arguments to __init__
+        that is defined in net-type.
+        """
+        try:
+            behaviors_class = getattr(type(self), "Behaviors") # This should always succeed
+        except:
+            raise SyntaxErrorException("The Behaviors class should always be defined in NetTypes, unless something is really screwed up in the inheritance relationships")
+        try:
+            behaviors_instances = behaviors_class()
+            return behaviors_instances
+        except:
+            return None
 
     def __eq__(self, other) -> bool:
         """
@@ -161,3 +160,9 @@ class NetType(object):
     def __ne__(self, other):
         # One usually overrides only __eq__, so provide a default, compatible __ne__ implementation
         return not self == other
+
+    class Behaviors(object):
+        """
+        An empty Behaviors class to make sure the inheritance chain for behaviors has always somewhere to terminate
+        """
+        pass

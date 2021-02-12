@@ -203,17 +203,17 @@ class Simulator(object):
             for xnet in self.simulator.netlist.xnets:
                 xnet.sim_state = SimXNetState(self, xnet)
 
-            def setup_junction(junction: 'Junction'):
+            def setup_junction_for_sim(junction: 'Junction'):
                 if junction.is_composite():
                     for member_junction, _ in junction.get_member_junctions().values():
-                        setup_junction(member_junction)
+                        setup_junction_for_sim(member_junction)
                 else:
                     junction._netlist = self.simulator.netlist
                     junction._xnet = junction._netlist.junction_to_xnet_map[junction]
 
             for module in self.simulator.netlist.modules:
                 for junction in module.get_junctions().values():
-                    setup_junction(junction)
+                    setup_junction_for_sim(junction)
                     # Schedule an event to call all 'simulate' methods. This will start the simulation.
             for module in self.simulator.netlist.modules:
                 # We extract all generators from the 'simulate' methods and run them to the first yield.

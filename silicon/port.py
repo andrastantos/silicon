@@ -11,6 +11,9 @@ from enum import Enum
 
 class JunctionBase(object):
     def __init__(self):
+        # Create an empty intermediary class until we have no type assigned.
+        # This will get replaced by the behavior class corresponding to the type
+        # once a type is assigned
         cls = self.__class__
         self.__class__ = cls.__class__(cls.__name__ + "Instance", (cls, ), {})
     @classmethod
@@ -121,6 +124,11 @@ class Junction(JunctionBase):
         assert not self.is_specialized()
         self._net_type = net_type
         if net_type is not None:
+            # We replace the empty intermediary class with the behaviors from net_type:
+            behavior_instance = net_type.get_behaviors()
+            if behavior_instance is not None:
+                true_port_type = type(self).__mro__[1]
+                self.__class__ = true_port_type.__class__(true_port_type.__name__ + "Instance", (true_port_type, type(behavior_instance)), behavior_instance.__dict__)
             net_type.setup_junction(self)
         # We need to ensure port type compatibility with all sinks/source
         if self.is_specialized():
@@ -956,7 +964,8 @@ class Wire(Junction):
             if not Module._parent_modules.is_empty():
                 parent_module = Module._parent_modules.top()
         super().__init__(net_type, parent_module)
-        parent_module._impl.register_wire(self)
+        if parent_module is not None:
+            parent_module._impl.register_wire(self)
         self.rhs_expression: Optional[Tuple[str, int]] = None # Filled-in by the parent_module during the 'generation' phase to contain the expression for the right-hand-side value, if inline expressions are supported for this port.
         self.local_name: Optional[str] = None
 

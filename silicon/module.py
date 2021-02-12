@@ -1,3 +1,4 @@
+# We will be able to rework generic modules when https://www.python.org/dev/peps/pep-0637/ becomes reality (currently targetting python 3.10)
 from typing import Union, Set, Tuple, Dict, Any, Optional, List, Iterable, Generator, Sequence, Callable
 import typing
 from collections import OrderedDict
