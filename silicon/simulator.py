@@ -47,6 +47,7 @@ class SimXNetState(object):
         self.vcd_vars = []
         self._last_changed = None
         self._vcd_value_converter = None
+        self.value_validator = net_type.validate_sim_value if net_type is not None else (lambda x, y: x)
 
     def add_listener(self, listener: Generator) -> None:
         #print(f"--- at {self.sim_context.now} xnet {first(self.parent_xnet.names)}: adding listener {listener}")
@@ -60,6 +61,8 @@ class SimXNetState(object):
         #print(f"--- at {self.sim_context.now} {self.parent_xnet.get_diagnostic_name()} setting value to {new_value}")
         #assert self._last_changed != self.sim_context.now, "Combinational loop detected???"
         #print(f"--- at {self.sim_context.now} xnet {first(self.parent_xnet.names)}: setting value {new_value}")
+
+        new_value = self.value_validator(new_value, self.parent_xnet.source)
         if self._last_changed != now:
             self.previous_value = self.value
         self.value = new_value

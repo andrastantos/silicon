@@ -213,15 +213,14 @@ class Enum(Number):
     def get_default_sim_value(self) -> Any:
         return first(self.base_type)
     def validate_sim_value(self, sim_value: Any, parent_junction: 'Junction') -> Any:
-        if isinstance(sim_value, int):
-            try:
-                return self.base_type(sim_value)
-            except ValueError:
-                raise SimulationException(f"Value {sim_value} can't be represented by Enum type {self.get_type_name()}")
-        elif sim_value in self.base_type:
+        if sim_value is None:
+            return sim_value
+        if not isinstance(sim_value, Enum.EnumConverter):
+            raise SimulationException(f"Value {sim_value} of type {type(sim_value)} is not valid for an Enum type {self.get_type_name()}")
+        elif sim_value.value in self.base_type:
             return sim_value
         else:
-            raise SimulationException(f"Value {sim_value} can't be represented by Enum type {self.get_type_name()}")
+            raise SimulationException(f"Value {sim_value.value} can't be represented by Enum type {self.get_type_name()}")
     
     @classmethod
     def result_type(cls, net_types: Sequence[Optional['NetType']], operation: str) -> 'NetType':
