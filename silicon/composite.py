@@ -98,13 +98,8 @@ class Composite(NetType):
         return None
 
     def generate_assign(self, sink_name: str, source_expression: str, xnet: 'XNet', back_end: 'BackEnd') -> str:
-        ret_val = ""
-        for (member_name, (member_type, member_reverse)) in self.get_members().items():
-            if member_reverse:
-                ret_val += member_type.generate_assign(f"{source_expression}{MEMBER_DELIMITER}{member_name}", f"{sink_name}{MEMBER_DELIMITER}{member_name}", None, back_end) + "\n"
-            else:
-                ret_val += member_type.generate_assign(f"{sink_name}{MEMBER_DELIMITER}{member_name}", f"{source_expression}{MEMBER_DELIMITER}{member_name}", None, back_end) + "\n"
-        return ret_val
+        # This function cannot be implemented (easily) for composite types. Luckily it should never be called as we never create XNets of composites.
+        raise NotImplementedError
 
     def setup_junction(self, junction: 'Junction') -> None:
         for (member_name, (member_type, member_reverse)) in self.get_members().items():
