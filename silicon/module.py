@@ -346,7 +346,9 @@ class Module(object):
                         if sub_module_port.is_deleted():
                             continue
                         if sub_module_port.is_composite():
-                            for sub_module_port_member in sub_module_port.get_all_member_junctions(False):
+                            members = sub_module_port.get_all_member_junctions(False)
+                            last_sub_idx = len(members)
+                            for sub_idx, sub_module_port_member in enumerate(members):
                                 if is_output_port(sub_module_port_member):
                                     source_str = sub_module_port_member.get_lhs_name(back_end, self)
                                 elif is_input_port(sub_module_port_member):
@@ -354,7 +356,7 @@ class Module(object):
                                 else:
                                     assert False
                                 rtl_instantiations += back_end.indent(f".{sub_module_port_member.interface_name}({source_str})")
-                                if idx != last_port_idx:
+                                if idx != last_port_idx or sub_idx != last_sub_idx:
                                     rtl_instantiations += ","
                                 rtl_instantiations += "\n"
                             rtl_instantiations += "\n"

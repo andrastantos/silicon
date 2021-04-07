@@ -20,9 +20,9 @@ module Top (
 		.in2_g(in1_g),
 		.in2_b(in1_b),
 
-		.outp_r(outp_r)
-		.outp_g(outp_g)
-		.outp_b(outp_b)
+		.outp_r(outp_r),
+		.outp_g(outp_g),
+		.outp_b(outp_b),
 
 	);
 
