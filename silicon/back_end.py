@@ -354,7 +354,9 @@ class VHDL(BackEnd):
             "while",
             "with",
             "xnor",
-            "xor"
+            "xor",
+            "input", # Apparently, even though it's not reserved, most compilers don't like it anways
+            "output", # Apparently, even though it's not reserved, most compilers don't like it anways
         )
 
 system_verilog = SystemVerilog()

@@ -14,11 +14,11 @@ import inspect
 TByte = Unsigned(length=8)
 
 class Parity(Module):
-    input = Input()
-    output = Output(logic)
+    input_port = Input()
+    output_port = Output(logic)
 
     def body(self):
-        self.output = xor_gate(*self.input)
+        self.output_port = xor_gate(*self.input_port)
 
 class Z80Alu(Module):
     in_a = Input(TByte)
@@ -1276,5 +1276,5 @@ def test_sim():
     test.simulation(Z80Alu_tb, "z80_alu")
 
 if __name__ == "__main__":
-    test_sim()
-    #test_verilog()
+    #test_sim()
+    test_verilog()
