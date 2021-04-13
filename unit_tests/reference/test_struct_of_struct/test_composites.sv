@@ -21,12 +21,19 @@ module AlphaBender (
 	output logic error
 );
 
-	assign outp_pixel_r = (in1_pixel_r * alpha + in2_pixel_r * (8'hff - alpha) + 7'h7f)[15:8];
-	assign outp_pixel_g = (in1_pixel_g * alpha + in2_pixel_g * (8'hff - alpha) + 7'h7f)[15:8];
-	assign outp_pixel_b = (in1_pixel_b * alpha + in2_pixel_b * (8'hff - alpha) + 7'h7f)[15:8];
+	logic [16:0] u6_output_port;
+	logic [16:0] u14_output_port;
+	logic [16:0] u22_output_port;
+
+	assign outp_pixel_r = u6_output_port[15:8];
+	assign outp_pixel_g = u14_output_port[15:8];
+	assign outp_pixel_b = u22_output_port[15:8];
 	assign outp_valid = in1_valid & in2_valid;
 	assign error = in1_valid ^ in2_valid;
 
+	assign u6_output_port = in1_pixel_r * alpha + in2_pixel_r * (8'hff - alpha) + 7'h7f;
+	assign u14_output_port = in1_pixel_g * alpha + in2_pixel_g * (8'hff - alpha) + 7'h7f;
+	assign u22_output_port = in1_pixel_b * alpha + in2_pixel_b * (8'hff - alpha) + 7'h7f;
 endmodule
 
 

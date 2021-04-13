@@ -14,14 +14,14 @@ import inspect
 TByte = Unsigned(length=8)
 
 class OneHotDecode(Module):
-    input = Input(Unsigned(length=2))
-    output = Output(Unsigned(length=4))
+    input_port = Input(Unsigned(length=2))
+    output_port = Output(Unsigned(length=4))
 
     def body(self):
-        self.output[0] = self.input == 0
-        self.output[1] = self.input == 1
-        self.output[2] = self.input == 2
-        self.output[3] = self.input == 3
+        self.output_port[0] = self.input_port == 0
+        self.output_port[1] = self.input_port == 1
+        self.output_port[2] = self.input_port == 2
+        self.output_port[3] = self.input_port == 3
 
 class intel_8255(Module):
     rst = Input(logic)

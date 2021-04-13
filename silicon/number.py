@@ -80,21 +80,21 @@ class Number(NetType):
     class Accessor(GenericModule):
         def construct(self, slice: Union[int, slice], number: 'Number') -> None:
             self.key = Number.Key(slice)
-            self.input = Input(number)
+            self.input_port = Input(number)
             # At least in SystemVerilog slice always returns unsigned.
             # That I think makes more sense so I'll implement it that way here too.
             # This of course means that signed_number[3:0] for a 4-bit signed is not a no-op!
             # This is listed as a gottcha here: https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.449.1578&rep=rep1&type=pdf
-            #self.output = Output(Number(length=self.key.length, signed=number.signed))
-            self.output = Output(Number(length=self.key.length, signed=False))
+            #self.output_port = Output(Number(length=self.key.length, signed=number.signed))
+            self.output_port = Output(Number(length=self.key.length, signed=False))
         def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
-            yield InlineExpression(self.output, *self.generate_inline_expression(back_end, target_namespace))
+            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
         def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
             assert back_end.language == "SystemVerilog"
 
             op_precedence = back_end.get_operator_precedence("[]")
-            rhs_name, _ = self.input.get_rhs_expression(back_end, target_namespace, self.output.get_net_type(), op_precedence)
-            assert self.key.start <= self.input.get_net_type().length, "FIXME: accessing slices of a Number outside it's length is not yet supported!!"
+            rhs_name, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence, allow_expression = False)
+            assert self.key.start <= self.input_port.get_net_type().length, "FIXME: accessing slices of a Number outside it's length is not yet supported!!"
             if self.key.end == self.key.start:
                 return f"{rhs_name}[{self.key.start}]", op_precedence
             else:
@@ -114,13 +114,13 @@ class Number(NetType):
             shift = self.key.end
             mask = (1 << (self.key.start - self.key.end + 1)) - 1
             while True:
-                yield self.input
-                in_val = self.input.sim_value
+                yield self.input_port
+                in_val = self.input_port.sim_value
                 if in_val is None:
                     out_val = None
                 else:
                     out_val = (in_val >> shift) & mask
-                self.output <<= out_val
+                self.output_port <<= out_val
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             assert False
         def is_combinational(self) -> bool:
@@ -137,9 +137,9 @@ class Number(NetType):
             return None
         return name
 
-    def get_rhs_expression(self, for_junction: Junction, back_end: 'BackEnd', target_namespace: Module, outer_precedence: Optional[int] = None) -> Tuple[str, int]:
+    def get_rhs_expression(self, for_junction: Junction, back_end: 'BackEnd', target_namespace: Module, outer_precedence: Optional[int] = None, allow_expression: bool = True) -> Tuple[str, int]:
         xnet = target_namespace._impl.netlist.get_xnet_for_junction(for_junction)
-        expr, prec = xnet.get_rhs_expression(target_namespace, back_end)
+        expr, prec = xnet.get_rhs_expression(target_namespace, back_end, allow_expression)
         if outer_precedence is not None and prec > outer_precedence:
             return f"({expr})", back_end.get_operator_precedence("()")
         else:
@@ -439,24 +439,24 @@ class Number(NetType):
                 raise SyntaxErrorException("Can only adapt the size of numbers")
             if not isinstance(output_type, Number):
                 raise SyntaxErrorException("Can only adapt the size of numbers")
-            self.input = Input(input_type)
-            self.output = Output(output_type)
+            self.input_port = Input(input_type)
+            self.output_port = Output(output_type)
         def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
-            yield InlineExpression(self.output, *self.generate_inline_expression(back_end, target_namespace))
+            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
         def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
             assert back_end.language == "SystemVerilog"
 
             ret_val = ""
-            need_sign_cast = self.input.signed and not self.output.signed
-            need_size_cast = self.input.length > self.output.length
+            need_sign_cast = self.input_port.signed and not self.output_port.signed
+            need_size_cast = self.input_port.length > self.output_port.length
             if need_sign_cast:
-                if self.output.signed:
+                if self.output_port.signed:
                     ret_val += "signed'("
                 else:
                     ret_val += "unsigned'("
             if need_size_cast:
-                ret_val += f"{self.output.length}'("
-            rhs_name, precedence = self.input.get_rhs_expression(back_end, target_namespace, self.output.get_net_type())
+                ret_val += f"{self.output_port.length}'("
+            rhs_name, precedence = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
             ret_val += rhs_name
             if need_size_cast:
                 precedence = 0
@@ -467,8 +467,8 @@ class Number(NetType):
             return ret_val, precedence
         def simulate(self) -> TSimEvent:
             while True:
-                yield self.input
-                self.output <<= self.input
+                yield self.input_port
+                self.output_port <<= self.input_port
         def is_combinational(self) -> bool:
             """
             Returns True if the module is purely combinational, False otherwise

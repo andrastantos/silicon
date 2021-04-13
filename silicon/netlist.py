@@ -31,8 +31,9 @@ class XNet(object):
         assert scope is None or is_module(scope)
         assert scope not in self.rhs_expressions
         self.rhs_expressions[scope] = (expr, precedence)
-    def get_rhs_expression(self, scope: 'Module', back_end: 'BackEnd') -> Tuple[str, int]:
+    def get_rhs_expression(self, scope: 'Module', back_end: 'BackEnd', allow_expression: bool = True) -> Tuple[str, int]:
         assert scope is None or is_module(scope)
+        # We should return the unconnected value if there's no source for this XNet at all.
         if self.source is None:
             net_type = self.get_net_type()
             if net_type is None:
@@ -40,9 +41,20 @@ class XNet(object):
             return net_type.get_unconnected_value(back_end), 0
         if scope in self.assigned_names:
             return self.assigned_names[scope], 0
+        make_name_used = False
         if scope in self.rhs_expressions:
-            return self.rhs_expressions[scope]
-        name = self.get_lhs_name(scope, allow_implicit=True)
+            if allow_expression:
+                return self.rhs_expressions[scope]
+            else:
+                # We are going to return a name. We have to make sure that an eventual assignment to that name is made
+                make_name_used = True
+        # If we're asked to return the name in the source context, we should return the unconnected value.
+        # That is because an XNet is either sourced by a primitive (which would never ask for the RHS name of its output)
+        # or it's unconnected, in which case we should return the unconnected value.
+        if scope == self.source.get_parent_module():
+            name = None
+        else:
+            name = self.get_lhs_name(scope, allow_implicit=True, mark_assigned=False)
         if name is None:
             # We end up here with an unconnected input in the instantiation scope, if that input feeds other sub-module inputs within the instance.
             port = self.source
@@ -50,11 +62,14 @@ class XNet(object):
                 return back_end.get_unconnected_value(), 0
             return port.get_net_type().get_unconnected_value(back_end), 0
         else:
+            if make_name_used:
+                self.use_name(scope, name)
             return name, 0 # This will put the returned value into self.assigned_names
-    def get_lhs_name(self, scope: 'Module', *, allow_implicit: bool = True) -> Optional[str]:
+    
+    def get_lhs_name(self, scope: 'Module', *, allow_implicit: bool = True, mark_assigned: bool = True) -> Optional[str]:
         assert scope is None or is_module(scope)
         name = self.get_best_name(scope, allow_implicit=allow_implicit)
-        if name is not None:
+        if name is not None and mark_assigned:
             self.assign_name(scope, name)
         return name
     def generate_assign(self, sink_name: str, source_expression: str, back_end: 'BackEnd') -> str:

@@ -2,11 +2,11 @@
 // top
 ////////////////////////////////////////////////////////////////////////////////
 module top (
-	input logic signed [7:0] input,
-	output logic signed [7:0] output
+	input logic signed [7:0] input_port,
+	output logic signed [7:0] output_port
 );
 
-	assign output = 8'x;
+	assign output_port = 8'x;
 endmodule
 
 

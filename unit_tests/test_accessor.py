@@ -13,11 +13,11 @@ import inspect
 TByte = Unsigned(length=8)
 
 class Parity(Module):
-    input = Input(TByte)
-    output = Output(logic)
+    input_port = Input(TByte)
+    output_port = Output(logic)
 
     def body(self):
-        self.output <<= self.input[0]
+        self.output_port <<= self.input_port[0]
 
 class Test(Module):
     in_a = Input(TByte)

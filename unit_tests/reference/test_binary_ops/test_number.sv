@@ -39,6 +39,15 @@ module top (
 	output logic [95:0] ursh_out
 );
 
+	logic [3:0] u23_output_port;
+	logic [3:0] u25_output_port;
+	logic [3:0] u31_output_port;
+	logic [3:0] u33_output_port;
+	logic [3:0] u39_output_port;
+	logic [3:0] u41_output_port;
+	logic [3:0] u47_output_port;
+	logic [3:0] u49_output_port;
+
 	assign uout1 = uin1 & uin2;
 	assign sout1 = sin1 & sin1;
 	assign uout2 = uin1 & uin2 & uin3;
@@ -61,12 +70,20 @@ module top (
 	assign srsh_out = sin1 >>> uin1;
 	assign ursh_out = uin1 >> uin1;
 	assign uout9 = {uin1[3] & (uin2[0] | uin5[3]), uin1[2] & (uin2[1] | uin5[2]), uin1[1] & (uin2[2] | uin5[1]), uin1[0] & (uin2[3] | uin5[0])};
-	assign uout10 = {(uin1 & (uin2 | uin5))[3], (uin1 & (uin2 | uin5))[2], (uin1 & (uin2 | uin5))[1], (uin1 & (uin2 | uin5))[0]};
-	assign uout11 = {(uin1 & (uin2 | uin5))[0], (uin1 & (uin2 | uin5))[1], (uin1 & (uin2 | uin5))[2], (uin1 & (uin2 | uin5))[3]};
+	assign uout10 = {u47_output_port[3], u39_output_port[2], u31_output_port[1], u23_output_port[0]};
+	assign uout11 = {u25_output_port[0], u33_output_port[1], u41_output_port[2], u49_output_port[3]};
 
 	assign uout5 = 4'x;
 	assign uout6 = 4'x;
 	assign uout12 = 4'x;
+	assign u23_output_port = uin1 & (uin2 | uin5);
+	assign u25_output_port = uin1 & (uin2 | uin5);
+	assign u31_output_port = uin1 & (uin2 | uin5);
+	assign u33_output_port = uin1 & (uin2 | uin5);
+	assign u39_output_port = uin1 & (uin2 | uin5);
+	assign u41_output_port = uin1 & (uin2 | uin5);
+	assign u47_output_port = uin1 & (uin2 | uin5);
+	assign u49_output_port = uin1 & (uin2 | uin5);
 endmodule
 
 

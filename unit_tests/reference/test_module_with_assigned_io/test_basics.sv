@@ -2,14 +2,14 @@
 // top
 ////////////////////////////////////////////////////////////////////////////////
 module top (
-	input logic signed [7:0] input,
+	input logic signed [7:0] input_port,
 	output logic signed [7:0] output1,
 	output logic signed [7:0] output2
 );
 
 	assign output2 = 1'h0;
 
-	assign output1 = input;
+	assign output1 = input_port;
 endmodule
 
 

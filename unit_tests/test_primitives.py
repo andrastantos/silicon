@@ -165,8 +165,8 @@ def test_reg4():
 if __name__ == "__main__":
     #test_select()
     #test_select_one_first()
-    test_reg()
-    #test_reg3()
+    #test_reg()
+    test_reg3()
     #test_mux()
     #test_select_with_none()
     #test_reg4()

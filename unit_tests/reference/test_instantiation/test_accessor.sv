@@ -12,13 +12,13 @@ module Test (
 	logic u1_output;
 
 	Parity u (
-		.input(in_a),
-		.output(u_output)
+		.input_port(in_a),
+		.output_port(u_output)
 	);
 
 	Parity_2 u1 (
-		.input(in_a),
-		.output(u1_output)
+		.input_port(in_a),
+		.output_port(u1_output)
 	);
 
 	// Assignments for outputs

@@ -161,27 +161,27 @@ class Enum(Number):
                 raise SyntaxErrorException("Can only adapt the size of numbers")
             if not isinstance(output_type, Enum):
                 raise SyntaxErrorException("Can only adapt the size of numbers")
-            self.input = Input(input_type)
-            self.output = Output(output_type)
+            self.input_port = Input(input_type)
+            self.output_port = Output(output_type)
         def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
-            yield InlineExpression(self.output, *self.generate_inline_expression(back_end, target_namespace))
+            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
         def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
             assert back_end.language == "SystemVerilog"
 
-            rhs_name, _ = self.input.get_rhs_expression(back_end, target_namespace, self.output.get_net_type())
-            ret_val = f"{self.output.get_net_type().get_type_name()}'({rhs_name})"
+            rhs_name, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), allow_expression = True)
+            ret_val = f"{self.output_port.get_net_type().get_type_name()}'({rhs_name})"
             return ret_val, 0
         def simulate(self) -> TSimEvent:
             while True:
-                yield self.input
-                if self.input.sim_value is None:
-                    self.output <<= None
+                yield self.input_port
+                if self.input_port.sim_value is None:
+                    self.output_port <<= None
                 else:
                     try:
-                        val_as_enum = self.output.get_net_type().base_type(self.input.sim_value)
-                        self.output <<= val_as_enum
+                        val_as_enum = self.output_port.get_net_type().base_type(self.input_port.sim_value)
+                        self.output_port <<= val_as_enum
                     except ValueError:
-                        raise SimulationException(f"Enum {self.output.get_net_type().get_type_name()} cannot be assigned a numberic value {self.input.sim_value}.")
+                        raise SimulationException(f"Enum {self.output_port.get_net_type().get_type_name()} cannot be assigned a numberic value {self.input_port.sim_value}.")
         def is_combinational(self) -> bool:
             """
             Returns True if the module is purely combinational, False otherwise

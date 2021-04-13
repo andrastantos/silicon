@@ -1,4 +1,4 @@
-digraph "UseFSM.my_fsm at /home/tantos/personal/silicon/unit_tests/test_fsm.py:26" {
+digraph "UseFSM.my_fsm at /home/tantos/silicon/unit_tests/test_fsm.py:26" {
 	rankdir=LR size="8,5"
 	reset [height=0.2 shape=point xlabel=reset]
 	rankdir=LR size="8,5"

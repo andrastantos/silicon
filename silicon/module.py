@@ -530,7 +530,10 @@ class Module(object):
                                     ret_val.append((name, val))
                         return tuple(ret_val)
 
+                    from .back_end import get_reserved_names
                     for (port_name, port_object) in ports(type(self._true_module)):
+                        if port_name in get_reserved_names():
+                            raise SyntaxErrorException(f"Class {self} uses reserved name as port definition {port_name}")
                         if port_object.source is not None:
                             raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with source already bound")
                         if len(port_object.sinks) != 0:
@@ -694,6 +697,9 @@ class Module(object):
                             del self._positional_outputs[name]
                 # If we insert a new Junction object, update the port lists as well
                 if is_junction(value):
+                    from .back_end import get_reserved_names
+                    if name in get_reserved_names():
+                        raise SyntaxErrorException(f"Class {self} uses reserved name as wire definition {name}")
                     junction = value
                     junction.set_parent_module(self._true_module)
                     assert junction.is_instantiable()

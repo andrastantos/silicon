@@ -7,8 +7,8 @@ module Test (
 );
 
 	Parity u (
-		.input(in_a),
-		.output(out_h)
+		.input_port(in_a),
+		.output_port(out_h)
 	);
 
 endmodule
@@ -18,10 +18,11 @@ endmodule
 // Parity
 ////////////////////////////////////////////////////////////////////////////////
 module Parity (
-	input logic [7:0] input,
-	output logic output
+	input logic [7:0] input_port,
+	output logic output_port
 );
 
+	assign output_port = 1'x;
 endmodule
 
 

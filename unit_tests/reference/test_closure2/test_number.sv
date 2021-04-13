@@ -7,8 +7,11 @@ module top (
 	input logic uin2
 );
 
-	assign uout11 = (uin1 | uin2)[0];
+	logic u_output_port;
 
+	assign uout11 = u_output_port[0];
+
+	assign u_output_port = uin1 | uin2;
 endmodule
 
 

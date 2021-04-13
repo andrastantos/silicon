@@ -17,7 +17,7 @@ class Pixel(Struct):
 
 def test_select_struct():
     class top(Module):
-        out = Output(Pixel())
+        out_port = Output(Pixel())
         in1 = Input(Pixel())
         in2 = Input(Pixel())
         in3 = Input(Pixel())
@@ -25,13 +25,13 @@ def test_select_struct():
         sel_in = Input(Unsigned(2))
 
         def body(self):
-            self.out = Select(self.sel_in, self.in1, self.in2, self.in3, self.in4)
+            self.out_port = Select(self.sel_in, self.in1, self.in2, self.in3, self.in4)
             
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_select_one_struct():
     class top(Module):
-        out = Output(Pixel())
+        out_port = Output(Pixel())
         in1 = Input(Pixel())
         in2 = Input(Pixel())
         in3 = Input(Pixel())
@@ -39,13 +39,13 @@ def test_select_one_struct():
         sel_in = Input(Unsigned(4))
 
         def body(self):
-            self.out = SelectOne(self.sel_in[0], self.in1, self.sel_in[1], self.in2, self.sel_in[2], self.in3, self.sel_in[3], self.in4)
+            self.out_port = SelectOne(self.sel_in[0], self.in1, self.sel_in[1], self.in2, self.sel_in[2], self.in3, self.sel_in[3], self.in4)
             
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_select_first_struct(mode: str = "rtl"):
     class top(Module):
-        out = Output(Pixel())
+        out_port = Output(Pixel())
         in1 = Input(Pixel())
         in2 = Input(Pixel())
         in3 = Input(Pixel())
@@ -53,7 +53,7 @@ def test_select_first_struct(mode: str = "rtl"):
         sel_in = Input(Unsigned(4))
 
         def body(self):
-            self.out = SelectFirst(self.sel_in[0], self.in1, self.sel_in[1], self.in2, self.sel_in[2], self.in3, self.sel_in[3], self.in4)
+            self.out_port = SelectFirst(self.sel_in[0], self.in1, self.sel_in[1], self.in2, self.sel_in[2], self.in3, self.sel_in[3], self.in4)
         def simulate(self):
             self.in1.r <<= 11
             self.in1.g <<= 12
@@ -365,14 +365,14 @@ def test_interface_wire3(mode: str = "rtl"):
 
 
 if __name__ == "__main__":
-    #test_select_struct()
+    test_select_struct()
     #test_select_one_struct()
     #test_select_first_struct("rtl")
     #test_select_first_struct("sim")
     #test_reg_struct()
     #test_struct_of_struct()
     #test_generic_struct()
-    test_struct_with_method()
+    #test_struct_with_method()
     #test_struct_to_number("rtl")
     #test_struct_to_number("sim")
     #test_struct_sub_module("rtl")

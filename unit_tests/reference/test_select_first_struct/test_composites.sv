@@ -2,9 +2,9 @@
 // top
 ////////////////////////////////////////////////////////////////////////////////
 module top (
-	output logic [7:0] out_b,
-	output logic [7:0] out_g,
-	output logic [7:0] out_r,
+	output logic [7:0] out_port_b,
+	output logic [7:0] out_port_g,
+	output logic [7:0] out_port_r,
 
 	input logic [7:0] in1_b,
 	input logic [7:0] in1_g,
@@ -25,9 +25,9 @@ module top (
 	input logic [3:0] sel_in
 );
 
-	assign out_b = sel_in[0] ? in1_b : sel_in[1] ? in2_b : sel_in[2] ? in3_b : sel_in[3] ? in4_b : 24'x;
-	assign out_g = sel_in[0] ? in1_g : sel_in[1] ? in2_g : sel_in[2] ? in3_g : sel_in[3] ? in4_g : 24'x;
-	assign out_r = sel_in[0] ? in1_r : sel_in[1] ? in2_r : sel_in[2] ? in3_r : sel_in[3] ? in4_r : 24'x;
+	assign out_port_b = sel_in[0] ? in1_b : sel_in[1] ? in2_b : sel_in[2] ? in3_b : sel_in[3] ? in4_b : 24'x;
+	assign out_port_g = sel_in[0] ? in1_g : sel_in[1] ? in2_g : sel_in[2] ? in3_g : sel_in[3] ? in4_g : 24'x;
+	assign out_port_r = sel_in[0] ? in1_r : sel_in[1] ? in2_r : sel_in[2] ? in3_r : sel_in[3] ? in4_r : 24'x;
 
 endmodule
 

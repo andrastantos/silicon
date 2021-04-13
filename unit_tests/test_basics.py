@@ -22,8 +22,8 @@ def test_empty_module():
 #################################################
 def test_module_with_io():
     class top(si.Module):
-        input = si.Input(si.Signed(8))
-        output = si.Output(si.Signed(8))
+        input_port = si.Input(si.Signed(8))
+        output_port = si.Output(si.Signed(8))
         def body(self):
             pass
 
@@ -33,11 +33,11 @@ def test_module_with_io():
 #################################################
 def test_module_with_assigned_io():
     class top(si.Module):
-        input = si.Input(si.Signed(8))
+        input_port = si.Input(si.Signed(8))
         output1 = si.Output(si.Signed(8))
         output2 = si.Output(si.Signed(8))
         def body(self):
-            self.output1 = self.input
+            self.output1 = self.input_port
             self.output2 = 0
 
     t.test.rtl_generation(top, inspect.currentframe().f_code.co_name, allow_new_attributes=True)
@@ -208,9 +208,9 @@ if __name__ == "__main__":
     #test_empty_module()
     #test_module_with_io()
     #test_module_with_assigned_io()
-    test_pass_through()
+    #test_pass_through()
     #test_wire_names()
     #test_wire_array3()
     #test_slice_bind()
-    #test_double_port_assign()
+    test_double_port_assign()
     #test_full_adder()
