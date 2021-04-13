@@ -66,10 +66,10 @@ class FSMLogic(Module):
             for new_state, condition_port in edges.items():
                 args.append(condition_port)
                 args.append(new_state)
-            condition_selector = SelectOne(*args, default = self.default_state)
+            condition_selector = SelectOne(*args, default_port = self.default_state)
             next_state_args.append(self.state == current_state)
             next_state_args.append(condition_selector)
-        self.next_state <<= SelectOne(*next_state_args, default = self.default_state)
+        self.next_state <<= SelectOne(*next_state_args, default_port = self.default_state)
 
     def draw(self, scope: Module, netlist: 'Netlist', back_end: 'BackEnd', graph: Optional['Digraph'] = None) -> 'Digraph':
         from graphviz import Digraph

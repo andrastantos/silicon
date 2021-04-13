@@ -23,7 +23,7 @@ module Top (
 		.port2_write_en(write_en_b)
 	);
 
-	assign data_out_b = 14'x;
+	assign data_out_b = 14'hx;
 endmodule
 
 
@@ -46,11 +46,11 @@ module Memory (
 		$readmemb("config.bin", mem);
 	end
 
-	wire [5:0] port1_addr_reg;
+	logic [5:0] port1_addr_reg;
 	always @(posedge port1_clk) begin
 		port1_addr_reg <= port1_addr;
 	end
-	port1_data_out <= mem[port1_addr_reg];
+	assign port1_data_out = mem[port1_addr_reg];
 
 	always @(posedge port1_clk) begin
 		if (port2_write_en) begin

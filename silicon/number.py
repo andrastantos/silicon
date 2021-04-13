@@ -92,6 +92,10 @@ class Number(NetType):
         def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
             assert back_end.language == "SystemVerilog"
 
+            if self.input_port.get_net_type().length == 1:
+                if self.key.start != 0 or self.key.end != 0:
+                    raise SyntaxErrorException("Can't access sections of single-bit number outside bit 0")
+                return self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), allow_expression = False)
             op_precedence = back_end.get_operator_precedence("[]")
             rhs_name, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence, allow_expression = False)
             assert self.key.start <= self.input_port.get_net_type().length, "FIXME: accessing slices of a Number outside it's length is not yet supported!!"
@@ -449,11 +453,6 @@ class Number(NetType):
             ret_val = ""
             need_sign_cast = self.input_port.signed and not self.output_port.signed
             need_size_cast = self.input_port.length > self.output_port.length
-            if need_sign_cast:
-                if self.output_port.signed:
-                    ret_val += "signed'("
-                else:
-                    ret_val += "unsigned'("
             if need_size_cast:
                 ret_val += f"{self.output_port.length}'("
             rhs_name, precedence = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
@@ -463,7 +462,10 @@ class Number(NetType):
                 ret_val += ")"
             if need_sign_cast:
                 precedence = 0
-                ret_val += ")"
+                if self.output_port.signed:
+                    ret_val += back_end.signed_cast(ret_val)
+                else:
+                    ret_val += back_end.unsigned_cast(ret_val)
             return ret_val, precedence
         def simulate(self) -> TSimEvent:
             while True:
@@ -641,7 +643,7 @@ class Number(NetType):
         # This is indeed true according to https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.449.1578&rep=rep1&type=pdf
         ret_val = "{" + ", ".join(rtl_part[0] for rtl_part in rtl_parts) + "}"
         if self.signed:
-            return f"signed'({ret_val})", 0
+            return back_end.signed_cast(ret_val), 0
         else:
             return ret_val, back_end.get_operator_precedence("{}")
 

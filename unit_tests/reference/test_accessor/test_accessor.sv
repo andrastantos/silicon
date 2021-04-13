@@ -18,7 +18,7 @@ module Test (
 		.output_port(out_2)
 	);
 
-	assign out_3 = 8'x;
+	assign out_3 = 8'hx;
 endmodule
 
 

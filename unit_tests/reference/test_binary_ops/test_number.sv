@@ -73,9 +73,9 @@ module top (
 	assign uout10 = {u47_output_port[3], u39_output_port[2], u31_output_port[1], u23_output_port[0]};
 	assign uout11 = {u25_output_port[0], u33_output_port[1], u41_output_port[2], u49_output_port[3]};
 
-	assign uout5 = 4'x;
-	assign uout6 = 4'x;
-	assign uout12 = 4'x;
+	assign uout5 = 4'hx;
+	assign uout6 = 4'hx;
+	assign uout12 = 4'hx;
 	assign u23_output_port = uin1 & (uin2 | uin5);
 	assign u25_output_port = uin1 & (uin2 | uin5);
 	assign u31_output_port = uin1 & (uin2 | uin5);

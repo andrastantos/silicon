@@ -51,15 +51,15 @@ module Memory (
 
 	logic [23:0] real_mem_data_out;
 
-	wire [23:0] mem [255:0];
-	wire [7:0] addr_reg;
+	logic [23:0] mem [255:0];
+	logic [7:0] addr_reg;
 	always @(posedge clk) begin
 		if (write_en) begin
 			mem[addr] <= {data_in_b, data_in_g, data_in_r};
 		end
 		addr_reg <= addr;
 	end
-	real_mem_data_out <= mem[addr_reg];
+	assign real_mem_data_out = mem[addr_reg];
 	assign {data_out_b, data_out_g, data_out_r} = real_mem_data_out;
 endmodule
 

@@ -11,7 +11,7 @@ module top (
 );
 
 	assign uout1 = {uin1, uin2};
-	assign sout1 = signed'({sin1, uin1});
+	assign sout1 = $signed({sin1, uin1});
 
 endmodule
 

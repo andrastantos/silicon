@@ -25,7 +25,7 @@ module Memory (
 	output logic [7:0] data_out
 );
 
-	wire [7:0] mem [255:0];
+	logic [7:0] mem [255:0];
 	initial begin
 		mem[0] <= 8'h0;
 		mem[1] <= 8'h1;
@@ -285,11 +285,11 @@ module Memory (
 		mem[255] <= 8'hff;
 	end
 
-	wire [7:0] addr_reg;
+	logic [7:0] addr_reg;
 	always @(posedge clk) begin
 		addr_reg <= addr;
 	end
-	data_out <= mem[addr_reg];
+	assign data_out = mem[addr_reg];
 
 endmodule
 

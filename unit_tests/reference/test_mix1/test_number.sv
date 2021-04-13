@@ -38,7 +38,7 @@ module top (
 		.out_a(u10_out_a)
 	);
 
-	assign out_a = 1'x;
+	assign out_a = 1'hx;
 endmodule
 
 

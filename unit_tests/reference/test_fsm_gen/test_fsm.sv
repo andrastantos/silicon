@@ -34,7 +34,7 @@ module UseFSM (
 	logic [7:0] my_sum;
 
 	assign next_my_sum = my_fsm_next_state == reset ? 1'h0 : 8'b0 | my_fsm_next_state == idle ? 1'h0 : 8'b0 | my_fsm_next_state == get_first_data ? data_in : 8'b0 | my_fsm_next_state == get_data ? u34_output_port[7:0] : 8'b0 | my_fsm_next_state == get_wait ? my_sum : 8'b0 | my_fsm_next_state == send_data ? u38_output_port[7:0] : 8'b0 ;
-	always_ff @(posedge clk) my_sum <= rst ? 8'0 : next_my_sum;
+	always_ff @(posedge clk) my_sum <= rst ? 8'h0 : next_my_sum;
 	assign data_out_valid = my_fsm_state == send_data;
 
 	FSM my_fsm (

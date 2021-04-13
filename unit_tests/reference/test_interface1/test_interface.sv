@@ -11,9 +11,9 @@ module top (
 	output logic out_a_valid
 );
 
-	assign in_a_ready = 1'x;
-	assign out_a_data = 8'x;
-	assign out_a_valid = 1'x;
+	assign in_a_ready = 1'hx;
+	assign out_a_data = 8'hx;
+	assign out_a_valid = 1'hx;
 endmodule
 
 

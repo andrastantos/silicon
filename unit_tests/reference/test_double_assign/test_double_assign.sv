@@ -22,7 +22,7 @@ module Parity (
 	output logic output_port
 );
 
-	assign output_port = 1'x;
+	assign output_port = 1'hx;
 endmodule
 
 

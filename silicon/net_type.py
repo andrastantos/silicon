@@ -69,7 +69,7 @@ class NetType(object):
         However an optional auto-input, if left unconnected uses the default value.
         """
         assert back_end.language == "SystemVerilog"
-        return f"{self.get_num_bits()}'x"
+        return f"{self.get_num_bits()}'hx"
     def get_default_value(self, back_end: 'BackEnd') -> str:
         """
         Get the default used to denote unconnected values for the given back-end.
@@ -85,7 +85,7 @@ class NetType(object):
         However an optional auto-input, if left unconnected uses the default value.
         """
         assert back_end.language == "SystemVerilog"
-        return f"{self.get_num_bits()}'0"
+        return f"{self.get_num_bits()}'h0"
     def generate_assign(self, sink_name: str, source_expression: str, xnet: 'XNet', back_end: 'BackEnd') -> str:
         """
         Generate and return an assignment appropriate for the given back-end

@@ -428,7 +428,7 @@ if __name__ == "__main__":
     #test_closure()
     #test_closure1()
     #test_closure2()
-    #test_slices()
+    test_slices()
     #test_assign()
     #test_concatenate()
     #test_slice_new()
@@ -439,7 +439,7 @@ if __name__ == "__main__":
     #test_local_slice()
     #test_wire_to_wire_loop()
     #test_partial_assign()
-    test_precedence()
+    #test_precedence()
     pass
 
 '''

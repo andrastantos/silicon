@@ -166,8 +166,8 @@ def test_enum_adapt2_sim():
 if __name__ == "__main__":
     #test_enum1()
     #test_enum_const()
-    #test_enum_add()
+    test_enum_add()
     #test_enum_and1()
     #test_enum_and2()
     #test_enum_adapt()
-    test_enum_adapt2("sim")
+    #test_enum_adapt2("sim")

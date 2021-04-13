@@ -25,12 +25,12 @@ module Memory (
 	output logic [7:0] data_out
 );
 
-	wire [7:0] mem [255:0];
+	logic [7:0] mem [255:0];
 	initial begin
 		$readmemb("xxx.bin", mem);
 	end
 
-	data_out <= mem[addr];
+	assign data_out = mem[addr];
 
 endmodule
 

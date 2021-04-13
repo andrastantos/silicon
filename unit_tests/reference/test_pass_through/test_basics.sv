@@ -7,7 +7,7 @@ module top (
 	input logic signed in_b
 );
 
-	assign out_a = signed'({in_a & in_b, 2'(1'h1), 2'(1'h0)});
+	assign out_a = $signed({in_a & in_b, 2'(1'h1), 2'(1'h0)});
 
 endmodule
 

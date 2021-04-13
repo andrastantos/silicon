@@ -132,3 +132,8 @@ examples/cpc6128/output
 # Other artifacts
 profile.out
 unit_tests/*.pdf
+
+a.out
+**/work/*
+*.vcd
+transcript

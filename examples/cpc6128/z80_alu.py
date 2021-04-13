@@ -1276,5 +1276,5 @@ def test_sim():
     test.simulation(Z80Alu_tb, "z80_alu")
 
 if __name__ == "__main__":
-    #test_sim()
-    test_verilog()
+    test_sim()
+    #test_verilog()

@@ -95,6 +95,15 @@ class test:
                 for file in test.file_list:
                     test_diff += f"file {file.filename} match: {file.match}"
             pytest.fail(f"Test failed with the following diff:\n{test_diff}")
+        from shutil import which
+        iverilog_path = which("iverilog", mode=os.X_OK)
+        if iverilog_path is not None:
+            from subprocess import run
+            top = netlist.get_top_level_name()
+            cmd = (iverilog_path, "-g2005-sv", f"-s{top}") + tuple(f.filename for f in test.file_list)
+            result = run(cmd)
+            if result.returncode != 0:
+                pytest.fail(f"Test failed with IVerilog errors")
 
     @staticmethod
     def simulation(top_class: Callable, test_name: str = None):

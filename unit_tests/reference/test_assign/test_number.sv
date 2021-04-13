@@ -15,7 +15,7 @@ module top (
 	assign sout1 = 6'h2b;
 	assign sout2 = -7'sh2d;
 
-	assign uout2 = 16'x;
+	assign uout2 = 16'hx;
 	assign out1 = in1;
 endmodule
 

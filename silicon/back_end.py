@@ -86,6 +86,12 @@ class SystemVerilog(BackEnd):
 
     UNARY = True
     BINARY = False
+
+    def signed_cast(self, expression: str) -> str:
+        return f"$signed({expression})"
+    def unsigned_cast(self, expression: str) -> str:
+        return f"$unsigned({expression})"
+    
     def get_operator_precedence(self, operator: str, is_unary: bool = None) -> int:
         """
         SystemVerilog operators and their precedence:
@@ -254,6 +260,9 @@ class SystemVerilog(BackEnd):
             "expect",
             "reject_on",
             "within"
+            "input", # Apparently, even though it's not reserved, most compilers don't like it anways
+            "output", # Apparently, even though it's not reserved, most compilers don't like it anways
+            "default",
         )
 
 class VHDL(BackEnd):
@@ -355,8 +364,6 @@ class VHDL(BackEnd):
             "with",
             "xnor",
             "xor",
-            "input", # Apparently, even though it's not reserved, most compilers don't like it anways
-            "output", # Apparently, even though it's not reserved, most compilers don't like it anways
         )
 
 system_verilog = SystemVerilog()

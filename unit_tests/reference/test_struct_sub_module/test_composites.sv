@@ -22,8 +22,7 @@ module Top (
 
 		.outp_r(outp_r),
 		.outp_g(outp_g),
-		.outp_b(outp_b),
-
+		.outp_b(outp_b)
 	);
 
 endmodule

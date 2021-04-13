@@ -15,7 +15,7 @@ class Select(Module):
     """
     output_port = Output()
     selector_port = Input()
-    default = Input(keyword_only=True)
+    default_port = Input(keyword_only=True)
     def construct(self):
         self.value_ports = OrderedDict()
     
@@ -46,8 +46,8 @@ class Select(Module):
 
     def generate_output_type(self) -> Optional['Number']:
         value_ports = list(self.value_ports.values())
-        if not self.default.is_typeless():
-            value_ports.append(self.default)
+        if not self.default_port.is_typeless():
+            value_ports.append(self.default_port)
         all_inputs_specialized = all(tuple(input.is_specialized() for input in self.get_inputs().values()))
         common_net_type = get_common_net_type(value_ports, not all_inputs_specialized)
         if common_net_type is None:
@@ -59,7 +59,7 @@ class Select(Module):
 
     @property
     def has_default(self) -> bool:
-        return self.default.has_driver()
+        return self.default_port.has_driver()
     
     def body(self) -> None:
         if len(self.value_ports) == 0:
@@ -79,7 +79,7 @@ class Select(Module):
                 continue
             selected_input_idx = self.selector_port.sim_value
             if selected_input_idx not in self.value_ports:
-                self.output_port <<= self.default
+                self.output_port <<= self.default_port
             else:
                 self.output_port <<= self.value_ports[selected_input_idx]
 
@@ -129,7 +129,7 @@ class Select(Module):
                 value_expression, _ = value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
                 ret_val += f"{selector_expression} == {selector_idx} ? {value_expression} : {zero}"
             # We don't add the default expression, because that's not the right thing to do: we would have to guard it with an 'else' clause, but that doesn't really exist in a series of and-or gates
-            #default_expression, _ = self.default.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
+            #default_expression, _ = self.default_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             #ret_val += default_expression
 
         return ret_val, final_precedence
@@ -158,7 +158,7 @@ class Select(Module):
                 value_expression, _ = value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
                 ret_val += f"{selector_expression} == {selector_idx} ? {value_expression} : {zero}"
             # We don't add the default expression, because that's not the right thing to do: we would have to guard it with an 'else' clause, but that doesn't really exist in a series of and-or gates
-            #default_expression, _ = self.default.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
+            #default_expression, _ = self.default_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             #ret_val += default_expression
 
         ret_val += "end"
@@ -176,7 +176,7 @@ class _SelectOneHot(Module):
     One-hot encoded selector base-class
     """
     output_port = Output()
-    default = Input(keyword_only=True)
+    default_port = Input(keyword_only=True)
     def construct(self):
         self.value_ports = OrderedDict()
         self.selector_ports = OrderedDict()
@@ -188,23 +188,23 @@ class _SelectOneHot(Module):
         1. Provide a list of ports, where
             each odd port (1st, 3rd, 5th, etc) is a selector port
             each even port is a value port
-            The optional kw-only argument 'default' sets the default value
+            The optional kw-only argument 'default_port' sets the default value
         2. Same as above, but
             selectors are specified by named arguments selector_<idx>
             values are specified by named arguments value_<idx>
             Selectors and their associated values are paired up by the <idx> number
             <idx> starts from 0 and while the parameter order is arbitrary, each selector
             and value must have a pair and the <idx> range must have all values filled in
-            The optional kw-only argument 'default' sets the default value
+            The optional kw-only argument 'default_port' sets the default value
         TODO: these call options need to be implemented:
         3. A number of sequences (lists, tuples), each containing two ports.
             The first port in each sequence is the selector port
             The second port is a value port
-            The optional kw-only argument 'default' sets the default value
+            The optional kw-only argument 'default_port' sets the default value
         4. Two sequences of ports,
             The first sequence containing selector ports
             The second sequence containing value ports 
-            The optional kw-only argument 'default' sets the default value
+            The optional kw-only argument 'default_port' sets the default value
         """
         output_net_type = kwargs.pop("output_net_type", None)
         if output_net_type is not None and has_port(self, "output_port"):
@@ -212,7 +212,7 @@ class _SelectOneHot(Module):
         return super().__call__(*args, **kwargs)
     @property
     def has_default(self) -> bool:
-        return self.default.has_driver()
+        return self.default_port.has_driver()
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         assert False
     def create_named_port(self, name: str) -> Optional[Port]:
@@ -239,11 +239,11 @@ class _SelectOneHot(Module):
 
     def generate_output_type(self) -> Optional['Number']:
         value_ports = list(self.value_ports.values())
-        if not self.default.is_typeless():
-            value_ports.append(self.default)
+        if not self.default_port.is_typeless():
+            value_ports.append(self.default_port)
         all_inputs_specialized = all(tuple(input.is_specialized() for input in self.get_inputs().values()))
         if self.has_default:
-            all_inputs_specialized &= self.default.is_specialized()
+            all_inputs_specialized &= self.default_port.is_specialized()
         common_net_type = get_common_net_type(value_ports, not all_inputs_specialized)
         if common_net_type is None:
             raise SyntaxErrorException(f"Can't figure out output port type for Select {self}")
@@ -288,7 +288,7 @@ class SelectOne(_SelectOneHot):
             found = False
             for selector in self.selector_ports.values():
                 if selector.sim_value is None:
-                    self.output_port <<= self.default
+                    self.output_port <<= self.default_port
                     found = True
                     break
                 if selector.sim_value != 0:
@@ -300,7 +300,7 @@ class SelectOne(_SelectOneHot):
                     found = True
                     self.output_port <<= self.selector_to_value_map[selector]
             if not found:
-                self.output_port <<= self.default
+                self.output_port <<= self.default_port
 
     def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
         self.init_map()
@@ -333,8 +333,8 @@ class SelectOne(_SelectOneHot):
             selector_expression, _ = selector.get_rhs_expression(back_end, target_namespace, None, op_precedence)
             value_expression, _ = value.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += f"{selector_expression} ? {value_expression} : {zero} | "
-        if not self.default.is_typeless():
-            default_expression, _ = self.default.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
+        if not self.default_port.is_typeless():
+            default_expression, _ = self.default_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += default_expression
         else:
             ret_val = ret_val[:-2] # delete the last '|'
@@ -360,14 +360,14 @@ class SelectFirst(_SelectOneHot):
                     raise SimulationException(f"SelectFirst is missing input value for index {idx}")
                 if selector.sim_value is None:
                     use_default = False
-                    self.output_port <<= self.default
+                    self.output_port <<= self.default_port
                     break
                 if selector.sim_value != 0:
                     use_default = False
                     self.output_port <<= value
                     break
             if use_default:
-                self.output_port <<= self.default
+                self.output_port <<= self.default_port
 
     def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
         #self.init_map()
@@ -407,7 +407,7 @@ class SelectFirst(_SelectOneHot):
             selector_expression, _ = selector.get_rhs_expression(back_end, target_namespace, None, op_precedence)
             value_expression, _ = value.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += f"{selector_expression} ? {value_expression} : "
-        default_expression, _ = self.default.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
+        default_expression, _ = self.default_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
         ret_val += default_expression
         return ret_val, op_precedence
 

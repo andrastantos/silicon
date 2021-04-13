@@ -460,6 +460,9 @@ class Netlist(object):
         for junction in module.get_junctions().values():
             self._register_junction(junction)
 
+    def get_top_level_name(self) -> str:
+        return self.get_module_class_name(self.top_level)
+
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> None:
         from .utils import str_block
         
@@ -471,8 +474,8 @@ class Netlist(object):
                 type_impls = ""
                 for net_type in types:
                     type_impl = net_type.generate(self, back_end)
-                    if type_impl is not None:
-                        type_impls = str_block(type_impl, "", "\n\n")
+                    if type_impl is not None and len(type_impl) > 0:
+                        type_impls += str_block(type_impl, "", "\n\n")
                 strm.write(str_block(type_impls, "/"*80+"\n// Type definitions\n"+"/"*80+"\n", "\n\n\n"))
 
                 for module in reversed(modules):

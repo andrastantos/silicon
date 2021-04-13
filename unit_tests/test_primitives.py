@@ -63,23 +63,23 @@ def test_select_one_first():
         val_in2 = Input(Unsigned(length=4))
         val_in3 = Input(Signed(length=4))
         val_in4 = Input(Signed(length=4))
-        default = Input(Unsigned(length=8))
+        default_port = Input(Unsigned(length=8))
         sel_in1 = Input(Unsigned(length=2))
         sel_in2 = Input(Unsigned(length=1))
         sel_in3 = Input(Signed(length=2))
         sel_in4 = Input(Signed(length=1))
 
         def body(self):
-            self.sout1 = SelectOne(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, self.sel_in4, self.val_in4, default=self.default)
-            self.sout2 = SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, self.sel_in4, self.val_in4, default=self.default)
-            self.sout3 = SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, selector_3=self.sel_in4, value_3=self.val_in4, default=self.default)
-            self.sout4 = SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, value_3=self.val_in4, selector_3=self.sel_in4, default=self.default)
+            self.sout1 = SelectOne(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, self.sel_in4, self.val_in4, default_port=self.default_port)
+            self.sout2 = SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, self.sel_in4, self.val_in4, default_port=self.default_port)
+            self.sout3 = SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, selector_3=self.sel_in4, value_3=self.val_in4, default_port=self.default_port)
+            self.sout4 = SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, value_3=self.val_in4, selector_3=self.sel_in4, default_port=self.default_port)
             self.sout5 = SelectFirst(
                 selector_2=self.sel_in3, value_2=self.val_in3,
                 selector_1=self.sel_in2, value_1=self.val_in2,
                 selector_3=self.sel_in4, value_3=self.val_in4,
                 selector_0=self.sel_in1, value_0=self.val_in1,
-                default=self.default
+                default_port=self.default_port
             )
             
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
@@ -164,9 +164,9 @@ def test_reg4():
 
 if __name__ == "__main__":
     #test_select()
-    #test_select_one_first()
+    test_select_one_first()
     #test_reg()
-    test_reg3()
+    #test_reg3()
     #test_mux()
     #test_select_with_none()
     #test_reg4()

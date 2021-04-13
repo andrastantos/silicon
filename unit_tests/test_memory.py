@@ -434,7 +434,7 @@ def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered
 if __name__ == "__main__":
     #test_single_port_ram_ff("rtl")
     #test_single_port_ram_ft("rtl")
-    #test_single_port_ram_tf("rtl")
+    test_single_port_ram_tf("rtl")
     #test_single_port_ram_tt("rtl")
     #test_single_port_rom("rtl")
     #test_single_port_rom2("rtl")
@@ -448,4 +448,4 @@ if __name__ == "__main__":
     #test_simple_dual_port_ram_rw("rtl")
 
     #test_single_port_ram_tt("sim")
-    test_struct_ram("rtl")
+    #test_struct_ram("rtl")

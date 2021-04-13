@@ -1,4 +1,4 @@
-$date 2021-02-04 09:27:37.220132 $end
+$date 2021-04-13 14:14:14.315186 $end
 $timescale 1 ns $end
 $scope module mc6845_tb $end
 $var wire 1 ! rst $end
@@ -36,7 +36,7 @@ $end
 0"
 #50
 1"
-1*
 0)
 0#
+1*
 1%

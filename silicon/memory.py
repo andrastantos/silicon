@@ -281,7 +281,7 @@ class _Memory(GenericModule):
         data_bits = prot_config.data_bits
         addr_bits = prot_config.addr_bits
 
-        rtl_body =  f"wire [{data_bits-1}:0] {memory_name} [{(1 << addr_bits)-1}:0];\n"
+        rtl_body =  f"logic [{data_bits-1}:0] {memory_name} [{(1 << addr_bits)-1}:0];\n"
 
         rtl_body += self.generate_reset_content(back_end, memory_name)
 
@@ -296,7 +296,7 @@ class _Memory(GenericModule):
         if data_out_port is not None:
             if prot_config.registered_input:
                 addr_name = netlist.register_symbol(target_namespace, "addr_reg", None)
-                rtl_body += f"wire [{addr_bits-1}:0] {addr_name};\n"
+                rtl_body += f"logic [{addr_bits-1}:0] {addr_name};\n"
             else:
                 addr_name = addr
         if data_in_port is not None or (data_out_port is not None and prot_config.registered_input):
@@ -314,7 +314,7 @@ class _Memory(GenericModule):
                 rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name}];\n")
             rtl_body += f"end\n"
         if data_out_port is not None and not prot_config.registered_output:
-            rtl_body += f"{data_out} <= {memory_name}[{addr_name}];\n"
+            rtl_body += f"assign {data_out} = {memory_name}[{addr_name}];\n"
         return rtl_body
 
     def generate_dual_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd', target_namespace: 'Module') -> str:
@@ -354,7 +354,7 @@ class _Memory(GenericModule):
             if data_out_port is not None:
                 if port_config.registered_input:
                     addr_name = netlist.register_symbol(target_namespace, f"{port_config.real_prefix}addr_reg", None)
-                    rtl_body += f"wire [{port_config.addr_bits-1}:0] {addr_name};\n"
+                    rtl_body += f"logic [{port_config.addr_bits-1}:0] {addr_name};\n"
                 else:
                     addr_name = addr
             if data_in_port is not None or (data_out_port is not None and port_config.registered_input):
@@ -382,9 +382,9 @@ class _Memory(GenericModule):
                 rtl_body += f"end\n"
             if data_out_port is not None and not port_config.registered_output:
                 if port_config.mem_ratio == 1:
-                    rtl_body += f"{data_out} <= {memory_name}[{addr_name}];\n"
+                    rtl_body += f"assign {data_out} = {memory_name}[{addr_name}];\n"
                 else:
-                    rtl_body += f"{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n"
+                    rtl_body += f"assign {data_out} = {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n"
             rtl_body += f"\n"
 
         return rtl_body

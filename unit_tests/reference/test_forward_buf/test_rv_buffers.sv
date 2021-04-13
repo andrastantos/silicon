@@ -57,9 +57,9 @@ module ForwardBuf (
 	logic buf_valid;
 	logic in_ready;
 
-	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 16'0 : (input_port_valid & in_ready) ? input_port_data : buf_data_data;
-	always_ff @(posedge clock_port) buf_data_data2 <= reset_port ? 13'0 : (input_port_valid & in_ready) ? input_port_data2 : buf_data_data2;
-	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'0 : (input_port_valid & in_ready) ? 1'h1 : (output_port_ready & buf_valid) ? 1'h0 : buf_valid;
+	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 16'h0 : (input_port_valid & in_ready) ? input_port_data : buf_data_data;
+	always_ff @(posedge clock_port) buf_data_data2 <= reset_port ? 13'h0 : (input_port_valid & in_ready) ? input_port_data2 : buf_data_data2;
+	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : (input_port_valid & in_ready) ? 1'h1 : (output_port_ready & buf_valid) ? 1'h0 : buf_valid;
 	assign in_ready =  ~ buf_valid | output_port_ready;
 
 	assign output_port_data = buf_data_data;

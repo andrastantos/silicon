@@ -371,7 +371,9 @@ class Module(object):
                             if idx != last_port_idx:
                                 rtl_instantiations += ","
                             rtl_instantiations += "\n"
-                    rtl_instantiations += ");\n"
+                    while rtl_instantiations[-1] in "\n,":
+                        rtl_instantiations = rtl_instantiations[:-1]
+                    rtl_instantiations += "\n);\n"
                 if not has_inline_support and not self._impl._body_generated:
                     sub_module._impl._generate_needed = True
 

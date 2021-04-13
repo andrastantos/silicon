@@ -20,9 +20,9 @@ module top (
 
 	assign uout1 = uin1;
 	assign uout2 = {uin1, uin1};
-	assign sout1 = sin1[0];
+	assign sout1 = sin1;
 
-	assign sout4 = 8'x;
+	assign sout4 = 8'hx;
 endmodule
 
 

@@ -10,12 +10,12 @@ module top (
 	logic A_out_a;
 
 	and_gate A (
-		.in_a(1'x),
-		.in_b(1'x),
+		.in_a(1'hx),
+		.in_b(1'hx),
 		.out_a(A_out_a)
 	);
 
-	assign out_1 = 1'x;
+	assign out_1 = 1'hx;
 endmodule
 
 

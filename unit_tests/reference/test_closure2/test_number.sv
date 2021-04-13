@@ -9,7 +9,7 @@ module top (
 
 	logic u_output_port;
 
-	assign uout11 = u_output_port[0];
+	assign uout11 = u_output_port;
 
 	assign u_output_port = uin1 | uin2;
 endmodule

@@ -58,11 +58,11 @@ module ReverseBuf (
 	logic buf_load;
 	logic buf_valid;
 
-	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 16'0 : buf_load ? input_port_data : buf_data_data;
-	always_ff @(posedge clock_port) buf_data_data2 <= reset_port ? 13'0 : buf_load ? input_port_data2 : buf_data_data2;
-	always_ff @(posedge clock_port) in_ready <= reset_port ? 1'0 : output_port_ready;
+	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 16'h0 : buf_load ? input_port_data : buf_data_data;
+	always_ff @(posedge clock_port) buf_data_data2 <= reset_port ? 13'h0 : buf_load ? input_port_data2 : buf_data_data2;
+	always_ff @(posedge clock_port) in_ready <= reset_port ? 1'h0 : output_port_ready;
 	assign buf_load = input_port_valid & in_ready &  ~ output_port_ready;
-	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'0 : output_port_ready ? 1'h0 : buf_load ? 1'h1 : buf_valid;
+	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : output_port_ready ? 1'h0 : buf_load ? 1'h1 : buf_valid;
 	assign output_port_valid = (output_port_ready &  ~ buf_valid) ? input_port_valid & in_ready : buf_valid;
 	assign output_port_data = (output_port_ready &  ~ buf_valid) ? input_port_data : buf_data_data;
 	assign output_port_data2 = (output_port_ready &  ~ buf_valid) ? input_port_data2 : buf_data_data2;

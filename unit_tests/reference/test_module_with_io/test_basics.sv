@@ -6,7 +6,7 @@ module top (
 	output logic signed [7:0] output_port
 );
 
-	assign output_port = 8'x;
+	assign output_port = 8'hx;
 endmodule
 
 

@@ -14,7 +14,7 @@ module top (
 	assign uout2 = uin1[9:5];
 	assign uout3 = {2'(uin2), uin1[0], 2'(uin1[2])};
 
-	assign uout4 = 5'x;
+	assign uout4 = 5'hx;
 endmodule
 
 
