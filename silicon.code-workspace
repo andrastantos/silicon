@@ -2,14 +2,10 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"name": "silicon @ ddc8e17",
-			"uri": "gitlens://ddc8e17/home/tantos/personal/silicon?{\"path\":\"/home/tantos/personal/silicon\",\"ref\":\"ddc8e172a5cdcad7445ec1114c378f025ad5c71a\",\"repoPath\":\"/home/tantos/personal/silicon\"}"
 		}
 	],
 	"settings": {
-		"python.pythonPath": "python",
+		"python.pythonPath": "/usr/bin/python3",
 		"jupyter.jupyterServerType": "local"
 	}
 }

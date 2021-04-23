@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import sys
 import os
+from unit_tests.test_utils import skip_iverilog
 sys.path.append(os.path.join(os.path.dirname(__file__),".."))
 
 from typing import *
@@ -112,6 +113,7 @@ def test_enum_and2():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+@skip_iverilog
 def test_enum_adapt():
     class E1(PyEnum):
         zero=0
@@ -129,6 +131,7 @@ def test_enum_adapt():
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 
+@skip_iverilog
 def test_enum_adapt2(mode = "rtl"):
     class E1(PyEnum):
         zero=0

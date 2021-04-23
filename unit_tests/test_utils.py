@@ -1,4 +1,4 @@
-from silicon import SystemVerilog, File, Module, Junction, NetType, Number, Simulator, Module, elaborate
+from silicon import SystemVerilog, File, Module, Junction, NetType, Number, Simulator, Module, elaborate, BoolMarker
 from silicon.utils import is_iterable, CountMarker, BoolMarker
 from typing import IO, Callable, Sequence, Union, Optional, Any
 from collections import OrderedDict
@@ -9,6 +9,7 @@ from pathlib import Path
 class test:
     file_list = []
 
+    skip_iverilog = BoolMarker()
     class DiffedFile(File):
         """
         A trivial file object with delayed open capability
@@ -95,15 +96,16 @@ class test:
                 for file in test.file_list:
                     test_diff += f"file {file.filename} match: {file.match}"
             pytest.fail(f"Test failed with the following diff:\n{test_diff}")
-        from shutil import which
-        iverilog_path = which("iverilog", mode=os.X_OK)
-        if iverilog_path is not None:
-            from subprocess import run
-            top = netlist.get_top_level_name()
-            cmd = (iverilog_path, "-g2005-sv", f"-s{top}") + tuple(f.filename for f in test.file_list)
-            result = run(cmd)
-            if result.returncode != 0:
-                pytest.fail(f"Test failed with IVerilog errors")
+        if not test.skip_iverilog:
+            from shutil import which
+            iverilog_path = which("iverilog", mode=os.X_OK)
+            if iverilog_path is not None:
+                from subprocess import run
+                top = netlist.get_top_level_name()
+                cmd = (iverilog_path, "-g2005-sv", f"-s{top}") + tuple(f.filename for f in test.file_list)
+                result = run(cmd)
+                if result.returncode != 0:
+                    pytest.fail(f"Test failed with IVerilog errors")
 
     @staticmethod
     def simulation(top_class: Callable, test_name: str = None):
@@ -324,3 +326,12 @@ class Writer(object):
     def dump(self, thing, name: Optional[str] = None) -> None:
         self.clear()
         self._dump(thing, name)
+
+# A simple decorator to skip iVerilog on tests that are known to fail on it due to iVerilog limitations
+def skip_iverilog(func):
+    def wrapper(*args, **kwargs):
+        with test.skip_iverilog:
+            return func(*args, **kwargs)
+    
+    return wrapper
+

@@ -108,7 +108,7 @@ class Fifo(GenericModule):
         output_data = Wire(data_type)
 
         push_addr = Wire(addr_type)
-        tail = Wire(addr_type)
+        pop_addr = Wire(addr_type)
 
         push = ~full & self.input_port.valid
         pop = ~empty & self.output_port.ready
@@ -120,7 +120,7 @@ class Fifo(GenericModule):
         push_addr <<= Reg(Select(push, push_addr, Select(push_will_wrap, push_addr+1, 0)))
         pop_addr <<= Reg(Select(pop, pop_addr, Select(pop_will_wrap, pop_addr+1, 0)))
 
-        next_looped = Select(push, Select(pop, loop, Select(pop_will_wrap, loop, 0)), Select(push_will_wrap, loop, 1))
+        next_looped = Select(push, Select(pop, looped, Select(pop_will_wrap, looped, 0)), Select(push_will_wrap, looped, 1))
         looped <<= Reg(next_looped)
 
         empty_or_full = push_addr == pop_addr
