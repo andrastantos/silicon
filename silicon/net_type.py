@@ -21,6 +21,42 @@ class NetType(object):
         self.parent_junction = None
         pass
 
+    def __call__(self, input_port: 'Junction') -> 'Junction':
+        # Implements explicit cast to type
+        from .module import Module, InlineBlock, InlineExpression
+        from .port import Input, Output
+        from typing import Generator
+        class ExplicitAdaptor(Module):
+            input_port = Input()
+            output_port = Output(self)
+   
+            def body(self):
+                # Determine if inlining is possible.
+                if self.input_port.get_net_type() == self.output_port.get_net_type():
+                    self._support_inline = True
+                    return
+                from .utils import cast
+                self.output_port <<= cast(self.input_port, self.output_port.get_net_type())
+                self._support_inline = False
+            def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
+                if not self._support_inline:
+                    return
+                yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+            def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
+                assert back_end.language == "SystemVerilog"
+
+                return self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
+            def simulate(self) -> 'TSimEvent':
+                while True:
+                    yield self.input_port
+                    self.output_port <<= self.input_port
+            def is_combinational(self) -> bool:
+                """
+                Returns True if the module is purely combinational, False otherwise
+                """
+                return True
+        return ExplicitAdaptor(input_port)
+
     def generate_type_ref(self, back_end: 'BackEnd') -> str:
         """
         Generate and return a type reference that is appropriate for the given back-end.
@@ -135,7 +171,7 @@ class NetType(object):
         return sim_value
     def get_num_bits(self) -> int:
         raise NotImplementedError
-    def adapt_from(self, input: 'Junction', implicit: bool) -> Optional['Junction']:
+    def adapt_from(self, input: 'Junction', implicit: bool, force: bool) -> Optional['Junction']:
         """
         Return the (output of) a converter object that adapts the input to the current type.
         Return None if adaptation is not supported.
@@ -143,7 +179,7 @@ class NetType(object):
         In these cases, should simply return input.
         """
         return None
-    def adapt_to(self, output_type: 'NetType', input: 'Junction', implicit: bool) -> Optional['Junction']:
+    def adapt_to(self, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool) -> Optional['Junction']:
         """
         Return the (output of) a converter object that adapts the current type to the desired output type.
         Return None if adaptation is not supported.

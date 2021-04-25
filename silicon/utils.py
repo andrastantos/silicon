@@ -185,14 +185,17 @@ def str_block(block: Optional[str], header: str, footer: str):
 
 
 def implicit_adapt(input: 'Junction', output_type: 'NetType') -> 'Junction':
-    return adapt(input, output_type, implicit=True)
+    return adapt(input, output_type, implicit=True, force=False)
 
 
 def explicit_adapt(input: 'Junction', output_type: 'NetType') -> 'Junction':
-    return adapt(input, output_type, implicit=False)
+    return adapt(input, output_type, implicit=False, force=False)
 
 
-def adapt(input: 'Junction', output_type: 'NetType', implicit: bool) -> 'Junction':
+def cast(input: 'Junction', output_type: 'NetType') -> 'Junction':
+    return adapt(input, output_type, implicit=False, force=True)
+
+def adapt(input: 'Junction', output_type: 'NetType', implicit: bool, force: bool) -> 'Junction':
     """
     Creates an adaptor instance if needed to convert input to output_type.
     Returns the generated output port. If such adaptation is not possible, raises an exception
@@ -200,13 +203,13 @@ def adapt(input: 'Junction', output_type: 'NetType', implicit: bool) -> 'Junctio
     if output_type == input.get_net_type():
         return input
     try:
-        ret_val = output_type.adapt_from(input, implicit)
+        ret_val = output_type.adapt_from(input, implicit, force)
         if ret_val is None:
             raise Exception # Force the other path to execute in case this one isn't supported
         return ret_val
     except:
         pass
-    ret_val = input.get_net_type().adapt_to(output_type, input, implicit)
+    ret_val = input.get_net_type().adapt_to(output_type, input, implicit, force)
     if ret_val is None:
         raise SyntaxErrorException(f"Can't generate adaptor from {input.get_net_type()} to {output_type} for port {input}")
     return ret_val

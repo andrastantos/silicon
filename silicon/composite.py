@@ -7,7 +7,7 @@ from .exceptions import SyntaxErrorException, SimulationException
 from .module import Module, GenericModule, InlineExpression, InlineBlock, InlineStatement
 from .port import Input, Output, Port, Junction
 from .tracer import no_trace
-from .utils import TSimEvent, MEMBER_DELIMITER, adapt
+from .utils import TSimEvent, MEMBER_DELIMITER, adapt, cast
 from collections import namedtuple, OrderedDict
 from copy import copy
 from .number import Unsigned, Number
@@ -269,17 +269,20 @@ class Struct(Composite):
             """
             return True
 
-    def adapt_to(self, output_type: 'NetType', input: 'Junction', implicit: bool) -> Optional['Junction']:
+    def adapt_to(self, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool) -> Optional['Junction']:
         assert input.get_net_type() is self
         if output_type == self:
             return input
         # We don't support implicit conversion
         if implicit:
             return None
-        # We only support conversion from Numbers
-        return Struct.ToNumber(input)
+        # We only support conversion to Numbers
+        raw_number = Struct.ToNumber(input)
+        if not force or raw_number.get_net_type() == output_type:
+            return raw_number
+        return cast(raw_number, output_type)
 
-    def adapt_from(self, input: 'Junction', implicit: bool) -> 'Junction':
+    def adapt_from(self, input: 'Junction', implicit: bool, force: bool) -> 'Junction':
         input_type = input.get_net_type()
         if input_type == self:
             return input
@@ -287,7 +290,7 @@ class Struct(Composite):
         if implicit:
             return None
         # We support anything that can convert to a number
-        input_as_num = adapt(input, Unsigned(length=input_type.get_num_bits()), implicit)
+        input_as_num = adapt(input, Unsigned(length=input_type.get_num_bits()), implicit, force)
         if input_as_num is None:
             return None
         return Struct.FromNumber(self)(input_as_num)

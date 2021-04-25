@@ -6,6 +6,18 @@ from .utils import is_input_port, is_output_port, is_wire, is_module, is_port, M
 from itertools import chain
 from .exceptions import SyntaxErrorException
 
+def fully_qualified_name(thing: Any, mangle: bool=True) -> str:
+    type = thing.__class__
+    module = type.__module__
+    if module == 'builtins':
+        return type.__qualname__
+    fqn: str = module + '.' + type.__qualname__
+    if mangle:
+        fqn = fqn.replace("__","")
+        fqn = fqn.replace("<","_")
+        fqn = fqn.replace(">","_")
+        fqn = fqn.replace(".","_")
+    return fqn
 class XNet(object):
     class NameStatus(object):
         def __init__(self, *, is_explicit: bool = True, is_used: bool = False, is_input: bool = False):
@@ -188,8 +200,9 @@ class Netlist(object):
         self.net_types: Dict[str, List['NetType']]= OrderedDict()
         self.ports: Set[object] = OrderedSet()
         self.simulator_context: Optional['Simulator.SimulatorContext'] = None
-        self.module_variants: Optional[Dict[type, Dict[str, List['Module']]]] = None
+        self.module_variants: Optional[Dict[str, Dict[str, List['Module']]]] = None
         self.module_to_class_map: Optional[Dict['Module', str]] = None
+        self.module_class_short_name_map: Dict[str, str] = OrderedDict() # Maps short names to their fully qualified names
         self.xnets = OrderedSet()
         self.junction_to_xnet_map = OrderedDict()
         self.module_to_xnet_map = OrderedDict()
@@ -400,36 +413,45 @@ class Netlist(object):
                 populate_names(sub_module)
 
         def populate_module_variants(module: 'Module'):
-            # First recurse into all sub-modules, then deal with this one...
-            for sub_module in module._impl.get_sub_modules():
-                populate_module_variants(sub_module)
+            def _populate_module_variants(module: 'Module'):
+                # First recurse into all sub-modules, then deal with this one...
+                for sub_module in module._impl.get_sub_modules():
+                    _populate_module_variants(sub_module)
 
-            assert module not in self.module_to_class_map
+                assert module not in self.module_to_class_map
 
-            module_class = module.__class__
-            found = False
-            if module_class not in self.module_variants:
-                self.module_variants[module_class] = OrderedDict()
-            else:
-                for variant_name, variant_instances in self.module_variants[module_class].items():
-                    # We assume that if we're compatible with one variant instance, we're compatible with all of them.
-                    # Now, this is potentially a bit restrictive, but the alternative is an O(N^2) search, which would be bad (TM)
-                    variant_instance = variant_instances[0]
-                    if not module._impl.is_equivalent(variant_instance, self):
-                        continue
-                    variant_instances.append(module)
-                    self.module_to_class_map[module] = variant_name
-                    found = True
-                    break
-            if not found:
-                #We need to come up with a module class name
-                variant_cnt = len(self.module_variants[module_class])
-                if variant_cnt == 0:
-                    module_class_name = module_class.__name__
+                module_class_base_name = fully_qualified_name(module)
+                module_class_short_name = module.__class__.__name__
+                found = False
+                if module_class_base_name not in self.module_variants:
+                    self.module_variants[module_class_base_name] = OrderedDict()
                 else:
-                    module_class_name = module_class.__name__ + "_" + str(variant_cnt+1)
-                self.module_variants[module_class][module_class_name] = [module]
-                self.module_to_class_map[module] = module_class_name
+                    for variant_name, variant_instances in self.module_variants[module_class_base_name].items():
+                        # We assume that if we're compatible with one variant instance, we're compatible with all of them.
+                        # Now, this is potentially a bit restrictive, but the alternative is an O(N^2) search, which would be bad (TM)
+                        variant_instance = variant_instances[0]
+                        if not module._impl.is_equivalent(variant_instance, self):
+                            continue
+                        variant_instances.append(module)
+                        self.module_to_class_map[module] = variant_name
+                        found = True
+                        break
+                if not found:
+                    # We need to come up with a module class name
+                    # Try to use the short name, but revert to the long one, if there's a collision
+                    variant_cnt = len(self.module_variants[module_class_base_name])
+                    module_class_name = module_class_short_name
+                    if module_class_short_name not in self.module_class_short_name_map:
+                        self.module_class_short_name_map[module_class_short_name] = module_class_base_name
+                    else:
+                        if self.module_class_short_name_map[module_class_short_name] != module_class_base_name:
+                            module_class_name = module_class_base_name
+                    if variant_cnt != 0:
+                        module_class_name += "_" + str(variant_cnt+1)
+                    self.module_variants[module_class_base_name][module_class_name] = [module]
+                    self.module_to_class_map[module] = module_class_name
+            
+            _populate_module_variants(module)
 
         def register_modules(module: 'Module'):
             self.register_module(module)
@@ -483,9 +505,9 @@ class Netlist(object):
                     if module_impl is not None:
                         strm.write(str_block(module_impl, "", "\n\n\n"))
                     # Mark all instances of the same variant as no body needed
-                    module_class = module.__class__
+                    module_class_base_name = fully_qualified_name(module)
                     module_class_name = self.module_to_class_map[module]
-                    for module_inst in self.module_variants[module_class][module_class_name]:
+                    for module_inst in self.module_variants[module_class_base_name][module_class_name]:
                         module_inst._impl._generate_needed = False
                         module_inst._impl._body_generated = True
 
@@ -512,7 +534,7 @@ class Netlist(object):
         for module in self.modules:
             assert module in self.module_to_class_map
             module_class_name = self.module_to_class_map[module]
-            module_class = module.__class__
-            assert module_class_name in self.module_variants[module_class]
-            assert module in self.module_variants[module_class][module_class_name]
+            module_class_base_name = fully_qualified_name(module)
+            assert module_class_name in self.module_variants[module_class_base_name]
+            assert module in self.module_variants[module_class_base_name][module_class_name]
     

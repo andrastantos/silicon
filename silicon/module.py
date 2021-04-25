@@ -875,7 +875,7 @@ class Module(object):
                         return parent_wires[name].get_underlying_junction()
             return None
 
-        def _elaborate(self, hier_level) -> None:
+        def _elaborate(self, hier_level, trace: bool) -> None:
             # Recursively go through each new node, add it to the netlist and call its body (which most likely will create more new nodes).
             # The algorithm does a depth-first walk of the netlist hierarchy, eventually resulting in the full network and netlist created
             self.freeze_interface()
@@ -896,7 +896,7 @@ class Module(object):
                     else:
                         raise SyntaxErrorException(f"Local wire {wire} is used without a source in module {self._true_module}")
             with self._in_elaborate:
-                self._body() # Will create all the sub-modules
+                self._body(trace) # Will create all the sub-modules
             
             for sub_module in self._sub_modules:
                 # handle any pending auto-binds
@@ -933,7 +933,7 @@ class Module(object):
                             input.set_net_type(input.source.get_net_type())
                     all_inputs_specialized = all(tuple(input.is_specialized() or not input.has_driver() for input in sub_module.get_inputs().values()))
                     if all_inputs_specialized:
-                        sub_module._impl._elaborate(hier_level + 1)
+                        sub_module._impl._elaborate(hier_level + 1, trace)
                         changes = True
                         incomplete_sub_modules.remove(sub_module)
 
@@ -966,7 +966,7 @@ class Module(object):
             all_inputs_specialized = all(tuple(input.is_specialized() for input in self.get_inputs().values()))
             if not all_inputs_specialized:
                 raise SyntaxErrorException(f"Top level module {self._true_module} must have all its inputs specialized before it can be elaborated")
-            self._elaborate(hier_level = 0)
+            self._elaborate(hier_level=0, trace=True)
             self.netlist._post_elaborate()
             return self.netlist
 

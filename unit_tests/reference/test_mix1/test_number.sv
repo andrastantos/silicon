@@ -26,13 +26,13 @@ module top (
 	assign out_b = {6'(1'h0), u10_out_a, in_a[2:0], c0};
 	assign out_d = {7'(1'h1), 4'({c0, b0, in_a[4]})};
 
-	and_gate u7 (
+	test_number_and_gate u7 (
 		.in_a(a0),
 		.in_b(b0),
 		.out_a(c0)
 	);
 
-	and_gate u10 (
+	test_number_and_gate u10 (
 		.in_a(in_a[3]),
 		.in_b(in_a[4]),
 		.out_a(u10_out_a)
@@ -43,9 +43,9 @@ endmodule
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// and_gate
+// test_number_and_gate
 ////////////////////////////////////////////////////////////////////////////////
-module and_gate (
+module test_number_and_gate (
 	input logic in_a,
 	input logic in_b,
 	output logic out_a

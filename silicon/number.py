@@ -477,7 +477,7 @@ class Number(NetType):
             """
             return True
 
-    def adapt_from(self, input: Junction, implicit: bool) -> Junction:
+    def adapt_from(self, input: Junction, implicit: bool, force: bool) -> Junction:
         input_type = input.get_net_type()
         if not isinstance(input_type, Number):
             return None
@@ -486,10 +486,15 @@ class Number(NetType):
         if self.is_abstract():
             return None
         if self.min_val > input_type.min_val or self.max_val < input_type.max_val:
-            return None
+            if not force:
+                return None
+            else:
+                return Number.SizeAdaptor(input_type = input_type, output_type = self)(input)
         if self.length >= input_type.length and self.signed == input_type.signed:
             return input
-        return Number.SizeAdaptor(input_type = input_type, output_type = self)(input)
+        output = Number.SizeAdaptor(input_type = input_type, output_type = self)(input)
+        #output.get_parent_module()._impl._elaborate(hier_level=0, trace=False)
+        return output
 
     """
     ============================================================================================

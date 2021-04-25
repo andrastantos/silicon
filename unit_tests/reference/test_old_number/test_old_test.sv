@@ -25,13 +25,13 @@ module top (
 	assign out_b = {6'(1'h0), u9_out_a, in_a[3:1], c0};
 	assign out_d = {7'(1'h0), 4'({c0, b0, in_a[4]})};
 
-	and_gate u7 (
+	test_old_test_test_old_number__locals__and_gate u7 (
 		.in_a(a0),
 		.in_b(b0),
 		.out_a(c0)
 	);
 
-	and_gate u9 (
+	test_old_test_test_old_number__locals__and_gate u9 (
 		.in_a(in_a[3]),
 		.in_b(in_a[4]),
 		.out_a(u9_out_a)
@@ -43,9 +43,9 @@ endmodule
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// and_gate
+// test_old_test_test_old_number__locals__and_gate
 ////////////////////////////////////////////////////////////////////////////////
-module and_gate (
+module test_old_test_test_old_number__locals__and_gate (
 	input logic in_a,
 	input logic in_b,
 	output logic out_a

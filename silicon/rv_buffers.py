@@ -88,6 +88,8 @@ class Fifo(GenericModule):
     reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=False)
 
     def construct(self, depth:int):
+        if not isinstance(depth, int):
+            raise SyntaxErrorException("Fifo depth must be an integer")
         self.depth = depth
 
     def body(self):
@@ -101,7 +103,7 @@ class Fifo(GenericModule):
         self.input_port.ready <<= ~full
         self.output_port.valid <<= ~empty
 
-        addr_type = Number(min=0, max=self.depth-1)
+        addr_type = Number(min_val=0, max_val=self.depth-1)
 
         data_type = input_data.get_net_type()
 
@@ -117,8 +119,8 @@ class Fifo(GenericModule):
 
         push_will_wrap = push_addr == self.depth-1
         pop_will_wrap = pop_addr == self.depth-1
-        push_addr <<= Reg(Select(push, push_addr, Select(push_will_wrap, push_addr+1, 0)))
-        pop_addr <<= Reg(Select(pop, pop_addr, Select(pop_will_wrap, pop_addr+1, 0)))
+        push_addr <<= Reg(Select(push, push_addr, Select(push_will_wrap, addr_type(push_addr+1), 0)))
+        pop_addr <<= Reg(Select(pop, pop_addr, Select(pop_will_wrap, addr_type(pop_addr+1), 0)))
 
         next_looped = Select(push, Select(pop, looped, Select(pop_will_wrap, looped, 0)), Select(push_will_wrap, looped, 1))
         looped <<= Reg(next_looped)

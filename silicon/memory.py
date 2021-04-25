@@ -135,7 +135,25 @@ class _Memory(GenericModule):
             self.optional_ports[f"{port_config.real_prefix}data_in"] = (port_config.data_type, Memory.INPUT)
             self.optional_ports[f"{port_config.real_prefix}data_out"] = (port_config.data_type, Memory.OUTPUT)
             self.optional_ports[f"{port_config.real_prefix}write_en"] = (logic, Memory.INPUT)
-            setattr(self, f"{port_config.real_prefix}clk", AutoInput(logic, keyword_only = True, auto_port_names = (f"{port_config}_clk", f"{port_config}_clock", "clk", "clock"), optional = False))
+            setattr(
+                self,
+                f"{port_config.real_prefix}clk",
+                AutoInput(
+                    logic,
+                    keyword_only = True,
+                    auto_port_names = (
+                        f"{port_config.real_prefix}clk",
+                        f"{port_config.real_prefix}clock",
+                        "clk",
+                        "clock",
+                        f"{port_config.real_prefix}clk_port",
+                        f"{port_config.real_prefix}clock_port",
+                        "clk_port",
+                        "clock_port"
+                    ),
+                    optional = False
+                )
+            )
 
     def create_named_port(self, name: str) -> Optional[Port]:
         """
@@ -168,16 +186,18 @@ class _Memory(GenericModule):
         self.primary_port_config = None
         self.secondary_port_configs = []
 
+        has_data_in = False        
+        
         for port_config in self.config.port_configs:
             data_conf_bits = port_config.data_type.get_num_bits() if port_config.data_type is not None else None
             addr_conf_bits = port_config.addr_type.get_num_bits() if port_config.addr_type is not None else None
 
             data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
 
+            has_data_in |= data_in_port is not None
+
             if data_in_port is None and data_out_port is None:
                 raise SyntaxErrorException(f"Memory has neither its read nor its write data connected. That's not a valid use of a memory")
-            if data_in_port is None and self.config.reset_content is None:
-                raise SyntaxErrorException(f"For ROMs, reset_content must be specified")
             if write_en_port is not None and data_in_port is None:
                 raise SyntaxErrorException("If a memory has a write-enable, it must have a corresponding data")
             if not port_config.registered_input and data_in_port is not None:
@@ -211,6 +231,9 @@ class _Memory(GenericModule):
                 addr_bits = max(addr_conf_bits, addr_bits)
             port_config.addr_bits = addr_bits
             port_config.data_bits = data_bits
+
+        if not has_data_in and self.config.reset_content is None:
+            raise SyntaxErrorException(f"For ROMs, reset_content must be specified")
 
         # Determine memory size
         self.mem_size = 0
@@ -549,7 +572,25 @@ class Memory(GenericModule):
             self.optional_ports[f"{port_config.real_prefix}data_in"] = (port_config.data_type, Memory.INPUT)
             self.optional_ports[f"{port_config.real_prefix}data_out"] = (port_config.data_type, Memory.OUTPUT)
             self.optional_ports[f"{port_config.real_prefix}write_en"] = (logic, Memory.INPUT)
-            setattr(self, f"{port_config.real_prefix}clk", AutoInput(logic, keyword_only = True, auto_port_names = (f"{port_config}_clk", f"{port_config}_clock", "clk", "clock"), optional = False))
+            setattr(
+                self,
+                f"{port_config.real_prefix}clk",
+                AutoInput(
+                    logic,
+                    keyword_only = True,
+                    auto_port_names = (
+                        f"{port_config.real_prefix}clk",
+                        f"{port_config.real_prefix}clock",
+                        "clk",
+                        "clock",
+                        f"{port_config.real_prefix}clk_port",
+                        f"{port_config.real_prefix}clock_port",
+                        "clk_port",
+                        "clock_port"
+                    ),
+                    optional = False
+                )
+            )
 
     def create_named_port(self, name: str) -> Optional[Port]:
         """

@@ -40,6 +40,20 @@ def test_reverse_buf(mode: str = "rtl"):
             
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+
+def test_fifo(mode: str = "rtl"):
+    class top(Module):
+        in1 = Input(Data())
+        out1 = Output(Data())
+        clk = Input(logic)
+        rst = Input(logic)
+
+        def body(self):
+            self.out1 = Fifo(depth=10)(self.in1)
+            
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 if __name__ == "__main__":
     #test_forward_buf("rtl")
-    test_reverse_buf("rtl")
+    #test_reverse_buf("rtl")
+    test_fifo("rtl")

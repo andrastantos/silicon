@@ -188,7 +188,7 @@ class Enum(Number):
             """
             return True
 
-    def adapt_from(self, input: 'Junction', implicit: bool) -> 'Junction':
+    def adapt_from(self, input: 'Junction', implicit: bool, force: bool) -> 'Junction':
         input_type = input.get_net_type()
         if not isinstance(input_type, Enum):
             if implicit:
