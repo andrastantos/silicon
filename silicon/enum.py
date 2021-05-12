@@ -181,7 +181,7 @@ class Enum(Number):
                         val_as_enum = self.output_port.get_net_type().base_type(self.input_port.sim_value)
                         self.output_port <<= val_as_enum
                     except ValueError:
-                        raise SimulationException(f"Enum {self.output_port.get_net_type().get_type_name()} cannot be assigned a numberic value {self.input_port.sim_value}.")
+                        raise SimulationException(f"Enum {self.output_port.get_net_type().get_type_name()} cannot be assigned a numberic value {self.input_port.sim_value}.", self)
         def is_combinational(self) -> bool:
             """
             Returns True if the module is purely combinational, False otherwise
@@ -216,11 +216,11 @@ class Enum(Number):
         if sim_value is None:
             return sim_value
         if not isinstance(sim_value, Enum.EnumConverter):
-            raise SimulationException(f"Value {sim_value} of type {type(sim_value)} is not valid for an Enum type {self.get_type_name()}")
+            raise SimulationException(f"Value {sim_value} of type {type(sim_value)} is not valid for an Enum type {self.get_type_name()}", parent_junction)
         elif sim_value.value in self.base_type:
             return sim_value
         else:
-            raise SimulationException(f"Value {sim_value.value} can't be represented by Enum type {self.get_type_name()}")
+            raise SimulationException(f"Value {sim_value.value} can't be represented by Enum type {self.get_type_name()}", parent_junction)
     
     @classmethod
     def result_type(cls, net_types: Sequence[Optional['NetType']], operation: str) -> 'NetType':

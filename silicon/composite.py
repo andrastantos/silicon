@@ -3,7 +3,7 @@ from typing import Tuple, Union, Any, Dict, Set, Optional, Generator, Sequence
 from .net_type import NetType, KeyKind
 from .netlist import Netlist
 from .back_end import BackEnd
-from .exceptions import SyntaxErrorException, SimulationException
+from .exceptions import SyntaxErrorException
 from .module import Module, GenericModule, InlineExpression, InlineBlock, InlineStatement
 from .port import Input, Output, Port, Junction
 from .tracer import no_trace

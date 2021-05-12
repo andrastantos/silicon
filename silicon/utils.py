@@ -275,7 +275,7 @@ def fill_arg_names(function: Callable, args: List[Any], kwargs: Dict[str, Any]) 
     my_kwargs = kwargs
 
     # mock-bind the now created invocation arguments to the signature of the function
-    # and attempt to locate the ports that need a name. This might fail if _function itself
+    # and attempt to locate the ports that need a name. This might fail if 'function' itself
     # has *args or **kwargs arguments
     from inspect import signature
     sig = signature(function)

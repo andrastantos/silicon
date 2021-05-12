@@ -176,7 +176,7 @@ class Number(NetType):
         def add_input(self, key: 'Key', junction: Junction) -> None:
             name = f"input_port_{len(self.raw_input_map)}"
             if has_port(self, name):
-                raise SyntaxErrorException(f"Can't add input to {self} as port name {name} already exists")
+                raise SyntaxErrorException(f"Can't add input as port. Name '{name}' already exists")
             port = self._impl._create_named_port(name)
             port <<= junction
             self.raw_input_map.append((key,  getattr(self, name)))
@@ -396,7 +396,7 @@ class Number(NetType):
         if sim_value is None:
             return sim_value
         if sim_value > self.max_val or sim_value < self.min_val:
-            raise SimulationException(f"Can't assign to net {parent_junction} a value {sim_value} that's outside of the representable range.")
+            raise SimulationException(f"Can't assign to net {parent_junction} a value {sim_value} that's outside of the representable range.", parent_junction)
         return sim_value
 
     def generate_const_val(self, value: Optional[int], back_end: 'BackEnd') -> str:
@@ -635,13 +635,13 @@ class Number(NetType):
             current_top_idx = sub_port_key.start if not sub_port_key.is_sequential else last_top_idx - 1
             assert current_top_idx < last_top_idx
             if current_top_idx < last_top_idx - 1:
-                raise SyntaxErrorException("not all bits in Number have sources")
+                raise SyntaxErrorException("Not all bits in Number have sources")
             sub_port = input_map[sub_port_key]
             last_top_idx = sub_port_key.end if not sub_port_key.is_sequential else last_top_idx - sub_port.length
             slice_length = sub_port_key.length if not sub_port_key.is_sequential else sub_port.length
             rtl_parts.append(compose_sub_source_expression(sub_port, slice_length))
         if last_top_idx > 0:
-            raise SyntaxErrorException("not all bits in Number have sources")
+            raise SyntaxErrorException("Not all bits in Number have sources")
         if len(rtl_parts) == 1:
             return rtl_parts[0]
         # For now we're assuming that concatenation returns an UNSIGNED vector independent of the SIGNED-ness of the sources.
@@ -666,7 +666,7 @@ class Number(NetType):
             current_top_idx = sub_port_key.start if not sub_port_key.is_sequential else last_top_idx - 1
             assert current_top_idx < last_top_idx
             if current_top_idx < last_top_idx - 1:
-                raise SyntaxErrorException("not all bits in Number have sources")
+                raise SyntaxErrorException("Not all bits in Number have sources")
             sub_port = input_map[sub_port_key]
             last_top_idx = sub_port_key.end if not sub_port_key.is_sequential else last_top_idx - sub_port.length
             concat_map.append((sub_port, last_top_idx))

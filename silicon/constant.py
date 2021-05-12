@@ -4,7 +4,7 @@ from .net_type import NetType
 from .module import Module, GenericModule, InlineBlock, InlineExpression
 from .port import Input, Output, sim_convert_lookup
 from .utils import TSimEvent
-from .exceptions import SyntaxErrorException, SimulationException
+from .exceptions import SyntaxErrorException
 from inspect import getmro
 
 const_to_rtl_lookup: Dict[NetType, Callable] = {}

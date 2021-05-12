@@ -102,9 +102,9 @@ class Simulator(object):
             assert is_iterable(yielded_value), "The simulate method can only yield an integer, a Port or a sequence of Port objects"
             for port in yielded_value:
                 if is_junction_member(port):
-                    raise SimulationException(f"Simulator currently doesn't support slices in sensitivity lists. Please use the whole value instead of a slice")
+                    raise SimulationException(f"Simulator currently doesn't support slices in sensitivity lists. Please use the whole value instead of a slice", port)
                 if not is_junction(port):
-                    raise SimulationException(f"The simulate method can only yield an integer, a Port or a sequence of Port objects")
+                    raise SimulationException(f"The simulate method can only yield an integer, a Port or a sequence of Port objects", port)
                 port._xnet.sim_state.add_listener(generator)
             '''
             if hasattr(yielded_value, "_xnet"):
@@ -115,12 +115,12 @@ class Simulator(object):
                         for member_port in port.get_all_member_junctions(add_self=True):
                             if not hasattr(member_port, "_xnet"):
                                 if is_junction_member(member_port):
-                                    raise SimulationException(f"Simulator currently doesn't support slices in sensitivity lists. Please use the whole value instead of a slice")
+                                    raise SimulationException(f"Simulator currently doesn't support slices in sensitivity lists. Please use the whole value instead of a slice", member_port)
                                 else:
-                                    raise SimulationException(f"The simulate method can only yield an integer, a Port or a sequence of Port objects")
+                                    raise SimulationException(f"The simulate method can only yield an integer, a Port or a sequence of Port objects", member_port)
                             member_port._xnet.sim_state.add_listener(generator)
                 except TypeError:
-                    raise SimulationException(f"The simulate method can only yield an integer, a Port or a sequence of Port objects")
+                    raise SimulationException(f"The simulate method can only yield an integer, a Port or a sequence of Port objects. The type of the yielded value is {type(port)}", port)
 
     class Event(object):
         def __init__(self, when: int, sim_context: 'SimulatorContext'):

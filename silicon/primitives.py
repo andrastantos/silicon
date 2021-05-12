@@ -51,7 +51,7 @@ class Select(Module):
         all_inputs_specialized = all(tuple(input.is_specialized() for input in self.get_inputs().values()))
         common_net_type = get_common_net_type(value_ports, not all_inputs_specialized)
         if common_net_type is None:
-            raise SyntaxErrorException(f"Can't figure out output port type for Select {self}")
+            raise SyntaxErrorException(f"Can't figure out output port type for Select")
         output_type = common_net_type.result_type(tuple(port.get_net_type() for port in value_ports), self.get_operation_str())
         return output_type
     def get_operation_str(self) -> str:
@@ -63,7 +63,7 @@ class Select(Module):
     
     def body(self) -> None:
         if len(self.value_ports) == 0:
-            raise SyntaxErrorException(f"Select must have at least one value port {self}")
+            raise SyntaxErrorException(f"Select must have at least one value port")
         if self.has_default:
             raise SyntaxErrorException("Default values for 'Select' modules are not supported: generation of inline verilog is rather difficult for them.")
         new_net_type = self.generate_output_type()
@@ -246,7 +246,7 @@ class _SelectOneHot(Module):
             all_inputs_specialized &= self.default_port.is_specialized()
         common_net_type = get_common_net_type(value_ports, not all_inputs_specialized)
         if common_net_type is None:
-            raise SyntaxErrorException(f"Can't figure out output port type for Select {self}")
+            raise SyntaxErrorException(f"Can't figure out output port type for Select")
         output_type = common_net_type.result_type(tuple(port.get_net_type() for port in value_ports), self.get_operation_str())
         return output_type
     def get_operation_str(self) -> str:
@@ -255,7 +255,7 @@ class _SelectOneHot(Module):
     
     def body(self) -> None:
         if len(self.value_ports) == 0:
-            raise SyntaxErrorException(f"Select must have at least one value port {self}")
+            raise SyntaxErrorException(f"Select must have at least one value port")
         new_net_type = self.generate_output_type()
         assert not self.output_port.is_specialized() or self.output_port.get_net_type() == new_net_type
         if not self.output_port.is_specialized():
@@ -296,7 +296,7 @@ class SelectOne(_SelectOneHot):
                         # Due to simultanious changes (that are delayed by epsilon) it's possible that we have multiple inputs set even if that should not occur in a no-delay simulation
                         self.output_port <<= None
                         break
-                        #raise SimulationException(f"Multiple selectors set on one-hot encoded selector: {self}")
+                        #raise SimulationException(f"Multiple selectors set on one-hot encoded selector", self)
                     found = True
                     self.output_port <<= self.selector_to_value_map[selector]
             if not found:
@@ -353,11 +353,11 @@ class SelectFirst(_SelectOneHot):
                 try:
                     selector = self.selector_ports[idx]
                 except:
-                    raise SimulationException(f"SelectFirst is missing input selector for index {idx}")
+                    raise SimulationException(f"SelectFirst is missing input selector for index {idx}", self)
                 try:
                     value = self.value_ports[idx]
                 except:
-                    raise SimulationException(f"SelectFirst is missing input value for index {idx}")
+                    raise SimulationException(f"SelectFirst is missing input value for index {idx}", self)
                 if selector.sim_value is None:
                     use_default = False
                     self.output_port <<= self.default_port
@@ -432,7 +432,7 @@ class Concatenator(Module):
     def add_input(self, key: 'Key', junction: Junction) -> None:
         name = f"keyed_input_port_{len(self.raw_input_map)}"
         if has_prot(self, name):
-            raise SyntaxErrorException(f"Can't add input to {self} as port name {name} already exists")
+            raise SyntaxErrorException(f"Can't add input as port. Name '{name}' already exists")
         with self.allow_keyed_input:
             port = self._impl._create_named_port(name)
             port <<= junction
@@ -471,7 +471,7 @@ class Concatenator(Module):
         from .number import Number
         common_net_type = get_common_net_type(self.get_inputs().values())
         if common_net_type is None:
-            raise SyntaxErrorException(f"Can't figure out output port type for Concatenator {self}")
+            raise SyntaxErrorException(f"Can't figure out output port type for Concatenator")
         self.finalize_input_map(common_net_type)
         output_type = common_net_type.concatenated_type(self.input_map)
         return output_type
@@ -480,7 +480,7 @@ class Concatenator(Module):
     def body(self) -> None:
         new_net_type = self.generate_output_type()
         if new_net_type is None:
-            raise SyntaxErrorException(f"Can't figure out output port type for Concatenator {self}")
+            raise SyntaxErrorException(f"Can't figure out output port type for Concatenator")
         assert not self.output_port.is_specialized()
         self.output_port.set_net_type(new_net_type)
 
@@ -518,7 +518,7 @@ class Reg(Module):
     def body(self) -> None:
         new_net_type = self.input_port.get_net_type() if self.input_port.is_specialized() else None
         if new_net_type is None:
-            raise SyntaxErrorException(f"Can't figure out output port type for Reg {self}")
+            raise SyntaxErrorException(f"Can't figure out output port type for Reg")
         assert not self.output_port.is_specialized() or self.output_port.get_net_type() == new_net_type
         if not self.output_port.is_specialized():
             self.output_port.set_net_type(new_net_type)

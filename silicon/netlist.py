@@ -49,7 +49,7 @@ class XNet(object):
         if self.source is None:
             net_type = self.get_net_type()
             if net_type is None:
-                raise SyntaxErrorException(f"Can't determine unconnected value for unconnected XNet {xnet}")
+                raise SyntaxErrorException(f"Can't determine unconnected value for unconnected XNet")
             return net_type.get_unconnected_value(back_end), 0
         if scope in self.assigned_names:
             return self.assigned_names[scope], 0

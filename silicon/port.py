@@ -232,7 +232,7 @@ class Junction(JunctionBase):
                 sinks = source.get_all_sinks()
                 for sink in sinks:
                     if not sink.is_typeless() and self.get_net_type() != sink.get_net_type():
-                        raise SyntaxErrorException(f"A sink if junction {source} ({sink}) is of the wrong type. All sinks should have type {source.get_net_type()}.")
+                        raise SyntaxErrorException(f"A sink of junction {source} ({sink}) is of the wrong type. All sinks should have type {source.get_net_type()}.")
                 source.set_net_type(self.get_net_type())
             for member_name, (member_junction, reversed) in self.get_member_junctions().items():
                 if reversed:
@@ -626,9 +626,9 @@ class Junction(JunctionBase):
             junction_value = convert_to_junction(other)
             if junction_value is None:
                 # We couldn't create a port out of the value:
-                raise SyntaxErrorException(f"couldn't bind port to value '{other}'.")
+                raise SyntaxErrorException(f"Couldn't bind port to value '{other}'.")
         except Exception as ex:
-            raise SyntaxErrorException(f"couldn't bind port to value '{other}' with exception '{ex}'")
+            raise SyntaxErrorException(f"Couldn't bind port to value '{other}' with exception '{ex}'")
         # assignment-style binding is only allowed for outputs (on the inside) and inputs (on the outside)
         if self.is_inside():
             if is_input_port(self):
@@ -644,7 +644,7 @@ class Junction(JunctionBase):
     def __ilshift__sim(self, other: Any) -> 'Junction':
         if self.is_composite():
             if other is not None and other.source is not None and (not isinstance(other, Junction) or self.get_net_type() != other.get_net_type()):
-                raise SimulationException(f"Assignment to compound types during simulation is only supported between identical net types")
+                raise SimulationException(f"Assignment to compound types during simulation is only supported between identical net types", self)
             # If something is connected to an otherwise unconnected port, we should support that.
             if other is None or other.source is None:
                 for self_member in self.get_all_member_junctions(add_self=False):
@@ -671,7 +671,7 @@ class Junction(JunctionBase):
         if hasattr(value, "sim_value"):
             new_sim_value = value.sim_value
         else:
-            new_sim_value = sim_const(value)
+            new_sim_value = sim_const(value, self)
 
         assert self._xnet.source is self or self._xnet.source is None
         if self._xnet.source is self:
@@ -1074,7 +1074,7 @@ class AutoInput(Input):
         if self.source is not None:
             return
         if self._candidate is None and not self._optional:
-            raise SyntaxErrorException(f"Can't auto-connect port {self.get_diagnostic_name()}: none of the names {self._auto_port_names} could be found in the enclosing module")
+            raise SyntaxErrorException(f"Can't auto-connect port {self}: none of the names {self._auto_port_names} could be found in the enclosing module")
         if self._candidate is not None:
             self.set_source(self._candidate.junction)
     def is_deleted(self) -> bool:
@@ -1107,8 +1107,8 @@ def junction_ref(junction: Optional[Junction]) -> Optional[JunctionRef]:
 
 sim_convert_lookup: Dict[Type, Callable] = {}
 
-def sim_const(value: Any) -> Any:
+def sim_const(value: Any, for_junction: 'Junction') -> Any:
     if type(value) in sim_convert_lookup:
         return sim_convert_lookup[type(value)](value)
-    raise SimulationException(f"Don't know how to convert value {value} of type {type(value)} during simulation")
+    raise SimulationException(f"Don't know how to convert value {value} of type {type(value)} during simulation", for_junction)
 

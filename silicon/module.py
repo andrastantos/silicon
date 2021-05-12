@@ -14,6 +14,7 @@ from .exceptions import SyntaxErrorException
 from threading import RLock
 from itertools import chain, zip_longest
 from .utils import is_port, is_input_port, is_output_port, is_wire, is_junction_member, is_module, fill_arg_names, is_junction_or_member, is_junction, is_iterable, MEMBER_DELIMITER, first
+from .state_stack import StateStackElement
 import inspect
 
 def has_port(module: 'Module', name: str) -> bool:
@@ -96,7 +97,9 @@ class Module(object):
     ignore_caller_libs= ["silicon"]
     ignore_callers = ["wrapper", "__init__"]
 
-
+    class Context(StateStackElement):
+        def __init__(self, context: 'Module'):
+            self.context = context
 
     def __new__(cls, *args, **kwargs):
         with cls._in_new_lock:
@@ -558,8 +561,9 @@ class Module(object):
                     (self._construct_args, self._construct_kwargs) = fill_arg_names(self._true_module.construct, args, kwargs)
                     with self._in_construct:
                         with Module._parent_modules.push(self._true_module):
-                            with Trace():
-                                self._true_module.construct(*self._construct_args, **self._construct_kwargs)
+                            with Module.Context(self):
+                                with Trace():
+                                    self._true_module.construct(*self._construct_args, **self._construct_kwargs)
                         for port in self.get_ports().values():
                             if port._auto:
                                 port.find_cadidates()
@@ -777,13 +781,13 @@ class Module(object):
                         if value.get_parent_module() is None:
                             # If the attribute doesn't exist and we do a direct-assign to a free-standing port, assume that this is a port-creation request
                             if hasattr(self._true_module, name):
-                                raise SyntaxErrorException(f"Can't create new {('port', 'wire')[is_wire(value)]} {name} as that attribute allready exists on object {self._true_module}")
+                                raise SyntaxErrorException(f"Can't create new {('port', 'wire')[is_wire(value)]} {name} as that attribute allready exists")
                             return self.__set_no_bind_attr__(name, value, super_setter)
                         elif (value.get_parent_module() is self._true_module and is_input_port(value)) or (value.get_parent_module()._impl.parent is self._true_module and is_output_port(value)):
                             # We assign a port of a submodule to a new attribute. Create a Wire for it, if it doesn't exist already
                             if hasattr(self._true_module, name):
                                 if not is_junction(getattr(self._true_module,name)):
-                                    raise SyntaxErrorException(f"Can't create new wire {name} as that attribute allready exists on object {self._true_module}")
+                                    raise SyntaxErrorException(f"Can't create new wire {name} as that attribute allready exists")
                             else:
                                 self.__set_no_bind_attr__(name, Wire(), super_setter)
                             # Flow-through to the binding portion below...
@@ -887,14 +891,14 @@ class Module(object):
                         self._wires.pop(wire_name)
                         self._junctions.pop(wire_name)
                     else:
-                        raise SyntaxErrorException(f"Wire {wire_name} is used without a source in module {self._true_module}")
+                        raise SyntaxErrorException(f"Wire {wire_name} is used without a source")
             for wire in tuple(self._local_wires):
                 if not wire.is_specialized():
                     if len(wire.sinks) == 0:
-                        print(f"WARNING: deleting unused local wire: {wire} in module {self._true_module}")
+                        print(f"WARNING: deleting unused local wire: {wire}")
                         self._local_wires.remove(wire)
                     else:
-                        raise SyntaxErrorException(f"Local wire {wire} is used without a source in module {self._true_module}")
+                        raise SyntaxErrorException(f"Local wire {wire} is used without a source")
             with self._in_elaborate:
                 self._body(trace) # Will create all the sub-modules
             
@@ -933,13 +937,14 @@ class Module(object):
                             input.set_net_type(input.source.get_net_type())
                     all_inputs_specialized = all(tuple(input.is_specialized() or not input.has_driver() for input in sub_module.get_inputs().values()))
                     if all_inputs_specialized:
-                        sub_module._impl._elaborate(hier_level + 1, trace)
+                        with Module.Context(sub_module._impl):
+                            sub_module._impl._elaborate(hier_level + 1, trace)
                         changes = True
                         incomplete_sub_modules.remove(sub_module)
 
             propagate_net_types()
             if len(incomplete_sub_modules) != 0:
-                raise SyntaxErrorException(f"Can't determine all net types in module {self._true_module}")
+                raise SyntaxErrorException(f"Can't determine all net types")
 
             # Propagate output types, if needed
             for output in self.get_outputs().values():
@@ -948,7 +953,7 @@ class Module(object):
                         if output.source.is_specialized():
                             output.set_net_type(output.source.get_net_type())
                         else:
-                            raise SyntaxErrorException(f"Output port {output} on module {self._true_module} is not fully specialized after body call. Can't finalize interface")
+                            raise SyntaxErrorException(f"Output port {output} is not fully specialized after body call. Can't finalize interface")
             assert all((output.is_specialized() or output.source is None) for output in self.get_outputs().values())
 
         def elaborate(self) -> Netlist:
@@ -964,9 +969,10 @@ class Module(object):
                 self.has_explicit_name = True
 
             all_inputs_specialized = all(tuple(input.is_specialized() for input in self.get_inputs().values()))
-            if not all_inputs_specialized:
-                raise SyntaxErrorException(f"Top level module {self._true_module} must have all its inputs specialized before it can be elaborated")
-            self._elaborate(hier_level=0, trace=True)
+            with Module.Context(self):
+                if not all_inputs_specialized:
+                    raise SyntaxErrorException(f"Top level module must have all its inputs specialized before it can be elaborated")
+                self._elaborate(hier_level=0, trace=True)
             self.netlist._post_elaborate()
             return self.netlist
 
@@ -977,11 +983,12 @@ class Module(object):
             with self._inside:
                 with Module._parent_modules.push(self._true_module):
                     assert self.is_interface_frozen()
-                    if trace:
-                        with Tracer():
+                    with Module.Context(self):
+                        if trace:
+                            with Tracer():
+                                self._true_module.body()
+                        else:
                             self._true_module.body()
-                    else:
-                        self._true_module.body()
 
                     # Finish ordering sub-modules:
                     for sub_module in self._unordered_sub_modules:
@@ -1155,21 +1162,21 @@ class Module(object):
                 xnets = netlist.get_xnets_for_junction(my_port, my_port_name)
                 for name, (xnet, port) in xnets.items():
                     if self.symbol_table.is_reserved_name(name):
-                        raise SyntaxErrorException(f"Port name {name} uses a reserved word inside module {self._true_module}")
+                        raise SyntaxErrorException(f"Port name {name} uses a reserved word")
                     unique_name = self.symbol_table.register_symbol(name, xnet)
                     xnet.add_name(self._true_module, unique_name, is_explicit=True, is_input=is_input_port(port))
                     if unique_name != name:
-                        raise SyntaxErrorException(f"Port name {name} is not unique inside module {self._true_module}")
+                        raise SyntaxErrorException(f"Port name {name} is not unique")
             # Look at named wires. These also have a name.
             for my_wire_name, my_wire in self.get_wires().items():
                 xnets = netlist.get_xnets_for_junction(my_wire, my_wire_name)
                 for name, (xnet, wire) in xnets.items():
                     if self.symbol_table.is_reserved_name(name):
-                        raise SyntaxErrorException(f"Wire name {name} uses a reserved word inside module {self._true_module}")
+                        raise SyntaxErrorException(f"Wire name {name} uses a reserved word")
                     unique_name = self.symbol_table.register_symbol(name, xnet)
                     xnet.add_name(self._true_module, unique_name, is_explicit=True, is_input=False)
                     if unique_name != name:
-                        raise SyntaxErrorException(f"Wire name {name} is not unique inside module {self._true_module}")
+                        raise SyntaxErrorException(f"Wire name {name} is not unique")
                     assert wire.local_name is None or wire.local_name == name
                     assert wire.interface_name == name
 
@@ -1249,7 +1256,7 @@ class DecoratorModule(GenericModule):
             instance_port = Output()
             setattr(self, port_name, instance_port)
 
-        self._impl._function = function
+        self._impl.function = function
         for idx in range(out_port_cnt):
             if out_port_cnt == 1:
                 port_name = "output_port"
@@ -1259,7 +1266,7 @@ class DecoratorModule(GenericModule):
 
     @no_trace
     def body(self) -> None:
-        return_values = self._impl._function(*self._impl._args, **self._impl._kwargs)
+        return_values = self._impl.function(*self._impl._args, **self._impl._kwargs)
         if isinstance(return_values, str) or is_junction_or_member(return_values) or not is_iterable(return_values):
             return_values = (return_values, )
         if len(return_values) != len(self._impl.get_outputs()):
@@ -1303,10 +1310,10 @@ class DecoratorModule(GenericModule):
             self._impl._kwargs[name] = my_arg
 
         # mock-bind the now created invocation arguments to the signature of the function
-        # and attempt to locate the ports that need a name. This might fail if _function itself
+        # and attempt to locate the ports that need a name. This might fail if 'function' itself
         # has *args or **kwargs arguments
         from inspect import signature
-        sig = signature(self._impl._function)
+        sig = signature(self._impl.function)
         bound_args = sig.bind(*self._impl._args, **self._impl._kwargs).arguments
         for name, arg in bound_args.items():
             if arg in ports_needing_name:
