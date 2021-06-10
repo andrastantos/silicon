@@ -1,52 +1,435 @@
-from typing import Optional, Any, Tuple, Generator, Union, Dict, Set, Sequence
+from typing import Optional, Any, Tuple, Generator, Union, Dict, Set, Sequence, Union
 from .exceptions import SyntaxErrorException, SimulationException
 from .net_type import NetType, KeyKind
 from .module import GenericModule, Module, InlineBlock, InlineExpression, has_port
 from .port import Input, Output, Junction, Port
 from .tracer import no_trace
-from .utils import first, TSimEvent, get_common_net_type, is_subscriptable
+from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim
 from collections import OrderedDict
+from math import prod
 
 class Number(NetType):
     """
-    Number is a range-tracking bit-vector, the basic type of Silicon.
+    Number is a range-tracking, fractional bit-vector, the basic type of Silicon.
 
     It has a minimum and a maximum value, from which the number of bits
     required for representing that range can be derived.
 
+    It is also capable of representing (fixed point) fractional numbers. It tracks
+    the 'precision', which is the number of bits after the fractional point.
+
     If the range contains negative numbers, the representation is 2's complement.
     If the range is non-negative, an unsigned representation is used.
 
+    The 'length' member contains the total number of bits, fractional and integer.
+    The 'min_val' and 'max_val' members identify the minimum and maximum *integer* values, the type can have.
+    The actual maximum value is max_val, plus all-1-s in the fractional part.
+
     NOTE: range is inclusive because Pythons 'range' concept (stop is not in the range, but start is) is
     just too obnoxious to use
+
+    NOTE: negative slice-indices are couting backwards from the fractional point. That is a[-1] is the first fractional bit.
     """
 
     # The associated VCD type (one of VAR_TYPES inside vcd.writer.py)
     vcd_type: str = 'wire'
 
-    def __init__(self, length: Optional[int] = None, signed: Optional[bool] = None, min_val: Optional[int] = None, max_val: Optional[int] = None):
+    class SimValue(object):
+        def __init__(self, value: Optional[Union[int,'Number.SimValue']]= None, precision: int = 0):
+            if isinstance(value, Number.SimValue):
+                self.value = value.value
+                self.precision = value.precision
+            else:
+                self.precision = int(precision)
+                self.value = int(value)
+        
+        @staticmethod
+        def _precision(thing: Union[int, 'Number.SimValue', 'Junction']) -> int:
+            if isinstance(thing, int):
+                return 0
+            from .gates import _sim_value
+            thing = _sim_value(thing)
+            return thing.precision
+        @staticmethod
+        def _value(thing: Union[int, 'Number.SimValue', 'Junction']) -> int:
+            if isinstance(thing, int):
+                return thing
+            from .gates import _sim_value
+            thing = _sim_value(thing)
+            return thing.value
+        @staticmethod
+        def _value_in_precision(value: int, precision: int, out_precision: int) -> int:
+            if value is None:
+                return None
+            if precision == out_precision:
+                return value
+            if precision > out_precision:
+                return value >> (precision - out_precision)
+            else:
+                return value << (out_precision - precision)
+
+        def _coerce_precisions(self, other) -> Tuple[int, int, int]:
+            other_precision = Number.SimValue._precision(other)
+            my_precision = self.precision
+            result_precision = max(my_precision, other_precision)
+            other_value = Number.SimValue._value_in_precision(Number.SimValue._value(other), other_precision, result_precision)
+            my_value = Number.SimValue._value_in_precision(self.value, my_precision, result_precision)
+            return my_value, other_value, result_precision
+
+        def __add__(self, other: Any) -> Any:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value + other_value, result_precision)
+        
+        def __sub__(self, other: Any) -> Any:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value - other_value, result_precision)
+        
+        def __mul__(self, other: Any) -> Any:
+            other_precision = Number.SimValue._precision(other)
+            my_precision = self.precision
+            result_precision = my_precision + other_precision
+            other_value = Number.SimValue._value(other)
+            my_value = self.value
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value * other_value, result_precision)
+        
+        #def __truediv__(self, other: Any) -> Any:
+        #def __floordiv__(self, other: Any) -> Any:
+        #def __mod__(self, other: Any) -> Any:
+        #def __divmod__(self, other: Any) -> Any:
+        #def __pow__(self, other: Any, modulo = None) -> Any:
+        
+        def __lshift__(self, other: Any) -> Any:
+            other_precision = Number.SimValue._precision(other)
+            if other_precision != 0:
+                raise SimulationException(f"Can only shift by integer amount. {other} is potentially fractional.")
+            my_precision = self.precision
+            other_value = Number.SimValue._value(other)
+            my_value = self.value
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, 0)
+            result_precision = my_precision
+            return Number.SimValue(my_value << other_value, result_precision)
+        
+        def __rshift__(self, other: Any) -> Any:
+            other_precision = Number.SimValue._precision(other)
+            if other_precision != 0:
+                raise SimulationException(f"Can only shift by integer amount. {other} is potentially fractional.")
+            my_precision = self.precision
+            other_value = Number.SimValue._value(other)
+            my_value = self.value
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, 0)
+            result_precision = my_precision
+            return Number.SimValue(my_value >> other_value, result_precision)
+        
+        def __and__(self, other: Any) -> Any:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value & other_value, result_precision)
+        
+        def __xor__(self, other: Any) -> Any:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value ^ other_value, result_precision)
+        
+        def __or__(self, other: Any) -> Any:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value | other_value, result_precision)
+        
+        def __radd__(self, other: Any) -> Any:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(other_value + my_value, result_precision)
+        
+        def __rsub__(self, other: Any) -> Any:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(other_value - my_value, result_precision)
+        
+        def __rmul__(self, other: Any) -> Any:
+            other_precision = Number.SimValue._precision(other)
+            my_precision = self.precision
+            result_precision = my_precision + other_precision
+            other_value = Number.SimValue._value(other)
+            my_value = self.value
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(other_value * my_value, result_precision)
+        
+        #def __rtruediv__(self, other: Any) -> Any:
+        #def __rfloordiv__(self, other: Any) -> Any:
+        #def __rmod__(self, other: Any) -> Any:
+        #def __rdivmod__(self, other: Any) -> Any:
+        #def __rpow__(self, other: Any) -> Any:
+        
+        def __rlshift__(self, other: Any) -> Any:
+            other_precision = Number.SimValue._precision(other)
+            my_precision = self.precision
+            if my_precision != 0:
+                raise SimulationException(f"Can only shift by integer amount. {self} is potentially fractional.")
+            other_value = Number.SimValue._value(other)
+            my_value = self.value
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, 0)
+            result_precision = other_precision
+            return Number.SimValue(other_value << my_value, result_precision)
+        
+        def __rrshift__(self, other: Any) -> Any:
+            other_precision = Number.SimValue._precision(other)
+            my_precision = self.precision
+            if my_precision != 0:
+                raise SimulationException(f"Can only shift by integer amount. {self} is potentially fractional.")
+            other_value = Number.SimValue._value(other)
+            my_value = self.value
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, 0)
+            result_precision = other_precision
+            return Number.SimValue(other_value >> my_value, result_precision)
+        
+        def __rand__(self, other: Any) -> Any:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(other_value & my_value, result_precision)
+        
+        def __rxor__(self, other: Any) -> Any:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(other_value ^ my_value, result_precision)
+        
+        def __ror__(self, other: Any) -> Any:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(other_value | my_value, result_precision)
+        
+        def __neg__(self) -> Any:
+            if self.value is None:
+                return Number.SimValue(None, self.precision)
+            return Number.SimValue(-self.value, self.precision)
+        
+        def __pos__(self) -> Any:
+            return self.value
+        
+        def __abs__(self) -> Any:
+            if self.value is None:
+                return Number.SimValue(None, self.precision)
+            return Number.SimValue(abs(self.value), self.precision)
+        
+        def __invert__(self) -> Any:
+            raise SyntaxErrorException(f"It's not really possible to invert a Number.SimValue without knowing it's length. Use the 'invert' method instead of the ~ operator if you really need this functionality.")
+            #if self.value is None:
+            #    return Number.SimValue(None, self.precision)
+            #return Number.SimValue(~self.value, self.precision)
+
+        def invert(self, length: int) -> Any:
+            if self.value is None:
+                return Number.SimValue(None, self.precision)
+            # Pythons binary negation operator is pretty lame: it apparently computes -x-1,
+            # which is not quite the same when doing fixed-width binary numbers
+            all_ones = (1 << length) - 1
+            return Number.SimValue(self.value ^ all_ones, self.precision)
+
+
+        #def __complex__(self) -> Any:
+
+        def __int__(self) -> Any:
+            if self.value is None:
+                return None
+            return self.value >> self.precision
+
+        def __long__(self) -> Any:
+            if self.value is None:
+                return None
+            return self.value >> self.precision
+
+        def __float__(self) -> Any:
+            if self.value is None:
+                return None
+            return self.value / (1 << self.precision)
+        
+         #def __index__(self) -> Any:
+
+        def __bool__(self) -> bool:
+            return bool(self.value)
+        
+        def __lt__(self, other: Any) -> bool:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return False
+            return my_value < other_value
+        
+        def __le__(self, other: Any) -> bool:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return False
+            return my_value <= other_value
+        
+        def __eq__(self, other: Any) -> bool:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return False
+            return my_value == other_value
+        
+        def __ne__(self, other: Any) -> bool:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return False
+            return my_value != other_value
+        
+        def __gt__(self, other: Any) -> bool:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return False
+            return my_value > other_value
+        
+        def __ge__(self, other: Any) -> bool:
+            my_value, other_value, result_precision = self._coerce_precisions(other)
+            if my_value is None or other_value is None:
+                return False
+            return my_value >= other_value
+
+        #def __round__(self, ndigits):
+        #def __trunc__(self):
+        #def __floor__(self):
+        #def __ceil__(self):
+
+        @staticmethod
+        def lt(self, other: Any) -> Any:
+            if isinstance(self, Number.SimValue):
+                my_value, other_value, result_precision = self._coerce_precisions(other)
+            elif isinstance(other, Number.SimValue):
+                other_value, my_value, result_precision = other._coerce_precisions(self)
+            else:
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value < other_value, 0)
+        
+        @staticmethod
+        def le(self, other: Any) -> Any:
+            if isinstance(self, Number.SimValue):
+                my_value, other_value, result_precision = self._coerce_precisions(other)
+            elif isinstance(other, Number.SimValue):
+                other_value, my_value, result_precision = other._coerce_precisions(self)
+            else:
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value <= other_value, 0)
+        
+        @staticmethod
+        def eq(self, other: Any) -> Any:
+            if isinstance(self, Number.SimValue):
+                my_value, other_value, result_precision = self._coerce_precisions(other)
+            elif isinstance(other, Number.SimValue):
+                other_value, my_value, result_precision = other._coerce_precisions(self)
+            else:
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value == other_value, 0)
+        
+        @staticmethod
+        def ne(self, other: Any) -> Any:
+            if isinstance(self, Number.SimValue):
+                my_value, other_value, result_precision = self._coerce_precisions(other)
+            elif isinstance(other, Number.SimValue):
+                other_value, my_value, result_precision = other._coerce_precisions(self)
+            else:
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value != other_value, 0)
+        
+        @staticmethod
+        def gt(self, other: Any) -> Any:
+            if isinstance(self, Number.SimValue):
+                my_value, other_value, result_precision = self._coerce_precisions(other)
+            elif isinstance(other, Number.SimValue):
+                other_value, my_value, result_precision = other._coerce_precisions(self)
+            else:
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value > other_value, 0)
+        
+        @staticmethod
+        def ge(self, other: Any) -> Any:
+            if isinstance(self, Number.SimValue):
+                my_value, other_value, result_precision = self._coerce_precisions(other)
+            elif isinstance(other, Number.SimValue):
+                other_value, my_value, result_precision = other._coerce_precisions(self)
+            else:
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+            if my_value is None or other_value is None:
+                return Number.SimValue(None, result_precision)
+            return Number.SimValue(my_value >= other_value, 0)
+
+
+        def as_number(self) -> 'Number.SimValue':
+            return self
+
+
+        def __hash__(self):
+            return hash(self.value) | hash(self.precision)
+
+        def __str__(self) -> str:
+            if self.precision == 0:
+                return str(self.value)
+            return str(self.value / (1 << self.precision))
+        def __format__(self, format_spec) -> str:
+            if self.precision == 0:
+                return format(self.value, format_spec)
+            return format(self.value / (1 << self.precision), format_spec)
+
+    def __init__(self, length: Optional[int] = None, signed: Optional[bool] = None, min_val: Optional[int] = None, max_val: Optional[int] = None, precision: Optional[int] = None):
+        if length is not None and length <= 0:
+            raise SyntaxErrorException("Number types must have a positive length")
+        if precision is not None and precision < 0:
+            raise SyntaxErrorException("Number types must have a non-negative precision")
+
         self.min_val = min_val
         self.max_val = max_val
         self.signed = signed
         self.length = length
+        self.precision = precision
         self._calc_metrics()
 
     def __str__(self) -> str:
         signed_str = 's' if self.signed else 'u'
-        return f"Number({signed_str}{self.length} {self.min_val}...{self.max_val})"
-
+        if self.precision == 0:
+            return f"Number({signed_str}{self.length} {self.min_val}...{self.max_val})"
+        else:
+            return f"Number({signed_str}{self.length} {self.min_val}...{self.max_val} step {1/(1<<self.precision)})"
+    
     def __repr__(self) -> str:
-        signed_str = 's' if self.signed else 'u'
-        return f"Number({signed_str}{self.length} {self.min_val}...{self.max_val})"
+        return self.__str__()
 
     def __eq__(self, other):
         if not isinstance(other, Number):
             return False
-        return self is other or (self.min_val == other.min_val and self.max_val == other.max_val and self.length == other.length and self.signed == other.signed)
+        return self is other or (self.min_val == other.min_val and self.max_val == other.max_val and self.length == other.length and self.signed == other.signed and self.precision == other.precision)
     
     def __hash__(self):
-        return hash(self.min_val, self.max_val)
+        return hash(self.min_val, self.max_val, self.precision)
 
+    @property
+    def int_length(self) -> int:
+        return self.length - self.precision
     class Key(object):
         def __init__(self, thing: Union[int, slice, None] = None):
             if isinstance(thing, slice):
@@ -78,6 +461,15 @@ class Number(NetType):
             return result
 
     class Accessor(GenericModule):
+        """
+        Accessor instances are used to implement the following constructs:
+
+        b <<= a[3]
+        b <<= a[3:0]
+        b <<= a[3:0][2]
+
+        They are instantiated from Number.get_slice, which is called from Junction.__getitem__ and from MemberGetter.get_underlying_junction
+        """
         def construct(self, slice: Union[int, slice], number: 'Number') -> None:
             self.key = Number.Key(slice)
             self.input_port = Input(number)
@@ -91,23 +483,30 @@ class Number(NetType):
             yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
         def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
             assert back_end.language == "SystemVerilog"
+            input_type = self.input_port.get_net_type()
 
-            if self.input_port.get_net_type().length == 1:
-                if self.key.start != 0 or self.key.end != 0:
+            # In Verilog we represent fractional types as simple bit-vectors, so the ranges must start from 0 for the right-most (fractional) bit-position.
+            start = self.key.start + input_type.precision
+            end = self.key.end + input_type.precision
+            if input_type.length == 1:
+                if start != 0 or end != 0:
                     raise SyntaxErrorException("Can't access sections of single-bit number outside bit 0")
                 return self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), allow_expression = False)
             op_precedence = back_end.get_operator_precedence("[]")
             rhs_name, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence, allow_expression = False)
             assert self.key.start <= self.input_port.get_net_type().length, "FIXME: accessing slices of a Number outside it's length is not yet supported!!"
-            if self.key.end == self.key.start:
-                return f"{rhs_name}[{self.key.start}]", op_precedence
+            if end == start:
+                return f"{rhs_name}[{start}]", op_precedence
             else:
-                return f"{rhs_name}[{self.key.start}:{self.key.end}]", op_precedence
+                return f"{rhs_name}[{start}:{end}]", op_precedence
 
         @staticmethod
-        def static_sim(in_val: int, key: 'Number.Key'):
-            shift = key.end
-            mask = (1 << (key.start - key.end + 1)) - 1
+        def static_sim(in_val: int, key: 'Number.Key', precision: int):
+            # In simulation we represent fractional types as integers, so the ranges must start from 0 for the right-most (fractional) bit-position.
+            start = key.start + precision
+            end = key.end + precision
+            shift = end
+            mask = (1 << (start - end + 1)) - 1
             if in_val is None:
                 out_val = None
             else:
@@ -115,8 +514,14 @@ class Number(NetType):
             return out_val
 
         def simulate(self) -> TSimEvent:
-            shift = self.key.end
-            mask = (1 << (self.key.start - self.key.end + 1)) - 1
+            input_type = self.input_port.get_net_type()
+
+            # In simulation we represent fractional types as integers, so the ranges must start from 0 for the right-most (fractional) bit-position.
+            start = self.key.start + input_type.precision
+            end = self.key.end + input_type.precision
+
+            shift = end
+            mask = (1 << (start - end + 1)) - 1
             while True:
                 yield self.input_port
                 in_val = self.input_port.sim_value
@@ -168,6 +573,20 @@ class Number(NetType):
         return f"{for_junction.generate_junction_ref(back_end)} {self.generate_type_ref(back_end)}"
 
     class MemberSetter(Module):
+        """
+        This class handles the case of member-wise assignment to Numbers. Things, like:
+
+        a[3:0] <<= b
+        a[3:0][1] <<= c
+
+        and things like that.
+
+        MemberSetters are type-specific and have different guts for ex. interfaces.
+
+        For Numbers, they are collecting *all* the assignments to a given junction and generate
+        a single assignment Verilog statement. This is needed because Verilog doesn't support
+        multiple-assignment to (sections of) vectors.
+        """
         output_port = Output()
 
         def construct(self):
@@ -222,6 +641,9 @@ class Number(NetType):
             # that our direct output is not the most restritive, that would
             # mean that somewhere in the assignment chain, there was a narrowing,
             # which will eventually blow up.
+            #
+            # Precision auto-extends the other way: we need to make sure the least precise sink
+            # is still good enough. It's always OK to append a bunch of 0-s to make the Number more 'precise'.
             from .number import Number
             common_net_type = get_common_net_type(self.get_inputs().values())
             if common_net_type is None:
@@ -232,19 +654,16 @@ class Number(NetType):
             sinks = self.output_port.get_all_sinks()
             min_val = None
             max_val = None
+            precision = None
             for sink in sinks:
                 if not sink.is_abstract() and isinstance(sink.get_net_type(), Number):
-                    if min_val == None:
-                        min_val = sink.get_net_type().min_val
-                    else:
-                        min_val = max(min_val, sink.get_net_type().min_val)
-                    if max_val == None:
-                        max_val = sink.get_net_type().max_val
-                    else:
-                        max_val = min(max_val, sink.get_net_type().max_val)
+                    min_val = max_none(min_val, sink.get_net_type().min_val)
+                    max_val = min_none(max_val, sink.get_net_type().max_val)
+                    precision = min_none(precision, sink.get_net_type().precision)
             if min_val is not None:
                 assert max_val is not None
-                output_type = Number(min_val=min_val, max_val=max_val)
+                assert precision is not None
+                output_type = Number(min_val=min_val, max_val=max_val, precision=precision)
             else:
                 output_type = common_net_type.concatenated_type(self.input_map)
             return output_type
@@ -279,7 +698,7 @@ class Number(NetType):
         def __init__(self, net_type: 'Number', junction: Junction):
             self.parent_junction = junction
             self.idx = 0
-            self.length = net_type.get_length()
+            self.length = net_type.length
         def __next__(self):
             if self.idx == self.length:
                 raise StopIteration
@@ -296,7 +715,7 @@ class Number(NetType):
     
     def get_slice(self, key: Any, junction: Junction) -> Any:
         if junction.active_context() == "simulation":
-            return Number.Accessor.static_sim(junction.sim_value, Number.Key(key))
+            return Number.Accessor.static_sim(junction.sim_value, Number.Key(key), junction.get_net_type().precision)
         else:
             return Number.Accessor(slice=key, number=self)(junction)
     
@@ -378,6 +797,16 @@ class Number(NetType):
                 raise SyntaxErrorException("Length and min_val are both specified, but are incompatible")
             if self.max_val > len_max_val:
                 raise SyntaxErrorException("Length and max_val are both specified, but are incompatible")
+        # So far we've dealt with the integer part. Now, look at the fractional section, and patch up 'length' if needed
+        if self.precision is not None:
+            self.length += self.precision
+        else:
+            self.precision = 0
+        # Cache maximum and minimum simluation values to speed up value simulation
+        self.max_sim_val = self.max_val << self.precision | ((1 << self.precision) - 1)
+        self.min_sim_val = self.min_val << self.precision
+        if self.precision != 0:
+            print("Boo!")
 
     def get_unconnected_sim_value(self) -> Any:
         return None
@@ -395,7 +824,7 @@ class Number(NetType):
         """
         if sim_value is None:
             return sim_value
-        if sim_value > self.max_val or sim_value < self.min_val:
+        if sim_value > self.max_sim_val or sim_value < self.min_sim_val:
             raise SimulationException(f"Can't assign to net {parent_junction} a value {sim_value} that's outside of the representable range.", parent_junction)
         return sim_value
 
@@ -419,6 +848,9 @@ class Number(NetType):
         """
         if value is None:
             return 'X'
+        if isinstance(value, Number.SimValue):
+            return value.value
+        assert False
         return value
 
     def get_junction_member(self, junction: Junction, name:str) -> Any:
@@ -430,6 +862,8 @@ class Number(NetType):
             return self.min_val
         if name == "max_val":
             return self.max_val
+        if name == "precision":
+            return self.precision
         raise AttributeError
 
     from .module import GenericModule
@@ -452,12 +886,14 @@ class Number(NetType):
 
             ret_val = ""
             need_sign_cast = self.input_port.signed and not self.output_port.signed
-            need_size_cast = self.input_port.length > self.output_port.length
-            if need_size_cast:
+            need_int_size_cast = self.input_port.get_net_type().int_length > self.output_port.get_net_type().int_length
+            need_fract_size_cast = self.input_port.precision != self.output_port.precision
+            if need_int_size_cast:
                 ret_val += f"{self.output_port.length}'("
             rhs_name, precedence = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
+            rhs_name, precedence = adjust_precision(self.input_port, rhs_name, precedence, self.output_port.precision, back_end)
             ret_val += rhs_name
-            if need_size_cast:
+            if need_int_size_cast:
                 precedence = 0
                 ret_val += ")"
             if need_sign_cast:
@@ -470,7 +906,7 @@ class Number(NetType):
         def simulate(self) -> TSimEvent:
             while True:
                 yield self.input_port
-                self.output_port <<= self.input_port
+                self.output_port <<= adjust_precision_sim(self.input_port.sim_value, self.input_port.precision, self.output_port.precision)
         def is_combinational(self) -> bool:
             """
             Returns True if the module is purely combinational, False otherwise
@@ -490,7 +926,7 @@ class Number(NetType):
                 return None
             else:
                 return Number.SizeAdaptor(input_type = input_type, output_type = self)(input)
-        if self.length >= input_type.length and self.signed == input_type.signed:
+        if self.length >= input_type.length and self.signed == input_type.signed and self.precision == input_type.precision:
             return input
         output = Number.SizeAdaptor(input_type = input_type, output_type = self)(input)
         #output.get_parent_module()._impl._elaborate(hier_level=0, trace=False)
@@ -583,6 +1019,8 @@ class Number(NetType):
     def concatenated_type(cls, input_map: Dict['Number.Key', Junction]) -> Optional['NetType']:
         """
         Returns the combined type for the given inputs for the keys
+
+        The combined type is always an integer: there's not fractional part to a concatenation.
         """
         assert len(input_map) > 0
         if not cls.validate_input_map(input_map):
@@ -592,9 +1030,10 @@ class Number(NetType):
                 raise SyntaxErrorException("Can only determine concatenated type if all constituents are Numbers")
             if junction.get_net_type().is_abstract():
                 raise SyntaxErrorException("Can't determine concatenated type if any of the constituents is an abstract Number")
-        # Simple assignment: return our input
+        # Simple assignment: return the input, but converted into an integer
         if len(input_map) == 1 and first(input_map.keys()).is_sequential:
-            return first(input_map.values()).get_net_type()
+            input_type = first(input_map.values()).get_net_type()
+            return Number(length=input_type.length, signed=input_type.signed)
         # Either multiple sources or the single source has a range assigned to it.
         sorted_keys = cls.sort_source_keys(input_map, back_end = None)
         top_key = first(sorted_keys)
@@ -663,12 +1102,12 @@ class Number(NetType):
         last_top_idx = self.length
         value = 0
         for sub_port_key in sorted_keys:
-            current_top_idx = sub_port_key.start if not sub_port_key.is_sequential else last_top_idx - 1
+            current_top_idx = sub_port_key.start + self.precision if not sub_port_key.is_sequential else last_top_idx - 1
             assert current_top_idx < last_top_idx
             if current_top_idx < last_top_idx - 1:
                 raise SyntaxErrorException("Not all bits in Number have sources")
             sub_port = input_map[sub_port_key]
-            last_top_idx = sub_port_key.end if not sub_port_key.is_sequential else last_top_idx - sub_port.length
+            last_top_idx = sub_port_key.end + self.precision if not sub_port_key.is_sequential else last_top_idx - sub_port.length
             concat_map.append((sub_port, last_top_idx))
         return concat_map
 
@@ -714,24 +1153,21 @@ class Number(NetType):
         if operation == "SELECT":
             max_val = None
             min_val = None
+            precision = None
             for net_type in net_types:
                 if net_type is None:
                     continue
-                if max_val is None:
-                    max_val = net_type.max_val
-                else:
-                    max_val = max(max_val, net_type.max_val)
-                if min_val is None:
-                    min_val = net_type.min_val
-                else:
-                    min_val = min(min_val, net_type.min_val)
-            return Number(max_val=max_val, min_val=min_val)
+                max_val = max_none(max_val, net_type.max_val)
+                min_val = min_none(min_val, net_type.min_val)
+                precision = max_none(precision, net_type.precision)
+            return Number(max_val=max_val, min_val=min_val, precision=precision)
         elif operation in ("OR", "AND", "XOR"):
             all_signed = True
             all_unsigned = True
             final_signed = False
             max_len = 0
             max_unsigned_len = 0
+            precision = net_types[0].precision
             for net_type in net_types:
                 if net_type is None:
                     continue
@@ -742,13 +1178,15 @@ class Number(NetType):
                 else:
                     all_signed = False
                     max_unsigned_len = max(max_unsigned_len, net_type.length)
+                if net_type.precision != precision:
+                    raise SyntaxErrorException("Can't determine union type unless all constituents have the same precision")
             assert not all_signed or not all_unsigned
             if not all_signed and not all_unsigned:
                 # FIXME: If some ports are signed and some are unsigned, we might have to sign-extend the result by an extra bit
                 #        in case the longest input was unsigned. However I'm not sure that's what we want to do. For now, leave it as-is
                 #max_len = max(max_len, max_unsigned_len + 1)
                 pass
-            ret_val = Number(length=max_len, signed=final_signed)
+            ret_val = Number(length=max_len, signed=final_signed, precision=precision)
             #print(f"------ returning {ret_val} for inputs: " + ",".join(str(net_type) for net_type in net_types))
             return ret_val
         elif operation == "SUM":
@@ -759,13 +1197,13 @@ class Number(NetType):
                     continue
                 max_val = max_val + net_type.max_val
                 min_val = min_val + net_type.min_val
-            return Number(max_val=max_val, min_val=min_val)
+            return Number(max_val=max_val, min_val=min_val, precision=max(n.precision for n in net_types))
         elif operation == "SUB":
             assert len(net_types) == 2
             check_all_types_valid()
             max_val = net_types[0].max_val - net_types[1].min_val
             min_val = net_types[0].min_val - net_types[1].max_val
-            return Number(max_val=max_val, min_val=min_val)
+            return Number(max_val=max_val, min_val=min_val, precision=max(n.precision for n in net_types))
         elif operation == "PROD":
             max_val = 1
             min_val = 1
@@ -784,10 +1222,13 @@ class Number(NetType):
                     min_val * net_type.max_val, 
                     min_val * net_type.min_val
                 )
-            return Number(max_val=max_val, min_val=min_val)
+            return Number(max_val=max_val, min_val=min_val, precision=prod(n.precision for n in net_types))
         elif operation == "SHL":
             assert len(net_types) == 2
             check_all_types_valid()
+            if net_types[1].precision != 0:
+                raise SyntaxErrorException("Shift amount must be integer")
+
             if net_types[0].min_val > 0:
                 min_val = net_types[0].min_val << net_types[1].min_val
             else:
@@ -797,10 +1238,16 @@ class Number(NetType):
                 max_val = net_types[0].max_val << net_types[1].max_val
             else:
                 max_val = net_types[0].max_val << net_types[1].min_val
-            return Number(max_val=max_val, min_val=min_val)
+
+            precision = max(net_types[0].precision - net_types[1].min_val, 0)
+
+            return Number(max_val=max_val, min_val=min_val, precision=precision)
         elif operation == "SHR":
             assert len(net_types) == 2
             check_all_types_valid()
+            if net_types[1].precision != 0:
+                raise SyntaxErrorException("Shift amount must be integer")
+
             if net_types[0].min_val > 0:
                 min_val = net_types[0].min_val >> net_types[1].max_val
             else:
@@ -810,16 +1257,21 @@ class Number(NetType):
                 max_val = net_types[0].max_val >> net_types[1].min_val
             else:
                 max_val = net_types[0].max_val >> net_types[1].max_val
-            return Number(max_val=max_val, min_val=min_val)
+
+            #precision = max(net_types[0].precision + net_types[1].max_val, 0)
+            # This is a bit asymmetrical, but the idea is that right-shift always truncates the bits it shifts out, even for fractional types.
+            precision = net_types[0].precision
+
+            return Number(max_val=max_val, min_val=min_val, precision=precision)
         elif operation == "NOT":
             assert len(net_types) == 1
             check_all_types_valid()
             # NOTE: it feels as if this is the same type, but it's not: it's the full binary range of the input, where as min/max for the input could be something smaller
-            return Number(length=net_types[0].length, signed=net_types[0].signed)
+            return Number(length=net_types[0].length, signed=net_types[0].signed, precision=net_types[0].precision)
         elif operation == "NEG":
             assert len(net_types) == 1
             check_all_types_valid()
-            return Number(min_val=-net_types[0].max_val, max_val=-net_types[0].min_val)
+            return Number(min_val=-net_types[0].max_val, max_val=-net_types[0].min_val, precision=net_types[0].precision)
         elif operation == "ABS":
             assert len(net_types) == 1
             check_all_types_valid()
@@ -828,7 +1280,7 @@ class Number(NetType):
             else:
                 min_val = min(abs(net_types[0].min_val), abs(net_types[0].max_val))
             max_val = max(abs(net_types[0].min_val), abs(net_types[0].max_val))
-            return Number(min_val=min_val, max_val=max_val)
+            return Number(min_val=min_val, max_val=max_val, precision=net_types[0].precision)
         else:
             return super().result_type(net_types, operation) # Will raise an exception.
 
@@ -836,8 +1288,8 @@ class Number(NetType):
 def int_to_const(value: int) -> Tuple[NetType, int]:
     return Number(min_val=value, max_val=value), value
 
-def val_to_sim(value: int) -> int:
-    return int(value)
+def val_to_sim(value: int) -> 'Number.SimValue':
+    return Number.SimValue(value)
 
 def _str_to_int(value: str) -> Tuple[int, int, bool]:
     """
@@ -898,7 +1350,7 @@ def str_to_const(value: str) -> Tuple[NetType, int]:
     return net_type, int_val
 
 def str_to_sim(value: str) -> int:
-    return _str_to_int(value)[0]
+    return Number.SimValue(_str_to_int(value)[0])
 
 
 def bool_to_const(value: bool) -> Tuple[NetType, int]:
@@ -915,6 +1367,7 @@ const_convert_lookup[bool] = bool_to_const
 sim_convert_lookup[int] = val_to_sim
 sim_convert_lookup[str] = str_to_sim
 sim_convert_lookup[bool] = val_to_sim
+sim_convert_lookup[Number.SimValue] = lambda sim_val: sim_val
 
 def Signed(length: int=None):
     return Number(length=length, signed=True)

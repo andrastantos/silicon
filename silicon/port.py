@@ -433,9 +433,9 @@ class Junction(JunctionBase):
 
     def _binary_op(self, other: Any, gate: 'Module', name: str) -> Any:
         context = self.active_context()
-        from .gates import _sim_value
         if context == "simulation":
-            return gate.sim_op(self, _sim_value(other))
+            my_val = self.sim_value
+            return getattr(type(my_val), name)(my_val, other)
         elif context == "elaboration":
             return gate(self, other)
         else:
@@ -445,7 +445,8 @@ class Junction(JunctionBase):
     def _rbinary_op(self, other: Any, gate: 'Module', name: str) -> Any:
         context = self.active_context()
         if context == "simulation":
-            return gate.sim_op(other, self.sim_value)
+            my_val = self.sim_value
+            return getattr(type(my_val), name)(my_val, other)
         elif context == "elaboration":
             return gate(other, self)
         else:
@@ -455,7 +456,8 @@ class Junction(JunctionBase):
     def _unary_op(self, gate: 'Module', name: str) -> Any:
         context = self.active_context()
         if context == "simulation":
-            return gate.sim_op(self)
+            my_val = self.sim_value
+            return getattr(type(my_val), name)(my_val)
         elif context == "elaboration":
             return gate(self)
         else:
@@ -465,7 +467,8 @@ class Junction(JunctionBase):
     def _ninput_op(self, other: Any, gate: 'Module', name: str) -> Any:
         context = self.active_context()
         if context == "simulation":
-            return gate.sim_op(other, self.sim_value)
+            my_val = self.sim_value
+            return getattr(type(my_val), name)(my_val, other)
         elif context == "elaboration":
             return gate(self, other)
         else:
@@ -474,9 +477,9 @@ class Junction(JunctionBase):
 
     def _rninput_op(self, other, gate: 'Module', name: str) -> Any:
         context = self.active_context()
-        from .gates import _sim_value
         if context == "simulation":
-            return gate.sim_op(self, _sim_value(other))
+            my_val = self.sim_value
+            return getattr(type(my_val), name)(my_val, other)
         elif context == "elaboration":
             return gate(other, self)
         else:
@@ -496,17 +499,11 @@ class Junction(JunctionBase):
         from .gates import prod_gate as gate
         return self._ninput_op(other, gate, "__mul__")
     
-    def __floordiv__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __mod__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __divmod__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __pow__(self, other: Any, modulo = None) -> Any:
-        assert False, "FIXME: implement!"
+    #def __floordiv__(self, other: Any) -> Any:
+    #def __mod__(self, other: Any) -> Any:
+    #def __divmod__(self, other: Any) -> Any:
+    #def __pow__(self, other: Any, modulo = None) -> Any:
+    #def __truediv__(self, other: Any) -> Any:
     
     def __lshift__(self, other: Any) -> Any:
         from .gates import lshift_gate as gate
@@ -528,8 +525,6 @@ class Junction(JunctionBase):
         from .gates import or_gate as gate
         return self._ninput_op(other, gate, "__or__")
     
-    def __truediv__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
 
     
     def __radd__(self, other: Any) -> Any:
@@ -544,20 +539,11 @@ class Junction(JunctionBase):
         from .gates import prod_gate as gate
         return self._rninput_op(other, gate, "__rmul__")
     
-    def __rtruediv__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __rfloordiv__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __rmod__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __rdivmod__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __rpow__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
+    #def __rtruediv__(self, other: Any) -> Any:
+    #def __rfloordiv__(self, other: Any) -> Any:
+    #def __rmod__(self, other: Any) -> Any:
+    #def __rdivmod__(self, other: Any) -> Any:
+    #def __rpow__(self, other: Any) -> Any:
     
     def __rlshift__(self, other: Any) -> Any:
         from .gates import lshift_gate as gate
@@ -578,47 +564,21 @@ class Junction(JunctionBase):
     def __ror__(self, other: Any) -> Any:
         from .gates import or_gate as gate
         return self._rninput_op(other, gate, "__ror__")
-    """
+
     
-    def __iadd__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __isub__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __imul__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __idiv__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __itruediv__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __ifloordiv__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __imod__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __ipow__(self, other: Any, modulo = None) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __ilshift__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __irshift__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __iand__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __ixor__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __ior__(self, other: Any) -> Any:
-        assert False, "FIXME: implement!"
-    """
+    #def __iadd__(self, other: Any) -> Any:
+    #def __isub__(self, other: Any) -> Any:
+    #def __imul__(self, other: Any) -> Any:
+    #def __idiv__(self, other: Any) -> Any:
+    #def __itruediv__(self, other: Any) -> Any:
+    #def __ifloordiv__(self, other: Any) -> Any:
+    #def __imod__(self, other: Any) -> Any:
+    #def __ipow__(self, other: Any, modulo = None) -> Any:
+    #def __ilshift__(self, other: Any) -> Any:
+    #def __irshift__(self, other: Any) -> Any:
+    #def __iand__(self, other: Any) -> Any:
+    #def __ixor__(self, other: Any) -> Any:
+    #def __ior__(self, other: Any) -> Any:
 
     
     def __ilshift__elab(self, other: Any) -> 'Junction':
@@ -691,33 +651,24 @@ class Junction(JunctionBase):
     
     def __invert__(self) -> Any:
         from .gates import not_gate as gate
-        return self._unary_op(gate, "__invert__")
+        context = self.active_context()
+        if context == "simulation":
+            my_val = self.sim_value
+            try:
+                return my_val.invert(self.get_num_bits())
+            except AttributeError:
+                return self._unary_op(gate, "__invert__")
+        else:
+            return self._unary_op(gate, "__invert__")
 
     
-    def __complex__(self) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __int__(self) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __long__(self) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __float__(self) -> Any:
-        assert False, "FIXME: implement!"
-
-    
-    def __oct__(self) -> Any:
-        assert False, "FIXME: implement!"
-    
-    def __hex__(self) -> Any:
-        assert False, "FIXME: implement!"
-
-    '''
-    
-    def __index__(self) -> Any:
-        assert False, "FIXME: implement!"
-    '''
+    #def __complex__(self) -> Any:
+    #def __int__(self) -> Any:
+    #def __long__(self) -> Any:
+    #def __float__(self) -> Any:
+    #def __oct__(self) -> Any:
+    #def __hex__(self) -> Any:
+    #def __index__(self) -> Any:
 
     
     def __bool__(self) -> bool:

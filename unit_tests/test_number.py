@@ -422,13 +422,136 @@ def test_precedence():
 
     test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
+def test_sim_value_int():
+    def test_result(result, expected_value, expected_precision = 0):
+        if isinstance(expected_value, Number.SimValue):
+            expected_precision = expected_value.precision
+            expected_value = expected_value.value
+        assert(result.value == expected_value)
+        assert(result.precision == expected_precision)
+    def n(value, precision = 0):
+        return Number.SimValue(value, precision)
+
+    test_result(n(1)+n(2), n(3))
+    test_result(n(1)+2, n(3))
+    test_result(1+n(2), n(3))
+
+    test_result(n(1)-n(2), n(-1))
+    test_result(n(52)-n(2), n(50))
+    test_result(n(1)-2, n(-1))
+    test_result(1-n(2), n(-1))
+
+    test_result(n(6)*n(9), n(54))
+    test_result(n(6)*7, n(42))
+    test_result(5*n(-3), n(-15))
+
+    test_result(n(6)|n(9), n(6|9))
+    test_result(6|n(9), n(6|9))
+    test_result(n(6)|9, n(6|9))
+
+    test_result(n(6)&n(5), n(6&5))
+    test_result(6&n(5), n(6&5))
+    test_result(n(6)&5, n(6&5))
+
+    test_result(n(2) << n(5), n(64))
+    test_result(2 << n(5), n(64))
+    test_result(n(2) << 5, n(64))
+    test_result(n(-2) << n(5), n(-64))
+
+    test_result(n(16) >> n(2), n(4))
+    test_result(16 >> n(2), n(4))
+    test_result(n(17) >> 2, n(4))
+    test_result(n(-16) >> 2, n(-4))
+
+    # This is weird. We have to follow Pythons rules here because we don't (and can't always) know the length of the number
+    #test_result(~n(1), n(-2))
+    #test_result(-n(1), n(-1))
+    test_result(abs(n(3)), n(3))
+    test_result(abs(n(-3)), n(3))
+
+    assert (n(3) < n(2)) == False
+    assert (3 < n(2)) == False
+    assert (n(3) < 2) == False
+    assert (n(2) < n(3)) == True
+    assert (2 < n(3)) == True
+    assert (n(2) < 3) == True
+    assert (n(3) <= n(2)) == False
+    assert (3 <= n(2)) == False
+    assert (n(3) <= 2) == False
+    assert (n(2) <= n(3)) == True
+    assert (2 <= n(3)) == True
+    assert (n(2) <= 3) == True
+    assert (n(3) == n(2)) == False
+    assert (3 == n(2)) == False
+    assert (n(2) == 3) == False
+    assert (n(3) != n(2)) == True
+    assert (3 != n(2)) == True
+    assert (n(2) != 3) == True
+    assert (n(3) > n(2)) == True
+    assert (3 > n(2)) == True
+    assert (n(3) > 2) == True
+    assert (n(2) > n(3)) == False
+    assert (2 > n(3)) == False
+    assert (n(2) > 3) == False
+    assert (n(3) >= n(2)) == True
+    assert (3 >= n(2)) == True
+    assert (n(3) >= 2) == True
+    assert (n(2) >= n(3)) == False
+    assert (2 >= n(3)) == False
+    assert (n(2) >= 3) == False
+    assert (n(2) < n(2)) == False
+    assert (n(2) <= n(2)) == True
+    assert (n(2) == n(2)) == True
+    assert (n(2) != n(2)) == False
+    assert (n(2) > n(2)) == False
+    assert (n(2) >= n(2)) == True
+
+
+    test_result(Number.SimValue.lt(n(3), n(2)), n(False))
+    test_result(Number.SimValue.lt(3, n(2)), n(False))
+    test_result(Number.SimValue.lt(n(3), 2), n(False))
+    test_result(Number.SimValue.lt(n(2), n(3)), n(True))
+    test_result(Number.SimValue.lt(2, n(3)), n(True))
+    test_result(Number.SimValue.lt(n(2), 3), n(True))
+    test_result(Number.SimValue.le(n(3), n(2)), n(False))
+    test_result(Number.SimValue.le(3, n(2)), n(False))
+    test_result(Number.SimValue.le(n(3), 2), n(False))
+    test_result(Number.SimValue.le(n(2), n(3)), n(True))
+    test_result(Number.SimValue.le(2, n(3)), n(True))
+    test_result(Number.SimValue.le(n(2), 3), n(True))
+    test_result(Number.SimValue.eq(n(3), n(2)), n(False))
+    test_result(Number.SimValue.eq(3, n(2)), n(False))
+    test_result(Number.SimValue.eq(n(2), 3), n(False))
+    test_result(Number.SimValue.ne(n(3), n(2)), n(True))
+    test_result(Number.SimValue.ne(3, n(2)), n(True))
+    test_result(Number.SimValue.ne(n(2), 3), n(True))
+    test_result(Number.SimValue.gt(n(3), n(2)), n(True))
+    test_result(Number.SimValue.gt(3, n(2)), n(True))
+    test_result(Number.SimValue.gt(n(3), 2), n(True))
+    test_result(Number.SimValue.gt(n(2), n(3)), n(False))
+    test_result(Number.SimValue.gt(2, n(3)), n(False))
+    test_result(Number.SimValue.gt(n(2), 3), n(False))
+    test_result(Number.SimValue.ge(n(3), n(2)), n(True))
+    test_result(Number.SimValue.ge(3, n(2)), n(True))
+    test_result(Number.SimValue.ge(n(3), 2), n(True))
+    test_result(Number.SimValue.ge(n(2), n(3)), n(False))
+    test_result(Number.SimValue.ge(2, n(3)), n(False))
+    test_result(Number.SimValue.ge(n(2), 3), n(False))
+    test_result(Number.SimValue.lt(n(2), n(2)), n(False))
+    test_result(Number.SimValue.le(n(2), n(2)), n(True))
+    test_result(Number.SimValue.eq(n(2), n(2)), n(True))
+    test_result(Number.SimValue.ne(n(2), n(2)), n(False))
+    test_result(Number.SimValue.gt(n(2), n(2)), n(False))
+    test_result(Number.SimValue.ge(n(2), n(2)), n(True))
+
 if __name__ == "__main__":
+    #test_sim_value_int()
     #test_mix1()
-    #test_binary_ops()
+    test_binary_ops()
     #test_closure()
     #test_closure1()
     #test_closure2()
-    test_slices()
+    #test_slices()
     #test_assign()
     #test_concatenate()
     #test_slice_new()

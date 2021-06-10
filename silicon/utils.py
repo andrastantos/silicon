@@ -292,3 +292,42 @@ def is_power_of_two(n: int) -> bool:
 
 def get_composite_member_name(names: Sequence[str], delimiter: str = ".") -> str:
     return delimiter.join(names)
+
+def min_none(*args):
+    return min(a for a in args if a is not None)
+
+def max_none(*args):
+    return max(a for a in args if a is not None)
+
+def adjust_precision(input: 'Junction', expression: str, precedence: int, target_precision: int, back_end: 'BackEnd') -> Tuple[str, int]:
+    assert back_end.language == "SystemVerilog"
+
+    ret_val = expression
+    if input.precision != target_precision:
+        # We need to either truncate some bits at the end or append some 0-s to make sure the precision field is of the right size
+        # We will do that using logic operator instead of slicing, because slicing doesn't work on expressions within Verilog and
+        # we *really* don't want to create another Verilog wire this deep down in expression generation
+        if input.precision > target_precision:
+            # Need to cut some bits off --> shift left
+            if input.signed:
+                op = ">>>"
+            else:
+                op = ">>"
+            ret_val, precedence = back_end.wrap_expression(ret_val, precedence, back_end.get_operator_precedence(op))
+            ret_val = f"{ret_val} {op} {input.precision - target_precision}"
+        else:
+            # Need to add some bits --> concatenate
+            ret_val, precedence = back_end.wrap_expression(ret_val, precedence, back_end.get_operator_precedence("{}"))
+            ret_val = f"{{ {ret_val}, {target_precision - input.precision}'b0 }}"
+    return ret_val, precedence
+
+def adjust_precision_sim(input_value: Optional[int], input_precision: int, target_precision: int) -> int:
+    if input_value is None:
+        return None
+    shift = input_precision - target_precision
+    if shift > 0:
+        return input_value >> shift
+    elif shift < 0:
+        return input_value << -shift
+    else:
+        return input_value

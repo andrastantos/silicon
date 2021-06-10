@@ -113,6 +113,9 @@ class Enum(Number):
         def __ge__(self, other: Any) -> bool:
             return int(self) >= int(other)
 
+        def as_number(self) -> Number.SimValue:
+            return Number.SimValue(self.value.value)
+
     @staticmethod
     def val_to_sim(val):
         return Enum.EnumConverter(val)
