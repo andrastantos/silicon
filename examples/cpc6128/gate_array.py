@@ -139,7 +139,7 @@ class gate_array(Module):
         hsync_after_vsync_stop = self.hsync_after_vsync_cnt == 2
         hsync_after_vsync_counting = Wire(logic)
         hsync_after_vsync_counting <<= Reg(Select(hsync_after_vsync_stop, Select(hsync_after_vsync_start, hsync_after_vsync_counting, 1), 0))
-        self.hsync_after_vsync_cnt <<= Reg(Select(hsync_after_vsync_counting, 0, self.hsync_after_vsync_cnt + hsync_falling_edge))
+        self.hsync_after_vsync_cnt <<= Reg(Select(hsync_after_vsync_counting, 0, (self.hsync_after_vsync_cnt + hsync_falling_edge)[1:0]))
 
         next_hsync_cnt = Select(int_delay | hsync_after_vsync_stop,
             Select(hsync_falling_edge, 
