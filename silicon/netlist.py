@@ -9,6 +9,13 @@ from .exceptions import SyntaxErrorException
 def fully_qualified_name(thing: Any, mangle: bool=True) -> str:
     type = thing.__class__
     module = type.__module__
+    if module == "__main__":
+        # We need to work around the problem that Python names the main module '__main__', but
+        # we would like to keep it consistent and use the file-name, if possible
+        import __main__
+        from pathlib import Path
+        main_path = Path(__main__.__file__)
+        module = main_path.stem
     if module == 'builtins':
         return type.__qualname__
     fqn: str = module + '.' + type.__qualname__
