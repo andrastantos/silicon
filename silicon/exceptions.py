@@ -25,5 +25,5 @@ class SimulationException(Exception):
         except Exception:
             loc = "<<NO LOCATION>>"
         from textwrap import indent, wrap
-        message = indent(wrap(message, width=70), "    ")
+        message = indent("\n".join(wrap(message, width=70)), "    ")
         super().__init__(f"{loc}\n{message}")
