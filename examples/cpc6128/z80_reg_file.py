@@ -257,7 +257,7 @@ def test_sim():
             # NOTE: we're going to use rdXX register addresses for both reads and writes
             def clk() -> int:
                 yield 10
-                self.clk <<= ~self.clk
+                self.clk <<= ~self.clk & self.clk
                 yield 10
                 self.clk <<= ~self.clk
                 yield 0
