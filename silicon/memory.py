@@ -76,7 +76,7 @@
 # Essentially 'contact your foundry'
 
 from .module import GenericModule, has_port, Module, InlineBlock, InlineStatement
-from .port import Input, Output, Wire, AutoInput, Port, EdgeType
+from .port import Input, Output, Wire, AutoInput, Port, EdgeType, Junction
 from .net_type import NetType
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -629,3 +629,58 @@ class Memory(GenericModule):
             else:
                 port <<= getattr(real_mem, port_name)
         port = None # Make sure tracer doesn't generate an unnecessary Wire object
+
+class SimpleDualPortMemory(Memory):
+    READ_PORT = 1
+    WRITE_PORT = 0
+
+    def construct(self, addr_type: NetType, data_type: NetType, reset_content: Optional[str] = None):
+        config = MemoryConfig(
+            (MemoryPortConfig(
+                addr_type = addr_type,
+                data_type = data_type,
+                registered_input = registered_input_a,
+                registered_output = registered_output_a
+            ),
+            MemoryPortConfig(
+                addr_type = addr_type,
+                data_type = data_type,
+                registered_input = registered_input_b,
+                registered_output = registered_output_b
+            ),),
+            reset_content = reset_content
+        )
+        return super().construct(config)
+    def _get_prefix_for_port(self, default_idx: int, port: Optional[str] = None) -> str:
+        if port == None:
+            return self.config.port_configs[default_idx].real_prefix
+        else:
+            for p in self.config.port_configs:
+                if p.prefix == port:
+                    return p.real_prefix
+        raise SyntaxErrorException(f"Port {port} is not valid for this memory instance")
+
+    def read(self, addr: Junction, port: Optional[str] = None) -> Junction:
+        """
+        Creates a read binding for a given port. If no port is given, port 1 is used
+        """
+        prefix = self._get_prefix_for_port(self.READ_PORT, port)
+        self.get_ports()[f"{prefix}addr"] <<= addr
+        return self.get_ports()[f"{prefix}data_out"]
+    def write(self, addr: Junction, data: Junction, write_en: Junction, port: Optional[str] = None) -> None:
+        """
+        Creates a read binding for a given port. If no port is given, port 0 is used
+        """
+        prefix = self._get_prefix_for_port(self.WRITE_PORT, port)
+        self.get_ports()[f"{prefix}addr"] <<= addr
+        self.get_ports()[f"{prefix}data_in"] <<= data
+        self.get_ports()[f"{prefix}write_en"] <<= write_en
+    def read_write(self, addr: Junction, data: Junction, write_en: Junction, port: Optional[str] = None) -> Junction:
+        """
+        Creates a read/write binding for a given port. If no port is given, port 0 is used
+        """
+        prefix = self._get_prefix_for_port(0, port)
+        self.get_ports()[f"{prefix}addr"] <<= addr
+        self.get_ports()[f"{prefix}data_in"] <<= data
+        self.get_ports()[f"{prefix}write_en"] <<= write_en
+        return self.get_ports()[f"{prefix}data_out"]
