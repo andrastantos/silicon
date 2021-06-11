@@ -119,6 +119,8 @@ class Number(NetType):
             my_value = self.value
             if my_value is None or other_value is None:
                 return Number.SimValue(None, 0)
+            if other_value < 0:
+                raise SimulationException(f"Can not shift by negative amount. {other} has a negative value of {other_value}")
             result_precision = my_precision
             return Number.SimValue(my_value << other_value, result_precision)
         
@@ -131,6 +133,8 @@ class Number(NetType):
             my_value = self.value
             if my_value is None or other_value is None:
                 return Number.SimValue(None, 0)
+            if other_value < 0:
+                raise SimulationException(f"Can not shift by negative amount. {other} has a negative value of {other_value}")
             result_precision = my_precision
             return Number.SimValue(my_value >> other_value, result_precision)
         
@@ -189,6 +193,8 @@ class Number(NetType):
             my_value = self.value
             if my_value is None or other_value is None:
                 return Number.SimValue(None, 0)
+            if my_value < 0:
+                raise SimulationException(f"Can not shift by negative amount. {self} has a negative value of {my_value}")
             result_precision = other_precision
             return Number.SimValue(other_value << my_value, result_precision)
         
@@ -201,6 +207,8 @@ class Number(NetType):
             my_value = self.value
             if my_value is None or other_value is None:
                 return Number.SimValue(None, 0)
+            if my_value < 0:
+                raise SimulationException(f"Can not shift by negative amount. {self} has a negative value of {my_value}")
             result_precision = other_precision
             return Number.SimValue(other_value >> my_value, result_precision)
         
