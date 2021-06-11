@@ -6,7 +6,13 @@ from .port import Input, Output, Junction, Port
 from .tracer import no_trace
 from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim
 from collections import OrderedDict
-from math import prod
+try:
+    from math import prod
+except:
+    def prod(*args):
+        p = 1
+        for a in args: p *= a
+        return a 
 
 class Number(NetType):
     """
