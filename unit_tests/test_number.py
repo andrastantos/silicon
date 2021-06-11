@@ -422,6 +422,27 @@ def test_precedence():
 
     test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
+def test_sim_value_fract():
+    def test_result(expected_value, operation, *args):
+        result = getattr(type(args[0]), operation)(*args)
+        diag_line = f"{operation}("
+        if len(args) > 0: diag_line += f"{args[0]}"
+        for a in args[1:]: diag_line += f", {a}"
+        diag_line += f") = {result} ?= {expected_value}"
+        print(diag_line)
+        assert(result.value == expected_value.value)
+        assert(result.precision == expected_value.precision)
+    def n(value, precision = 0):
+        ret_val = Number.SimValue(value, precision)
+        return ret_val
+
+    test_result(n(4,2), "__add__", n(1, 2), n(3,2))
+    test_result(n(8,3), "__add__", n(1, 2), n(6,3))
+    test_result(n(8,3), "__add__", n(2, 3), n(3,2))
+    test_result(n(-2,2), "__sub__", n(1, 2), n(3,2))
+    test_result(n(-4,3), "__sub__", n(1, 2), n(6,3))
+    test_result(n(-4,3), "__sub__", n(2, 3), n(3,2))
+
 def test_sim_value_int():
     def test_result(result, expected_value, expected_precision = 0):
         if isinstance(expected_value, Number.SimValue):
@@ -545,9 +566,10 @@ def test_sim_value_int():
     test_result(Number.SimValue.ge(n(2), n(2)), n(True))
 
 if __name__ == "__main__":
+    test_sim_value_fract()
     #test_sim_value_int()
     #test_mix1()
-    test_binary_ops()
+    #test_binary_ops()
     #test_closure()
     #test_closure1()
     #test_closure2()
