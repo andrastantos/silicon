@@ -63,10 +63,11 @@ class Gate(Module):
             return None
     
     def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
-        return input_expression, input_precedence
+        raise NotImplementedError
 
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
-        assert False
+        raise SyntaxErrorException(f"Gates don't support 'outlining'.")
+
     def is_combinational(self) -> bool:
         """
         Returns True if the module is purely combinational, False otherwise
@@ -203,6 +204,8 @@ class prod_gate(NInputGate):
         return "*", back_end.get_operator_precedence("*", back_end.BINARY)
     def get_operation_str(self) -> str:
         return "PROD"
+    def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
+        return input_expression, input_precedence
 
 
 
@@ -376,6 +379,8 @@ class lshift_gate(BinaryGate):
             return "<<", back_end.get_operator_precedence("<<", back_end.BINARY)
     def get_operation_str(self) -> str:
         return "SHL"
+    def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
+        return input_expression, input_precedence
 
 class rshift_gate(BinaryGate):
     def sim_op(cls, input_0: Port, input_1: Any) -> Any:
@@ -392,6 +397,8 @@ class rshift_gate(BinaryGate):
             return ">>", back_end.get_operator_precedence(">>", back_end.BINARY)
     def get_operation_str(self) -> str:
         return "SHR"
+    def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
+        return input_expression, input_precedence
 
 
 class ComparisonGate(BinaryGate):
