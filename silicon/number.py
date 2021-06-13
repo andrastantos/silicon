@@ -441,9 +441,6 @@ class Number(NetType):
     def __hash__(self):
         return hash(self.min_val, self.max_val, self.precision)
 
-    @property
-    def int_length(self) -> int:
-        return self.length - self.precision
     class Key(object):
         def __init__(self, thing: Union[int, slice, None] = None):
             if isinstance(thing, slice):
@@ -780,28 +777,33 @@ class Number(NetType):
             if self.signed is None:
                 raise SyntaxErrorException("Abstract Number types must have signage specified")
             return
+        if self.precision is None:
+            self.precision = 0
         if self.length is None:
             if self.min_val is None or self.max_val is None:
                 raise SyntaxErrorException("Number objects must have either their range or their length specified")
             if self.min_val > self.max_val:
                 raise SyntaxErrorException("The min_val value of a Number object must not be greater than max_val")
             if self.min_val < 0: # In theory, we only need the sign bit if min and max straddle 0, but that would leave us with an unsigned representation for negative ranges.
-                self.length = max(abs(self.max_val), abs(self.min_val + 1)).bit_length() + 1
+                self.int_length = max(abs(self.max_val), abs(self.min_val + 1)).bit_length() + 1
                 self.signed = True
             else:
-                self.length = self.max_val.bit_length()
+                self.int_length = self.max_val.bit_length()
                 # (0).bit_length() is 0, so let's patch that up
-                if self.length == 0:
-                    self.length = 1
+                if self.int_length == 0:
+                    self.int_length = 1
                 self.signed = False
+            # Length is integer and fractional part combined
+            self.length = self.int_length + self.precision 
         else:
+            self.int_length = self.length - self.precision
             if self.signed is None:
                 raise SyntaxErrorException("For Number objects if length is specified, signed must be specified as well")
             if self.signed:
-                len_max_val = 2 ** (self.length - 1) - 1
-                len_min_val = -(2 ** (self.length - 1))
+                len_max_val = 2 ** (self.int_length - 1) - 1
+                len_min_val = -(2 ** (self.int_length - 1))
             else:
-                len_max_val = 2 ** self.length - 1
+                len_max_val = 2 ** self.int_length - 1
                 len_min_val = 0
             if self.max_val is None:
                 self.max_val = len_max_val
@@ -811,16 +813,9 @@ class Number(NetType):
                 raise SyntaxErrorException("Length and min_val are both specified, but are incompatible")
             if self.max_val > len_max_val:
                 raise SyntaxErrorException("Length and max_val are both specified, but are incompatible")
-        # So far we've dealt with the integer part. Now, look at the fractional section, and patch up 'length' if needed
-        if self.precision is not None:
-            self.length += self.precision
-        else:
-            self.precision = 0
         # Cache maximum and minimum simluation values to speed up value simulation
         self.max_sim_val = self.max_val << self.precision | ((1 << self.precision) - 1)
         self.min_sim_val = self.min_val << self.precision
-        if self.precision != 0:
-            print("Boo!")
 
     def get_unconnected_sim_value(self) -> Any:
         return None
