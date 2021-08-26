@@ -10,7 +10,7 @@ import re
 try:
     from math import prod
 except:
-    def prod(*args):
+    def prod(args):
         p = 1
         for a in args: p *= a
         return a 
