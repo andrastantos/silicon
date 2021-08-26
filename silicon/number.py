@@ -4,8 +4,9 @@ from .net_type import NetType, KeyKind
 from .module import GenericModule, Module, InlineBlock, InlineExpression, has_port
 from .port import Input, Output, Junction, Port
 from .tracer import no_trace
-from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim
+from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set
 from collections import OrderedDict
+import re
 try:
     from math import prod
 except:
@@ -13,6 +14,11 @@ except:
         p = 1
         for a in args: p *= a
         return a 
+
+def __init__mantissa_bits():
+    unit_matches = Number.SimValue.__float_parser.match((1.0).hex())
+    unit_mantissa = int(unit_matches.group(2).replace(".", ""), 16)
+    return unit_mantissa.bit_length()
 
 class Number(NetType):
     """
@@ -35,12 +41,29 @@ class Number(NetType):
     just too obnoxious to use
 
     NOTE: negative slice-indices are couting backwards from the fractional point. That is a[-1] is the first fractional bit.
+
+    NOTE: as of now, only ranges that are greater then one are supported. For example a range from 0 to 0.125 is not supported
+          even though it should be perfectly valid to do so. This causes complications for floating-point constant representation
+          among other thigs.
     """
 
     # The associated VCD type (one of VAR_TYPES inside vcd.writer.py)
     vcd_type: str = 'wire'
 
     class SimValue(object):
+        # Used to extract the exact floating point exponent and mantissa from a float.
+        # Pre-compiled only once to speed things up a little.
+        __float_parser = re.compile("(-?)0x([^p]*)p(.*)")
+        # Let's figure out the number of bits in the mantissa and cache it in the class
+        # NOTE: This is ugly as hell, but I had to inline everything to make Python happy. What's really going on here is this:
+        #           def __init_mantissa_bits():
+        #               unit_matches = Number.SimValue.__float_parser.match((1.0).hex())
+        #               unit_mantissa = int(unit_matches.group(2).replace(".", ""), 16)
+        #               return unit_mantissa.bit_length()
+        #           __float_mantissa_bits = __init_mantissa_bits()
+        __float_mantissa_bits = int(re.compile("(-?)0x([^p]*)p(.*)").match((1.0).hex()).group(2).replace(".", ""), 16).bit_length()
+
+
         def __init__(self, value: Optional[Union[int,'Number.SimValue']]= None, precision: int = 0):
             if isinstance(value, Number.SimValue):
                 self.value = value.value
@@ -50,19 +73,36 @@ class Number(NetType):
                 self.value = int(value)
         
         @staticmethod
-        def _precision(thing: Union[int, 'Number.SimValue', 'Junction']) -> int:
+        def _precision_and_value(thing: Union[int, float, 'Number.SimValue', 'Junction']) -> Tuple[int]:
             if isinstance(thing, int):
-                return 0
+                return 0, thing
+            if isinstance(thing, float):
+                if thing == 0.0:
+                    return 0, 0
+
+                # Now, pick apart the actual number
+                matches = Number.SimValue.__float_parser.match(thing.hex())
+                if matches is None:
+                    raise ValueError(f"Somehow '{thing}' is not a float I can parse")
+                is_positive = matches.group(1) == ''
+                mantissa_str = matches.group(2)
+                mantissa = int(mantissa_str.replace(".",""), 16) # This is now a fixed point integer where the MSB is the integer part, all other bits are fractional.
+                if not is_positive:
+                    mantissa = -mantissa
+                exponent = int(matches.group(3))
+                rightmost_bit_idx = first_bit_set(mantissa)
+                leftmost_bit_idx = mantissa.bit_length() - 1
+
+                precision = (Number.SimValue.__float_mantissa_bits - rightmost_bit_idx - 1) - exponent + (Number.SimValue.__float_mantissa_bits - leftmost_bit_idx - 1)
+                mantissa >>= rightmost_bit_idx
+                if precision < 0:
+                    mantissa <<= -precision
+                    precision = 0
+                return precision, mantissa
+
             from .gates import _sim_value
             thing = _sim_value(thing)
-            return thing.precision
-        @staticmethod
-        def _value(thing: Union[int, 'Number.SimValue', 'Junction']) -> int:
-            if isinstance(thing, int):
-                return thing
-            from .gates import _sim_value
-            thing = _sim_value(thing)
-            return thing.value
+            return thing.precision, thing.value
         @staticmethod
         def _value_in_precision(value: int, precision: int, out_precision: int) -> int:
             if value is None:
@@ -75,10 +115,10 @@ class Number(NetType):
                 return value << (out_precision - precision)
 
         def _coerce_precisions(self, other) -> Tuple[int, int, int]:
-            other_precision = Number.SimValue._precision(other)
+            other_precision, other_value = Number.SimValue._precision_and_value(other)
             my_precision = self.precision
             result_precision = max(my_precision, other_precision)
-            other_value = Number.SimValue._value_in_precision(Number.SimValue._value(other), other_precision, result_precision)
+            other_value = Number.SimValue._value_in_precision(other_value, other_precision, result_precision)
             my_value = Number.SimValue._value_in_precision(self.value, my_precision, result_precision)
             return my_value, other_value, result_precision
 
@@ -95,10 +135,9 @@ class Number(NetType):
             return Number.SimValue(my_value - other_value, result_precision)
         
         def __mul__(self, other: Any) -> Any:
-            other_precision = Number.SimValue._precision(other)
+            other_precision, other_value = Number.SimValue._precision_and_value(other)
             my_precision = self.precision
             result_precision = my_precision + other_precision
-            other_value = Number.SimValue._value(other)
             my_value = self.value
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
@@ -111,11 +150,10 @@ class Number(NetType):
         #def __pow__(self, other: Any, modulo = None) -> Any:
         
         def __lshift__(self, other: Any) -> Any:
-            other_precision = Number.SimValue._precision(other)
+            other_precision, other_value = Number.SimValue._precision_and_value(other)
             if other_precision != 0:
                 raise SimulationException(f"Can only shift by integer amount. {other} is potentially fractional.")
             my_precision = self.precision
-            other_value = Number.SimValue._value(other)
             my_value = self.value
             if my_value is None or other_value is None:
                 return Number.SimValue(None, 0)
@@ -125,11 +163,10 @@ class Number(NetType):
             return Number.SimValue(my_value << other_value, result_precision)
         
         def __rshift__(self, other: Any) -> Any:
-            other_precision = Number.SimValue._precision(other)
+            other_precision, other_value = Number.SimValue._precision_and_value(other)
             if other_precision != 0:
                 raise SimulationException(f"Can only shift by integer amount. {other} is potentially fractional.")
             my_precision = self.precision
-            other_value = Number.SimValue._value(other)
             my_value = self.value
             if my_value is None or other_value is None:
                 return Number.SimValue(None, 0)
@@ -169,10 +206,9 @@ class Number(NetType):
             return Number.SimValue(other_value - my_value, result_precision)
         
         def __rmul__(self, other: Any) -> Any:
-            other_precision = Number.SimValue._precision(other)
+            other_precision, other_value = Number.SimValue._precision_and_value(other)
             my_precision = self.precision
             result_precision = my_precision + other_precision
-            other_value = Number.SimValue._value(other)
             my_value = self.value
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
@@ -185,11 +221,10 @@ class Number(NetType):
         #def __rpow__(self, other: Any) -> Any:
         
         def __rlshift__(self, other: Any) -> Any:
-            other_precision = Number.SimValue._precision(other)
+            other_precision, other_value = Number.SimValue._precision_and_value(other)
             my_precision = self.precision
             if my_precision != 0:
                 raise SimulationException(f"Can only shift by integer amount. {self} is potentially fractional.")
-            other_value = Number.SimValue._value(other)
             my_value = self.value
             if my_value is None or other_value is None:
                 return Number.SimValue(None, 0)
@@ -199,11 +234,10 @@ class Number(NetType):
             return Number.SimValue(other_value << my_value, result_precision)
         
         def __rrshift__(self, other: Any) -> Any:
-            other_precision = Number.SimValue._precision(other)
+            other_precision, other_value = Number.SimValue._precision_and_value(other)
             my_precision = self.precision
             if my_precision != 0:
                 raise SimulationException(f"Can only shift by integer amount. {self} is potentially fractional.")
-            other_value = Number.SimValue._value(other)
             my_value = self.value
             if my_value is None or other_value is None:
                 return Number.SimValue(None, 0)
@@ -1297,7 +1331,7 @@ class Number(NetType):
 def int_to_const(value: int) -> Tuple[NetType, int]:
     return Number(min_val=value, max_val=value), value
 
-def val_to_sim(value: int) -> 'Number.SimValue':
+def val_to_sim(value: int, target_net_type: NetType) -> 'Number.SimValue':
     return Number.SimValue(value)
 
 def _str_to_int(value: str) -> Tuple[int, int, bool]:
@@ -1358,9 +1392,15 @@ def str_to_const(value: str) -> Tuple[NetType, int]:
     assert int_val >= net_type.min_val and int_val <= net_type.max_val
     return net_type, int_val
 
-def str_to_sim(value: str) -> int:
+def str_to_sim(value: str, target_net_type: NetType) -> int:
     return Number.SimValue(_str_to_int(value)[0])
 
+def float_to_sim(value: float, target_net_type: NetType) -> int:
+    # We are converting a float to the (nearest) representanble fixed-point value
+    if not isinstance(target_net_type, Number):
+        raise SimulationException(f"Can only assign a floating point value to a Number")
+    value_as_int = round(value * (2 ** target_net_type.precision))
+    return Number.SimValue(value_as_int, target_net_type.precision)
 
 def bool_to_const(value: bool) -> Tuple[NetType, int]:
     if value:
@@ -1376,7 +1416,8 @@ const_convert_lookup[bool] = bool_to_const
 sim_convert_lookup[int] = val_to_sim
 sim_convert_lookup[str] = str_to_sim
 sim_convert_lookup[bool] = val_to_sim
-sim_convert_lookup[Number.SimValue] = lambda sim_val: sim_val
+sim_convert_lookup[float] = float_to_sim
+sim_convert_lookup[Number.SimValue] = lambda sim_val, target_net_type: sim_val
 
 def Signed(length: int=None):
     return Number(length=length, signed=True)

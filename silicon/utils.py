@@ -331,3 +331,10 @@ def adjust_precision_sim(input_value: Optional[int], input_precision: int, targe
         return input_value << -shift
     else:
         return input_value
+
+def first_bit_set(x):
+    """
+    Returns the index, counting from 0, of the
+    least significant set bit in `x`.
+    """
+    return (x&-x).bit_length()-1

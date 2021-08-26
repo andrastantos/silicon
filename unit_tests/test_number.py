@@ -433,7 +433,6 @@ def test_fractional1():
 
     test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
-        
 def test_fractional2():
     class Top(Module):
         in1 = Input(Number(length=8, signed=True, precision=3))
@@ -445,7 +444,25 @@ def test_fractional2():
 
     test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
-        
+def test_fractional1_sim():
+    class Top(Module):
+        in1 = Input(Number(length=8, signed=False, precision=3))
+        in2 = Input(Number(length=8, signed=False, precision=4))
+        outp = Output(Number(length=10, signed=False, precision=4))
+
+        def body(self):
+            self.outp <<= self.in1 + self.in2
+
+        def simulate(self) -> TSimEvent:
+            print("Simulation started")
+            self.in1 = 1.1
+            self.in2 = 2
+            now = yield 10
+            assert self.outp.sim_value == 3
+            print("Done")
+
+    test.simulation(Top, inspect.currentframe().f_code.co_name)
+
 def test_sim_value_fract():
     def test_result(expected_value, operation, *args):
         result = getattr(type(args[0]), operation)(*args)
@@ -673,6 +690,36 @@ def test_sim_value_int():
     test_result(Number.SimValue.gt(n(2), n(2)), n(False))
     test_result(Number.SimValue.ge(n(2), n(2)), n(True))
 
+def test_float_convert():
+    p, v = Number.SimValue._precision_and_value(1.0)
+    assert p == 0 and v == 1
+    p, v = Number.SimValue._precision_and_value(0.5)
+    assert p == 1 and v == 1
+    p, v = Number.SimValue._precision_and_value(0.125)
+    assert p == 3 and v == 1
+    p, v = Number.SimValue._precision_and_value(0.625)
+    assert p == 3 and v == 5
+    p, v = Number.SimValue._precision_and_value(4.0)
+    assert p == 0 and v == 4
+    p, v = Number.SimValue._precision_and_value(4.5)
+    assert p == 1 and v == 9
+    p, v = Number.SimValue._precision_and_value(-1.0)
+    assert p == 0 and v == -1
+    p, v = Number.SimValue._precision_and_value(-0.5)
+    assert p == 1 and v == -1
+    p, v = Number.SimValue._precision_and_value(-0.125)
+    assert p == 3 and v == -1
+    p, v = Number.SimValue._precision_and_value(-0.625)
+    assert p == 3 and v == -5
+    p, v = Number.SimValue._precision_and_value(-4.0)
+    assert p == 0 and v == -4
+    p, v = Number.SimValue._precision_and_value(-4.5)
+    assert p == 1 and v == -9
+    p, v = Number.SimValue._precision_and_value(0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001)
+    assert p == 1089, v == 202402253307
+    p, v = Number.SimValue._precision_and_value(0.1)
+    assert p == 55
+
 if __name__ == "__main__":
     #test_sim_value_fract()
     #test_sim_value_int()
@@ -694,7 +741,9 @@ if __name__ == "__main__":
     #test_partial_assign()
     #test_precedence()
     #test_fractional1()
-    test_fractional2()
+    #test_fractional2()
+    test_fractional1_sim()
+    #test_float_convert()
     pass
 
 '''
