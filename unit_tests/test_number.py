@@ -434,6 +434,18 @@ def test_fractional1():
     test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
         
+def test_fractional2():
+    class Top(Module):
+        in1 = Input(Number(length=8, signed=True, precision=3))
+        in2 = Input(Number(length=8, signed=False, precision=4))
+        outp = Output(Number(length=10, signed=True, precision=3))
+
+        def body(self):
+            self.outp <<= self.in1 + self.in2
+
+    test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+
+        
 def test_sim_value_fract():
     def test_result(expected_value, operation, *args):
         result = getattr(type(args[0]), operation)(*args)
@@ -681,7 +693,8 @@ if __name__ == "__main__":
     #test_wire_to_wire_loop()
     #test_partial_assign()
     #test_precedence()
-    test_fractional1()
+    #test_fractional1()
+    test_fractional2()
     pass
 
 '''
