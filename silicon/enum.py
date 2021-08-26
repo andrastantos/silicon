@@ -117,7 +117,7 @@ class Enum(Number):
             return Number.SimValue(self.value.value)
 
     @staticmethod
-    def val_to_sim(val):
+    def val_to_sim(val, target_net_type: NetType):
         return Enum.EnumConverter(val)
 
     def __str__(self) -> str:
@@ -245,5 +245,5 @@ def enum_to_const(value: Enum) -> Tuple[NetType, Enum]:
 from .constant import const_convert_lookup, sim_convert_lookup
 const_convert_lookup[PyEnum] = enum_to_const
 #sim_convert_lookup[Enum] = val_to_sim
-sim_convert_lookup[Enum.EnumConverter] = lambda enum_converter: enum_converter
+sim_convert_lookup[Enum.EnumConverter] = lambda enum_converter, target_net_type: enum_converter
 

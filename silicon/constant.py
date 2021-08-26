@@ -87,7 +87,7 @@ class NoneType(NetType):
 #def None_to_const(value: None) -> Tuple[None, None]:
 #    return None, None
 
-def None_to_sim(value: None) -> None:
+def None_to_sim(value: None, target_net_type: NetType) -> None:
     return None
 
 #const_convert_lookup[type(None)] = None_to_const

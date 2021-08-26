@@ -1060,6 +1060,6 @@ sim_convert_lookup: Dict[Type, Callable] = {}
 
 def sim_const(value: Any, for_junction: 'Junction') -> Any:
     if type(value) in sim_convert_lookup:
-        return sim_convert_lookup[type(value)](value)
+        return sim_convert_lookup[type(value)](value, for_junction.get_net_type())
     raise SimulationException(f"Don't know how to convert value {value} of type {type(value)} during simulation", for_junction)
 
