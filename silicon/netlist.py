@@ -331,6 +331,8 @@ class Netlist(object):
         from .module import Module
         rank_map: Dict[Module, int] = OrderedDict()
         rank_list: List[Set[Module]] = []
+        visited_xnets: Set[XNet] = set()
+        xnet_trace: List[XNet] = []
 
         def get_sourced_xnets(module: Module) -> Set[XNet]:
             xnets = OrderedSet()
@@ -349,31 +351,45 @@ class Netlist(object):
                         xnets.add(xnet)
             return xnets
 
-        def _rank_module(module: Module, iter_level: int = 0) -> int:
+        def _rank_module(module: Module, xnet: Optional[XNet] = None, iter_level: int = 0) -> int:
+            assert module is not None
+            if xnet is not None:
+                xnet_trace.append(xnet)
             assert iter_level < 100
             if module in rank_map:
+                if xnet is not None: xnet_trace.pop()
                 return rank_map[module]
             if not module.is_combinational():
                 rank = 0
             else:
                 source_xnets = get_sinked_xnets(module)
+                for source_xnet in source_xnets:
+                    if source_xnet in visited_xnets:
+                        def get_xnet_names(xnet):
+                            return ' a.k.a. '.join(xnet.names)
+                        def xnet_trace_names():
+                            return " ".join(get_xnet_names(xnet) for xnet in xnet_trace)
+                        raise SyntaxErrorException(f"Combinatorial loop found:{xnet_trace_names()}")
+                    visited_xnets.add(source_xnet)
                 if len(source_xnets) == 0:
                     rank = 0
                 else:
-                    sources = OrderedSet(xnet.source for xnet in source_xnets if xnet.source is not None)
-                    source_modules = OrderedSet(source.get_parent_module() for source in sources if source.get_parent_module() is not None)
+                    sources = OrderedSet((source_xnet.source, source_xnet) for source_xnet in source_xnets if source_xnet.source is not None)
+                    source_modules = OrderedSet((source[0].get_parent_module(), source[1]) for source in sources if source[0].get_parent_module() is not None)
                     if len(source_modules) == 0:
                         rank = 0
                     else:
                         assert None not in source_modules
-                        rank = max(_rank_module(source_module, iter_level + 1) + 1 for source_module in source_modules)
+                        rank = max(_rank_module(source_module[0], source_module[1], iter_level + 1) + 1 for source_module in source_modules)
             rank_map[module] = rank
             while len(rank_list) <= rank:
                 rank_list.append(OrderedSet())
             rank_list[rank].add(module)
+            if xnet is not None: xnet_trace.pop()
             return rank
 
         for module in self.modules:
+            visited_xnets = set()
             _rank_module(module)
         for module in self.modules:
             assert module in rank_map
