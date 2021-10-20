@@ -236,6 +236,15 @@
             "justMyCode": false
         },
         {
+            "name": "Python: FFT/fft_tb",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/examples/fft/fft_tb.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/examples/fft",
+            "justMyCode": false
+        },
+        {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
