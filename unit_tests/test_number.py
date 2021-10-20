@@ -455,10 +455,10 @@ def test_fractional1_sim():
 
         def simulate(self) -> TSimEvent:
             print("Simulation started")
-            self.in1 = 1.1
+            self.in1 = 1.1 # should get rounded to 1.125
             self.in2 = 2
             now = yield 10
-            assert self.outp.sim_value == 3
+            assert self.outp.sim_value == 3.125
             print("Done")
 
     test.simulation(Top, inspect.currentframe().f_code.co_name)
