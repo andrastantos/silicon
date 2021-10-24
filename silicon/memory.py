@@ -469,6 +469,8 @@ class _Memory(GenericModule):
             mem_addr_bits = min(mem_addr_bits, port_config.addr_bits)
         
         def get_sim_value(port):
+            if port is None:
+                return None
             if port.get_sim_edge() != EdgeType.NoEdge:
                 return None
             else:
