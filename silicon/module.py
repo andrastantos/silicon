@@ -1191,10 +1191,6 @@ class Module(object):
             for my_wire in tuple(self._local_wires):
                 local_name = my_wire.local_name
                 if local_name is None: local_name = my_wire.interface_name
-                if my_wire.interface_name == 'input_datax_data':
-                    print("boo")
-                elif my_wire.interface_name is not None:
-                    print("bo")
                 explicit = local_name is not None
                 if local_name is None:
                     local_name = self.symbol_table.register_symbol("unnamed_wire", my_wire)

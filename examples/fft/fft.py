@@ -8,8 +8,18 @@ class ComplexType(Struct):
     real = DataType
     img  = DataType
 
-    def __eq__(self, other):
-        return self.real == other.real and self.img == other.img
+    def __call__(self, real, img):
+        context = self.active_context()
+        if context != "simulation":
+            raise SyntaxErrorException("Can't create instances of Structs outside of simulation")
+        self.real = real
+        self.img = img
+        return self
+
+    #def __eq__(self, other):
+    #    if not super().__eq__(other):
+    #        return False
+    #    return self.real == other.real and self.img == other.img
     def __str__(self):
         return f"({self.real}+{self.img}j)"
     def __repr__(self):
