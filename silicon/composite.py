@@ -120,6 +120,45 @@ class Struct(Composite):
     def __init__(self):
         super().__init__(support_reverse = False)
 
+    def __call__(self, *args, **kwargs) -> 'Junction':
+        """
+        Here we should support the following formats:
+        my_wire <<= RGB(r_net, g_net, b_net) # which would assign the three constituents to the appropriate sections
+        my_wire <<= RGB(some_other_wire) # which is an explicit type-conversion
+        my_wire <<= RGB(5,7,9) # which is a constant assignment and should probably be interpreted as:
+        my_wire <<= RGB(Constant(5), Constant(7), Constant(9)) # so, essentially the first format.
+
+        There is a degenerate case if the struct contains only a single member. In that case, we can't determine which format we're using, but
+        that's fine: in that case, it doesn't really even matter.
+
+        NOTE: we can use named arguments to make the assignment to elements cleaner:
+
+        my_wire <<= RGB(r=something, g=other, b=a_third_thing)
+        """
+        if len(args) == 1 and len(kwargs) == 0:
+            # This is te explicit type-conversion path
+            return super().__call__(self, *args)
+        # We're in the element-wise assignment regime
+        args_idx = 0
+        assigned_names = set()
+        # First assign positional arguments, only after exhausting that list, start looking at named ones
+        members = self.get_members()
+        for member_name, (member, reversed) in members.items():
+            assert not reversed
+            if args_idx < len(args):
+                member(args[args_idx])
+                assigned_names.add(member_name)
+                args_idx += 1
+        # Make sure we've actually exhausted all positional arguments
+        if args_idx < len(args):
+            raise SyntaxErrorException("Too many positional arguments for Struct composition")
+        # Go through all named arguments
+        for member_name, value in kwargs.items():
+            if member_name in assigned_names:
+                raise SyntaxErrorException(f"Struct member {member_name} is already assigned")
+            members[member_name](value)
+            assigned_names.add(member_name)
+
     @classmethod
     def result_type(cls, net_types: Sequence[Optional['NetType']], operation: str) -> 'NetType':
         """
