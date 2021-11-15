@@ -8,14 +8,6 @@ class ComplexType(Struct):
     real = DataType
     img  = DataType
 
-    def __call__(self, real, img):
-        context = self.active_context()
-        if context != "simulation":
-            raise SyntaxErrorException("Can't create instances of Structs outside of simulation")
-        self.real = real
-        self.img = img
-        return self
-
     #def __eq__(self, other):
     #    if not super().__eq__(other):
     #        return False

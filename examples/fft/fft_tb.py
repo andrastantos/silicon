@@ -73,6 +73,7 @@ def test_butterfly_mem_sim():
             def do_reset():
                 self.rst <<= 1
                 self.clk <<= 1
+                self.flush_in <<= 0
                 yield 10
                 for i in range(5):
                     yield from clk()
@@ -105,6 +106,7 @@ def test_butterfly_mem_sim():
             print("Simulation started")
             yield from do_reset()
             print("Init complete")
+            self.output_data.ready <<= 1
             for _ in range(5):
                 yield from clk()
             for i in range(4):
