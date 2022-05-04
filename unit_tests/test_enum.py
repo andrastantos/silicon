@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 import sys
 import os
-from unit_tests.test_utils import skip_iverilog
 sys.path.append(os.path.join(os.path.dirname(__file__),".."))
+from unit_tests.test_utils import skip_iverilog
+
 
 from typing import *
 
