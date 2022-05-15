@@ -186,8 +186,8 @@ class _Memory(GenericModule):
         self.primary_port_config = None
         self.secondary_port_configs = []
 
-        has_data_in = False        
-        
+        has_data_in = False
+
         for port_config in self.config.port_configs:
             data_conf_bits = port_config.data_type.get_num_bits() if port_config.data_type is not None else None
             addr_conf_bits = port_config.addr_type.get_num_bits() if port_config.addr_type is not None else None
@@ -467,7 +467,7 @@ class _Memory(GenericModule):
         for port_config in self.config.port_configs[1:]:
             mem_data_bits = min(mem_data_bits, port_config.data_bits)
             mem_addr_bits = min(mem_addr_bits, port_config.addr_bits)
-        
+
         def get_sim_value(port):
             if port.get_sim_edge() != EdgeType.NoEdge:
                 return None
@@ -634,7 +634,16 @@ class SimpleDualPortMemory(Memory):
     READ_PORT = 1
     WRITE_PORT = 0
 
-    def construct(self, addr_type: NetType, data_type: NetType, reset_content: Optional[str] = None):
+    def construct(
+        self,
+        addr_type: NetType,
+        data_type: NetType,
+        registered_input_a: bool = True,
+        registered_output_a: bool = False,
+        registered_input_b: bool = True,
+        registered_output_b: bool = False,
+        reset_content: Optional[str] = None
+    ):
         config = MemoryConfig(
             (MemoryPortConfig(
                 addr_type = addr_type,
