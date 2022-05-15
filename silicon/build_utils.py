@@ -11,7 +11,6 @@ class Build:
 
     @staticmethod
     def generate_rtl(top_class: Union[Callable, Module]):
-        import os
         Build.clear()
         if isinstance(top_class, Module):
             top = top_class
@@ -35,7 +34,6 @@ class Build:
     def simulation(top_class: Callable, vcd_filename: str = None):
         if vcd_filename is None:
             vcd_filename = top_class.__name__.lower()
-        import os
         Build.clear()
         top = top_class()
         netlist = elaborate(top)

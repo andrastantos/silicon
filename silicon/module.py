@@ -448,12 +448,15 @@ class Module(object):
                 import os
                 import pathlib
                 # We have to work around a problem under windows where subst can create a confusion about drive letters and various paths pointing to the same file
-                cur_path = str(pathlib.Path(os.path.abspath(os.path.curdir)).resolve())
                 try:
-                    class_path = str(pathlib.Path(os.path.abspath(inspect.getfile(true_module.__class__))).resolve())
+                    class_path = pathlib.Path(inspect.getfile(true_module.__class__)).absolute().resolve()
+                    try:
+                        cur_path = pathlib.Path().absolute().resolve()
+                        self._class_filename = str(class_path.relative_to(cur_path))
+                    except ValueError:
+                        self._class_filename = str(class_path)
                 except:
-                    class_path = "<unknown>"
-                self._class_filename = os.path.relpath(class_path, cur_path)
+                    self._class_filename = "<unknown>"
                 current_frame = inspect.currentframe()
                 current_code = current_frame.f_code
                 caller_frame = current_frame.f_back

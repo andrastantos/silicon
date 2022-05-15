@@ -21,17 +21,16 @@ class test:
             self.match = None
             self.diff = None
         def __enter__(self) -> IO:
-            import os
             self.diff = None
             test.file_list.append(self)
             self.pure_filename = self.filename
-            (folder, name) = os.path.split(self.pure_filename)
-            output_path = os.path.join(test.output_dir, folder)
-            reference_path = os.path.join(folder, test.reference_dir)
-            self.filename = os.path.join(output_path, name)
-            self.reference_filename = os.path.join(reference_path, name)
-            if not os.path.exists(output_path):
-                os.makedirs(output_path)
+            folder = Path(self.pure_filename).parent
+            name = Path(self.pure_filename).name
+            output_path = test.output_dir / folder
+            reference_path = folder / test.reference_dir
+            self.filename = output_path / name
+            self.reference_filename = reference_path / name
+            output_path.mkdir(parents=True, exist_ok=True)
             return super().__enter__()
         def __exit__(self, exception_type, exception_value, traceback):
             stream = self.stream
@@ -43,13 +42,12 @@ class test:
             else:
                 # We have been successful in generating the file, let's compare!
                 import difflib
-                import os
-                if os.path.exists(self.reference_filename):
-                    with open(self.reference_filename, "r") as reference_file:
+                if self.reference_filename.exists():
+                    with self.reference_filename.open("r") as reference_file:
                         reference_content = reference_file.readlines()
-                    with open(self.filename, "r") as test_file:
+                    with self.filename.open("r") as test_file:
                         test_content = test_file.readlines()
-                    diff = difflib.unified_diff(reference_content, test_content, self.reference_filename, self.filename, n = 3)
+                    diff = difflib.unified_diff(reference_content, test_content, str(self.reference_filename), str(self.filename), n = 3)
                     self.match = True
                     for diff_line in diff:
                         if self.diff is None:
@@ -59,7 +57,7 @@ class test:
                             self.match = False
                 else:
                     import warnings
-                    self.diff = f"No reference file '{self.reference_filename}' found for output file '{self.filename}'"
+                    self.diff = f"No reference file '{self.reference_filename.absolute()}' found for output file '{self.filename.absolute()}'"
                     if self.allow_missing_reference:
                         warnings.warn(UserWarning(self.diff))
                         self.match = True
@@ -73,8 +71,8 @@ class test:
             test_name = top_class.__name__.lower()
         import os
         test.clear()
-        test.reference_dir = os.path.join("reference", test_name)
-        test.output_dir = os.path.join("output", test_name)
+        test.reference_dir = Path("reference") / test_name
+        test.output_dir = Path("output") / test_name
         if isinstance(top_class, Module):
             top = top_class
         else:
@@ -111,17 +109,15 @@ class test:
     def simulation(top_class: Callable, test_name: str = None):
         if test_name is None:
             test_name = top_class.__name__.lower()
-        import os
         test.clear()
-        test.reference_dir = os.path.join("reference", test_name)
-        test.output_dir = os.path.join("output", test_name)
+        test.reference_dir = Path("reference") / Path(test_name)
+        test.output_dir = Path("output") / Path(test_name)
         top = top_class()
         netlist = elaborate(top)
-        if not os.path.exists(test.output_dir):
-            os.makedirs(test.output_dir)
-        vcd_filename = os.path.join(test.output_dir, f"{test_name}.vcd")
+        test.output_dir.mkdir(parents=True, exist_ok=True)
+        vcd_filename = test.output_dir / Path(f"{test_name}.vcd")
         netlist.simulate(vcd_filename)
-        print(f"Simulation results saved into {vcd_filename}")
+        print(f"Simulation results saved into {Path(vcd_filename).absolute()}")
         #with test.DiffedFile(f"{test_name}.dmp", "w", allow_added_lines=allow_new_attributes) as dump_file:
         #    Writer(dump_file).dump(netlist)
         test_diff = ""
@@ -308,7 +304,7 @@ class Writer(object):
                 write("]\n")
         else:
             write(f"{str(thing)}\n")
-        
+
         if self.dump_level == 0:
             # We're at the end of the top level: look for referenced, but not dumped objects and dump them
             first = True
@@ -332,6 +328,6 @@ def skip_iverilog(func):
     def wrapper(*args, **kwargs):
         with test.skip_iverilog:
             return func(*args, **kwargs)
-    
+
     return wrapper
 

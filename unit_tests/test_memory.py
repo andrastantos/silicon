@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__),".."))
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent / ".."))
 
 from typing import *
 
@@ -58,7 +58,7 @@ def _test_single_port_ram(mode: str, registered_input: bool, registered_output: 
                 yield 10
                 self.clk <<= ~self.clk
                 yield 0
-            
+
             self.clk <<= 1
             self.write_en <<= 0
             yield 10
@@ -82,7 +82,7 @@ def _test_single_port_ram(mode: str, registered_input: bool, registered_output: 
                 yield from clk()
             assert self.data_in.sim_value == 3
             yield from clk()
-            
+
 
     if mode == "rtl":
         test.rtl_generation(Top(), inspect.currentframe().f_back.f_code.co_name)
@@ -394,7 +394,7 @@ def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered
                 yield 10
                 self.clk <<= ~self.clk
                 yield 0
-            
+
             self.clk <<= 1
             self.write_en <<= 0
             yield 10
@@ -418,7 +418,7 @@ def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered
                 yield from clk()
             assert self.data_in.sim_value == 3
             yield from clk()
-            
+
 
     if mode == "rtl":
         test.rtl_generation(Top(), inspect.currentframe().f_code.co_name)

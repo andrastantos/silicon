@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__),".."))
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent / ".."))
 
 from typing import *
 
@@ -26,7 +26,7 @@ def test_select_struct():
 
         def body(self):
             self.out_port = Select(self.sel_in, self.in1, self.in2, self.in3, self.in4)
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_select_one_struct():
@@ -40,7 +40,7 @@ def test_select_one_struct():
 
         def body(self):
             self.out_port = SelectOne(self.sel_in[0], self.in1, self.sel_in[1], self.in2, self.sel_in[2], self.in3, self.sel_in[3], self.in4)
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_select_first_struct(mode: str = "rtl"):
@@ -102,7 +102,7 @@ def test_reg_struct():
             #self.uout3 = Reg(self.uin1)
             clk = self.clk1
             self.uout3 = Reg(self.uin1)
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_struct_of_struct():
@@ -116,9 +116,9 @@ def test_struct_of_struct():
         alpha = Input(Unsigned(8))
         outp = Output(ValidPixel())
         error = Output(logic)
-        
+
         def body(self):
-            
+
             def blend_mono(in1, in2):
                 pix1 = in1 * self.alpha
                 pix2 = in2 * (255-self.alpha)
@@ -145,10 +145,10 @@ def test_generic_struct():
         in2 = Input(Pixel(8))
         alpha = Input(Unsigned(8))
         outp = Output(Pixel(8))
-        
+
         def body(self):
             pixel_width = 8
-            
+
             def blend_mono(in1, in2):
                 pix1 = in1 * self.alpha
                 pix2 = in2 * ((2**pixel_width)-1-self.alpha)
@@ -166,7 +166,7 @@ def test_struct_with_method():
 
         class Behaviors(Struct.Behaviors):
             def blend(self, other, alpha):
-                
+
                 def blend_mono(in1, in2):
                     pix1 = in1 * alpha
                     pix2 = in2 * (255-alpha)
@@ -191,7 +191,7 @@ def test_struct_with_method():
         in2 = Input(Pixel(pixel_width))
         alpha = Input(Unsigned(8))
         outp = Output(Pixel(pixel_width))
-        
+
         def body(self):
             self.outp = self.in1.blend(self.in2, self.alpha)
 
@@ -212,7 +212,7 @@ def test_struct_to_number(mode: str = "rtl"):
     class Top(Module):
         in1 = Input(Pixel(pixel_width))
         outp = Output()
-        
+
         def body(self):
             self.outp = explicit_adapt(self.in1, Unsigned(length=self.in1.get_num_bits()))
 
@@ -251,7 +251,7 @@ def test_number_to_struct(mode: str = "rtl"):
     class Top(Module):
         in1 = Input(Unsigned(pixel_width * 3))
         outp = Output(Pixel(pixel_width))
-        
+
         def body(self):
             self.outp <<= explicit_adapt(self.in1, self.outp.get_net_type())
 
@@ -292,14 +292,14 @@ def test_struct_sub_module(mode: str = "rtl"):
         in1 = Input(Pixel(pixel_width))
         in2 = Input(Pixel(pixel_width))
         outp = Output(Pixel(pixel_width))
-        
+
         def body(self):
             self.outp = Select(1, self.in1, self.in2)
 
     class Top(Module):
         in1 = Input(Pixel(pixel_width))
         outp = Output()
-        
+
         def body(self):
             self.outp = Sub(self.in1, self.in1)
 

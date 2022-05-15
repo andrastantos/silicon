@@ -5,6 +5,7 @@ from collections import OrderedDict
 from .utils import is_input_port, is_output_port, is_wire, is_module, is_port, MEMBER_DELIMITER
 from itertools import chain
 from .exceptions import SyntaxErrorException
+from pathlib import Path
 
 def fully_qualified_name(thing: Any, mangle: bool=True) -> str:
     type = thing.__class__
@@ -539,9 +540,9 @@ class Netlist(object):
                         module_inst._impl._generate_needed = False
                         module_inst._impl._body_generated = True
 
-    def simulate(self, vcd_file_name: str, end_time: Optional[int] = None, timescale='1ns') -> int:
+    def simulate(self, vcd_file_name: Union[Path,str], end_time: Optional[int] = None, timescale='1ns') -> int:
         from .simulator import Simulator
-        with Simulator(self, vcd_file_name, timescale) as context:
+        with Simulator(self, str(vcd_file_name), timescale) as context:
             context.dump_signals()
             import cProfile as profile
             import pstats as pstats

@@ -1,7 +1,7 @@
 #!pytest
 import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__),".."))
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent / ".."))
 import silicon as si
 import test_utils as t
 import inspect
@@ -189,7 +189,7 @@ class FullAdder(si.Module):
     in_c = si.Input(si.logic)
     out_r = si.Output(si.logic)
     out_c = si.Output(si.logic)
-    
+
     def body(self):
         self.out_r <<= self.in_a ^ self.in_b ^ self.in_c
         self.out_c <<= (self.in_a & self.in_b) | (self.in_b & self.in_c) | (self.in_c & self.in_a)

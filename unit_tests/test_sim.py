@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__),".."))
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent / ".."))
 
 from typing import *
 
@@ -25,7 +25,7 @@ def test_sim_gates():
             self.out_and = self.in_1 & self.in_2
             self.out_or = self.in_1 | self.in_2
             self.out_xor = self.in_1 ^ self.in_2
-        
+
         def simulate(self) -> TSimEvent:
             print("Simulation started")
             now = yield 10
@@ -60,7 +60,7 @@ def test_sim_select():
             self.select1 = Select(selector_port = self.selectw & 3, value_0 = self.a, value_1 = self.b, value_2 = self.c)
             self.select2 = SelectFirst(selector_0 = self.selectw[0], value_0 = self.a, selector_1 = self.selectw[1], value_1 = self.b, selector_2 = self.selectw[2], value_2 = self.c)
             self.select3 = SelectOne(selector_0 = self.select_one_hot[0], value_0 = self.a, selector_1 = self.select_one_hot[1], value_1 = self.b, selector_2 = self.select_one_hot[2], value_2 = self.c)
-        
+
         def simulate(self) -> TSimEvent:
             print("Simulation started")
             self.a = 3
@@ -110,7 +110,7 @@ def test_sim_counter():
             self.count = Wire(Unsigned(4))
 
             self.count = Reg((self.count + 1)[3:0])
-        
+
         def simulate(self) -> TSimEvent:
             print("Simulation started")
             now = yield 10

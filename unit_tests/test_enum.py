@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__),".."))
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent / ".."))
 from unit_tests.test_utils import skip_iverilog
 
 

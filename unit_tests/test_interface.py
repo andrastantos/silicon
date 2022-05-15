@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__),".."))
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent / ".."))
 
 from typing import *
 
@@ -14,7 +14,7 @@ def test_interface1(mode = "rtl"):
         data = Unsigned(8)
         ready = Reverse(logic)
         valid = logic
-    
+
     class top(Module):
         in_a = Input(MyInterface())
         out_a = Output(MyInterface())
@@ -40,7 +40,7 @@ def test_interface2(mode = "rtl"):
         data = Unsigned(8)
         ready = Reverse(logic)
         valid = logic
-    
+
     class top(Module):
         in_a = Input(MyInterface())
         out_a = Output(MyInterface())
@@ -63,7 +63,7 @@ def test_interface3(mode = "rtl"):
         data = Unsigned(8)
         ready = Reverse(logic)
         valid = logic
-    
+
     class top(Module):
         in_a = Input(MyInterface())
         out_a = Output(MyInterface())
@@ -189,5 +189,5 @@ if __name__ == "__main__":
     #test_composite_interface2("rtl")
     #test_composite_interface3("rtl")
     test_composite_interface4("rtl")
-    
+
 
