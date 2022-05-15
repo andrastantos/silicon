@@ -84,10 +84,10 @@ class Tracer(object):
                     if junction is not None:
                         from .module import Module
                         from .port import Wire
-                        jnuction_parent_module = junction.get_parent_module()
+                        junction_parent_module = junction.get_parent_module()
                         parent_module = Module._parent_modules.top()
-                        same_level = jnuction_parent_module is parent_module
-                        sub_level = jnuction_parent_module._impl.parent is parent_module
+                        same_level = junction_parent_module is parent_module
+                        sub_level = junction_parent_module._impl.parent is parent_module
                         if same_level or (sub_level and not is_wire(junction)):
                             wire = Wire(parent_module=parent_module)
                             wire.local_name = local_name
@@ -205,12 +205,12 @@ def no_trace(func):
     def wrapper(*args, **kwargs):
         with NoTrace():
             return func(*args, **kwargs)
-    
+
     return wrapper
 
 def trace(func):
     def wrapper(*args, **kwargs):
         with Trace():
             return func(*args, **kwargs)
-    
+
     return wrapper

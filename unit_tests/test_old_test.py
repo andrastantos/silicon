@@ -124,7 +124,7 @@ def test_local_gates():
         in_c = Input(logic)
         out_a = Output(logic)
         out_c = Output(logic)
-        
+
         def body(self):
             self.out_a = xor_gate1(self.in_a, xor_gate2(self.in_b, self.in_c))
             self.out_c = or_gate(
@@ -190,7 +190,7 @@ def test_local_gates():
             #print(str(r1))
             self.out_5 = 0
             self.out_6 = const(1)
-    
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_unconnected_submodule():
@@ -259,7 +259,7 @@ def test_old_number():
         in_c = Input(logic)
         out_a = Output(logic)
         out_c = Output(logic)
-        
+
         def body(self):
             self.out_a = xor_gate(self.in_a, xor_gate(self.in_b, self.in_c))
             self.out_c = or_gate(
@@ -306,7 +306,7 @@ def test_old_number():
             #self.out_c = [a0, b0, c0]
             # There's a strange artifact in the generation of this code. It outputs:
             #   assign out_d = {{7{1'bX}}, {in_a[4], in_b[0], u1_out}};
-            # This is probably not a big deal, but maybe at some point we sohuld optimize away the extra {} braces to improve readability.
+            # This is probably not a big deal, but maybe at some point we should optimize away the extra {} braces to improve readability.
             self.out_d[3:0] = (c0, b0, self.in_a[4])
             self.out_d[10:4] = 0
 
@@ -356,7 +356,7 @@ def a():
     b(2)
     print('Leaving a()')
     sys.setprofile(old_tracer)
-    
+
 TRACE_INTO = ['b']
 
 a()
@@ -577,5 +577,5 @@ This is - again - something that needs the concept of sub-sources.
 
 Constants:
 ==========
-The easiest way to 
+The easiest way to
 """
