@@ -27,3 +27,6 @@ class SimulationException(Exception):
         from textwrap import indent, wrap
         message = indent("\n".join(wrap(message, width=70)), "    ")
         super().__init__(f"{loc}\n{message}")
+
+class IVerilogException(Exception):
+    pass
