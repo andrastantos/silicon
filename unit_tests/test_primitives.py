@@ -22,7 +22,7 @@ def test_select():
         def body(self):
             #self.sout1 = Select(self.sel_in, self.uin1, self.uin2, self.sin1, default=self.sin2)
             self.sout1 = Select(self.sel_in, self.uin1, self.uin2, self.sin1, self.sin2)
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_select_with_none():
@@ -37,7 +37,7 @@ def test_select_with_none():
         def body(self):
             #self.sout1 = Select(self.sel_in, self.uin1, self.uin2, self.sin1, default=self.sin2)
             self.sout1 = Select(self.sel_in, self.uin1, self.uin2, self.sin1, self.sin2, None)
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_mux():
@@ -81,7 +81,7 @@ def test_select_one_first():
                 selector_0=self.sel_in1, value_0=self.val_in1,
                 default_port=self.default_port
             )
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_reg():
@@ -109,7 +109,7 @@ def test_reg():
             #self.uout3 = Reg(self.uin1)
             clk = self.clk1
             self.uout3 = Reg(self.uin1)
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_reg_with_adaptor():
@@ -121,7 +121,7 @@ def test_reg_with_adaptor():
         def body(self):
             registered = Reg(self.uin2)
             self.uout1 = registered
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_reg3():
@@ -147,7 +147,7 @@ def test_reg3():
             with self.clk2 as clk:
                 self.uout2 = Reg(self.uin2)
             self.uout3 = Reg(self.uin1)
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_reg4():
@@ -158,8 +158,50 @@ def test_reg4():
 
         def body(self):
             self.sout1 = Reg(self.uin1, clock_port=(self.clk1 & self.uin1[0]))
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+def test_partial_assign():
+    class top(Module):
+        out1 = Output(Unsigned(length=5))
+        in1 = Input(Unsigned(length=2))
+
+        def body(self):
+            self.out1[2:0] = self.in1
+            self.out1[4:3] = self.in1
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+@skip_iverilog
+def test_unassigned_net_repro():
+    class top(Module):
+        clk = Input(logic)
+        rst = Input(logic)
+
+        fetch = Input(Unsigned(32))
+        push_data = Output(Unsigned(32))
+
+        def body(self):
+            btm_inst_reg = Wire(Unsigned(32))
+            btm_inst_reg[31:16] <<= Reg(self.fetch[31:16])
+            btm_inst_reg[15:0] <<= Reg(self.fetch[15:0])
+            #btm_inst_reg <<= concat(
+            #    Reg(self.fetch[31:16]),
+            #    Reg(self.fetch[15:0])
+            #)
+            self.push_data[31:16] <<= Reg(self.fetch[31:16])
+            self.push_data[15:0] <<= Reg(self.fetch[15:0])
+            s1 = Wire(logic)
+            s1 <<= 1
+            sfd = Wire(Unsigned(32))
+            sfd <<= self.fetch
+            inst_btm_top = Select(
+                s1,
+                btm_inst_reg,
+                sfd
+            )
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 
 
 if __name__ == "__main__":
@@ -170,4 +212,6 @@ if __name__ == "__main__":
     #test_mux()
     #test_select_with_none()
     #test_reg4()
-    test_reg_with_adaptor()
+    #test_reg_with_adaptor()
+    #test_partial_assign()
+    test_unassigned_net_repro()
