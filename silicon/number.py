@@ -13,7 +13,7 @@ except:
     def prod(args):
         p = 1
         for a in args: p *= a
-        return a 
+        return a
 
 def __init__mantissa_bits():
     unit_matches = Number.SimValue.__float_parser.match((1.0).hex())
@@ -71,7 +71,7 @@ class Number(NetType):
             else:
                 self.precision = int(precision)
                 self.value = int(value)
-        
+
         @staticmethod
         def _precision_and_value(thing: Union[int, float, 'Number.SimValue', 'Junction']) -> Tuple[int]:
             if isinstance(thing, int):
@@ -127,13 +127,13 @@ class Number(NetType):
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(my_value + other_value, result_precision)
-        
+
         def __sub__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(my_value - other_value, result_precision)
-        
+
         def __mul__(self, other: Any) -> Any:
             other_precision, other_value = Number.SimValue._precision_and_value(other)
             my_precision = self.precision
@@ -142,13 +142,13 @@ class Number(NetType):
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(my_value * other_value, result_precision)
-        
+
         #def __truediv__(self, other: Any) -> Any:
         #def __floordiv__(self, other: Any) -> Any:
         #def __mod__(self, other: Any) -> Any:
         #def __divmod__(self, other: Any) -> Any:
         #def __pow__(self, other: Any, modulo = None) -> Any:
-        
+
         def __lshift__(self, other: Any) -> Any:
             other_precision, other_value = Number.SimValue._precision_and_value(other)
             if other_precision != 0:
@@ -161,7 +161,7 @@ class Number(NetType):
                 raise SimulationException(f"Can not shift by negative amount. {other} has a negative value of {other_value}")
             result_precision = my_precision
             return Number.SimValue(my_value << other_value, result_precision)
-        
+
         def __rshift__(self, other: Any) -> Any:
             other_precision, other_value = Number.SimValue._precision_and_value(other)
             if other_precision != 0:
@@ -174,37 +174,37 @@ class Number(NetType):
                 raise SimulationException(f"Can not shift by negative amount. {other} has a negative value of {other_value}")
             result_precision = my_precision
             return Number.SimValue(my_value >> other_value, result_precision)
-        
+
         def __and__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(my_value & other_value, result_precision)
-        
+
         def __xor__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(my_value ^ other_value, result_precision)
-        
+
         def __or__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(my_value | other_value, result_precision)
-        
+
         def __radd__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(other_value + my_value, result_precision)
-        
+
         def __rsub__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(other_value - my_value, result_precision)
-        
+
         def __rmul__(self, other: Any) -> Any:
             other_precision, other_value = Number.SimValue._precision_and_value(other)
             my_precision = self.precision
@@ -213,13 +213,13 @@ class Number(NetType):
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(other_value * my_value, result_precision)
-        
+
         #def __rtruediv__(self, other: Any) -> Any:
         #def __rfloordiv__(self, other: Any) -> Any:
         #def __rmod__(self, other: Any) -> Any:
         #def __rdivmod__(self, other: Any) -> Any:
         #def __rpow__(self, other: Any) -> Any:
-        
+
         def __rlshift__(self, other: Any) -> Any:
             other_precision, other_value = Number.SimValue._precision_and_value(other)
             my_precision = self.precision
@@ -232,7 +232,7 @@ class Number(NetType):
                 raise SimulationException(f"Can not shift by negative amount. {self} has a negative value of {my_value}")
             result_precision = other_precision
             return Number.SimValue(other_value << my_value, result_precision)
-        
+
         def __rrshift__(self, other: Any) -> Any:
             other_precision, other_value = Number.SimValue._precision_and_value(other)
             my_precision = self.precision
@@ -245,38 +245,38 @@ class Number(NetType):
                 raise SimulationException(f"Can not shift by negative amount. {self} has a negative value of {my_value}")
             result_precision = other_precision
             return Number.SimValue(other_value >> my_value, result_precision)
-        
+
         def __rand__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(other_value & my_value, result_precision)
-        
+
         def __rxor__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(other_value ^ my_value, result_precision)
-        
+
         def __ror__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(other_value | my_value, result_precision)
-        
+
         def __neg__(self) -> Any:
             if self.value is None:
                 return Number.SimValue(None, self.precision)
             return Number.SimValue(-self.value, self.precision)
-        
+
         def __pos__(self) -> Any:
             return self.value
-        
+
         def __abs__(self) -> Any:
             if self.value is None:
                 return Number.SimValue(None, self.precision)
             return Number.SimValue(abs(self.value), self.precision)
-        
+
         def __invert__(self) -> Any:
             raise SyntaxErrorException(f"It's not really possible to invert a Number.SimValue without knowing it's length. Use the 'invert' method instead of the ~ operator if you really need this functionality.")
             #if self.value is None:
@@ -308,42 +308,42 @@ class Number(NetType):
             if self.value is None:
                 return None
             return self.value / (1 << self.precision)
-        
+
          #def __index__(self) -> Any:
 
         def __bool__(self) -> bool:
             return bool(self.value)
-        
+
         def __lt__(self, other: Any) -> bool:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return False
             return my_value < other_value
-        
+
         def __le__(self, other: Any) -> bool:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return False
             return my_value <= other_value
-        
+
         def __eq__(self, other: Any) -> bool:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return False
             return my_value == other_value
-        
+
         def __ne__(self, other: Any) -> bool:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return False
             return my_value != other_value
-        
+
         def __gt__(self, other: Any) -> bool:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
                 return False
             return my_value > other_value
-        
+
         def __ge__(self, other: Any) -> bool:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
@@ -366,7 +366,7 @@ class Number(NetType):
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(my_value < other_value, 0)
-        
+
         @staticmethod
         def le(self, other: Any) -> Any:
             if isinstance(self, Number.SimValue):
@@ -378,7 +378,7 @@ class Number(NetType):
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(my_value <= other_value, 0)
-        
+
         @staticmethod
         def eq(self, other: Any) -> Any:
             if isinstance(self, Number.SimValue):
@@ -390,7 +390,7 @@ class Number(NetType):
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(my_value == other_value, 0)
-        
+
         @staticmethod
         def ne(self, other: Any) -> Any:
             if isinstance(self, Number.SimValue):
@@ -402,7 +402,7 @@ class Number(NetType):
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(my_value != other_value, 0)
-        
+
         @staticmethod
         def gt(self, other: Any) -> Any:
             if isinstance(self, Number.SimValue):
@@ -414,7 +414,7 @@ class Number(NetType):
             if my_value is None or other_value is None:
                 return Number.SimValue(None, result_precision)
             return Number.SimValue(my_value > other_value, 0)
-        
+
         @staticmethod
         def ge(self, other: Any) -> Any:
             if isinstance(self, Number.SimValue):
@@ -463,7 +463,7 @@ class Number(NetType):
             return f"Number({signed_str}{self.length} {self.min_val}...{self.max_val})"
         else:
             return f"Number({signed_str}{self.length} {self.min_val}...{self.max_val} step {1/(1<<self.precision)})"
-    
+
     def __repr__(self) -> str:
         return self.__str__()
 
@@ -471,7 +471,7 @@ class Number(NetType):
         if not isinstance(other, Number):
             return False
         return self is other or (self.min_val == other.min_val and self.max_val == other.max_val and self.length == other.length and self.signed == other.signed and self.precision == other.precision)
-    
+
     def __hash__(self):
         return hash(self.min_val, self.max_val, self.precision)
 
@@ -713,7 +713,7 @@ class Number(NetType):
                 output_type = common_net_type.concatenated_type(self.input_map)
             return output_type
 
-        
+
         def body(self) -> None:
             new_net_type = self.generate_output_type()
             if new_net_type is None:
@@ -757,13 +757,13 @@ class Number(NetType):
         return Number.Iterator(self, parent_junction)
     def get_length(self) -> int:
         return self.length
-    
+
     def get_slice(self, key: Any, junction: Junction) -> Any:
         if junction.active_context() == "simulation":
             return Number.Accessor.static_sim(junction.sim_value, Number.Key(key), junction.get_net_type().precision)
         else:
             return Number.Accessor(slice=key, number=self)(junction)
-    
+
     def set_member_access(self, key: Any, value: Any, junction: Junction) -> None:
         # The junction conversion *has* to happen before the creation of the Concatenator.
         # Otherwise, the auto-created converter object (such as Constant) will be evaluated in the wrong order
@@ -828,7 +828,7 @@ class Number(NetType):
                     self.int_length = 1
                 self.signed = False
             # Length is integer and fractional part combined
-            self.length = self.int_length + self.precision 
+            self.length = self.int_length + self.precision
         else:
             self.int_length = self.length - self.precision
             if self.signed is None:
@@ -860,9 +860,9 @@ class Number(NetType):
         Validates the new sim value before assignment.
 
         Raises exceptions with appropriate error messages in case of a validation error.
-        
+
         Has the option to change/correct the sim_value prior to assignment.
-        
+
         Returns potentially modified sim_value for assignment.
         """
         if sim_value is None:
@@ -1000,8 +1000,8 @@ class Number(NetType):
         Returns True if the supplied input map is valid, False otherwise
 
         input_map can contain:
-        - One more more inputs with a sequential key. In that case, the inputs are simply concatenated 
-          (in MSB->LSB order) in the order they were inserted into the map. This is the SV {a,b,c} 
+        - One more more inputs with a sequential key. In that case, the inputs are simply concatenated
+          (in MSB->LSB order) in the order they were inserted into the map. This is the SV {a,b,c}
           concatenation behavior.
         - One more more inputs with a slice or integer-based keys. In that case the inputs are assigned
           (potentially sign- or zero-extended) to the range specified by the key.
@@ -1033,8 +1033,8 @@ class Number(NetType):
         Returns true if the provided input_map is all sequential
 
         input_map can contain:
-        - One more more inputs with a sequential key. In that case, the inputs are simply concatenated 
-          (in MSB->LSB order) in the order they were inserted into the map. This is the SV {a,b,c} 
+        - One more more inputs with a sequential key. In that case, the inputs are simply concatenated
+          (in MSB->LSB order) in the order they were inserted into the map. This is the SV {a,b,c}
           concatenation behavior.
         - One more more inputs with a slice or integer-based keys. In that case the inputs are assigned
           (potentially sign- or zero-extended) to the range specified by the key.
@@ -1254,15 +1254,15 @@ class Number(NetType):
                 if net_type is None:
                     continue
                 max_val = max(
-                    max_val * net_type.max_val, 
-                    max_val * net_type.min_val, 
-                    min_val * net_type.max_val, 
+                    max_val * net_type.max_val,
+                    max_val * net_type.min_val,
+                    min_val * net_type.max_val,
                     min_val * net_type.min_val
                 )
                 min_val = min(
-                    max_val * net_type.max_val, 
-                    max_val * net_type.min_val, 
-                    min_val * net_type.max_val, 
+                    max_val * net_type.max_val,
+                    max_val * net_type.min_val,
+                    min_val * net_type.max_val,
                     min_val * net_type.min_val
                 )
             return Number(max_val=max_val, min_val=min_val, precision=prod(n.precision for n in net_types))
@@ -1343,7 +1343,7 @@ def _str_to_int(value: str) -> Tuple[int, int, bool]:
     which is very important for quick concatenations, such as [a1, 4'b0, a2].
 
     The notation used here is identical to Verilogs literals:
-    
+
     [-]<bit width>'[b|o|h|d]<digits>
 
     What's not supported:
@@ -1363,7 +1363,7 @@ def _str_to_int(value: str) -> Tuple[int, int, bool]:
     base_field = value_field[0]
     base_convert = {"d": 10, "D": 10, "h": 16, "H": 16, "o": 8, "O": 8, "b": 2, "B": 2, "x": 16, "X": 16}
     if base_field not in base_convert:
-        raise SyntaxErrorException("String '{value}' isn't a valid Constant. It's base '{base_field}' is not valid.")
+        raise SyntaxErrorException(f"String '{value}' isn't a valid Constant. It's base '{base_field}' is not valid.")
     base = base_convert[base_field]
     try:
         size = int(size_field)
