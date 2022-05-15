@@ -141,7 +141,7 @@ class Module(object):
         return self._impl.get_junctions()
 
 
-    
+
     def __call__(self, *args, **kwargs) -> Union[Port, Tuple[Port]]:
         def do_call() -> Union[Port, Tuple[Port]]:
             my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
@@ -234,7 +234,7 @@ class Module(object):
         The default implementation is to not support inlineing, thus not yielding anything.
         """
         return
-        # NOTE: the hack of the unreachable yield expression to inform the Python interpreter of the fact that the function is a 
+        # NOTE: the hack of the unreachable yield expression to inform the Python interpreter of the fact that the function is a
         #       generator even though it never actually yields anything.
         yield
 
@@ -258,7 +258,7 @@ class Module(object):
     def is_combinational(self) -> bool:
         """
         Returns True if the module is purely combinational, False otherwise
-        
+
         Default implementation is to return False, as that's the safe assumption.
         """
         return False
@@ -312,7 +312,7 @@ class Module(object):
         for inline_block in self.get_inline_block(back_end, self):
             self_inline_support = True
             rtl_inline_assignments += inline_block.get_inline_assignments(back_end)
-        
+
         if not self_inline_support:
             # Mark all inputs assigned and all outputs used in this scope.
             interface_port_names = set()
@@ -435,7 +435,7 @@ class Module(object):
             return ret_val
 
     class Impl(object):
-        
+
         def __init__(self, true_module: 'Module', *args, **kwargs):
             """
             For non-generic modules, init is always called with no arguments. The arguments here are only filled-in
@@ -481,7 +481,7 @@ class Module(object):
                 finally:
                     del caller_frame
                     del current_frame
-                    
+
                 #print(f"================= module init called from: {self._filename}:{self._lineno} for module {type(self)}")
                 self._context = None
                 self.setattr__impl = self.__setattr__normal
@@ -517,7 +517,7 @@ class Module(object):
                 else:
                     self.netlist = Netlist(self._true_module)
                     self.parent = None
-        
+
         def _init_phase2(self, *args, **kwargs):
             with self._no_junction_bind:
                 with self._inside:
@@ -590,7 +590,7 @@ class Module(object):
 
         def get_sub_modules(self) -> Sequence['Module']:
             return self._sub_modules
-    
+
         def order_sub_module(self, sub_module: 'Module'):
             """
             Moves a module from the unordered set of sub-modules to the ordered one.
@@ -627,7 +627,7 @@ class Module(object):
                 # 4. This type-change process creates an Adaptor between the output and its previous sink(s)
                 # 5. This Adaptor gets injected *into the scope of this module* even though it got created within
                 #    the sub-module.
-                # 6. Since this process happens after body and _body for this module terminated, the 
+                # 6. Since this process happens after body and _body for this module terminated, the
                 #    _unordered_sub_modules attribute is already deleted.
                 # To make sure this process succeeds, we'll simply include these type-conversion modules into our
                 # sub-module list.
@@ -761,7 +761,7 @@ class Module(object):
                     return self.__set_no_bind_attr__(name, value, super_setter)
                 '''
 
-        
+
         def __setattr__normal(self, name, value, super_setter: Callable) -> None:
             with self._no_port_create_in_get_attr:
                 if name in self._true_module.__dict__ and self._true_module.__dict__[name] is value:
@@ -901,7 +901,7 @@ class Module(object):
                         raise SyntaxErrorException(f"Local wire {wire} is used without a source")
             with self._in_elaborate:
                 self._body(trace) # Will create all the sub-modules
-            
+
             for sub_module in self._sub_modules:
                 # handle any pending auto-binds
                 for port in sub_module.get_ports().values():
@@ -1005,6 +1005,8 @@ class Module(object):
                     # Go through each junction and make sure their Concatenators are created if needed
                     for junction in self.get_junctions().values():
                         finalize_slices(junction)
+                    for junction in self._local_wires:
+                        finalize_slices(junction)
 
                     # The above code might have added some modules into _unordered_sub_modules, so let's clear them once again
                     for sub_module in self._unordered_sub_modules:
@@ -1068,7 +1070,7 @@ class Module(object):
             )
             if not wires_are_ok:
                 return False
-            
+
             if len(self._sub_modules) != len(other._impl._sub_modules):
                 return False
             sub_modules_are_ok = all(
@@ -1136,7 +1138,7 @@ class Module(object):
             """
             Makes sure that every sub_module have a name and that all names are unique.
             """
-            
+
             for sub_module in self._sub_modules:
                 if sub_module._impl.name is not None:
                     base_instance_name = sub_module._impl.name
@@ -1346,7 +1348,7 @@ def module(ret_val_cnt) -> Callable:
             return DecoratorModule(self.callable, self.ret_val_cnt)(*args, **kwargs)
     def inner(callable) -> 'Module':
         return DecoratedFunction(callable, ret_val_cnt)
-    
+
     return inner
 
 def elaborate(top_level: Module) -> Netlist:
