@@ -18,7 +18,7 @@ class Select(Module):
     default_port = Input(keyword_only=True)
     def construct(self):
         self.value_ports = OrderedDict()
-    
+
     def __call__(self, *args, **kwargs) -> Union[Port, Tuple[Port]]:
         output_net_type = kwargs.pop("output_net_type", None)
         if output_net_type is not None and has_port(self, "output_port"):
@@ -60,7 +60,7 @@ class Select(Module):
     @property
     def has_default(self) -> bool:
         return self.default_port.has_driver()
-    
+
     def body(self) -> None:
         if len(self.value_ports) == 0:
             raise SyntaxErrorException(f"Select must have at least one value port")
@@ -181,7 +181,7 @@ class _SelectOneHot(Module):
         self.value_ports = OrderedDict()
         self.selector_ports = OrderedDict()
         self.selector_to_value_map = None
-    
+
     def __call__(self, *args, **kwargs) -> Union[Port, Tuple[Port]]:
         """
         This type of module accepts several calling mechanisms:
@@ -203,7 +203,7 @@ class _SelectOneHot(Module):
             The optional kw-only argument 'default_port' sets the default value
         4. Two sequences of ports,
             The first sequence containing selector ports
-            The second sequence containing value ports 
+            The second sequence containing value ports
             The optional kw-only argument 'default_port' sets the default value
         """
         output_net_type = kwargs.pop("output_net_type", None)
@@ -252,7 +252,7 @@ class _SelectOneHot(Module):
     def get_operation_str(self) -> str:
         return "SELECT"
 
-    
+
     def body(self) -> None:
         if len(self.value_ports) == 0:
             raise SyntaxErrorException(f"Select must have at least one value port")
@@ -476,7 +476,7 @@ class Concatenator(Module):
         output_type = common_net_type.concatenated_type(self.input_map)
         return output_type
 
-    
+
     def body(self) -> None:
         new_net_type = self.generate_output_type()
         if new_net_type is None:
@@ -513,8 +513,8 @@ class Reg(Module):
 
     def construct(self) -> None:
         self.sync_reset = True
-    
-    
+
+
     def body(self) -> None:
         new_net_type = self.input_port.get_net_type() if self.input_port.is_specialized() else None
         if new_net_type is None:
@@ -523,7 +523,7 @@ class Reg(Module):
         if not self.output_port.is_specialized():
             self.output_port.set_net_type(new_net_type)
 
-    
+
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         assert False
 
@@ -532,7 +532,7 @@ class Reg(Module):
         if self.output_port.is_composite():
             if self.input_port.get_net_type() != self.output_port.get_net_type():
                 raise SyntaxErrorException(f"Can only register composite types if the input and output types are the same.")
-            
+
             input_members = self.input_port.get_all_member_junctions(add_self=False)
             output_members = self.output_port.get_all_member_junctions(add_self=False)
 
@@ -585,7 +585,12 @@ class Reg(Module):
             if self.reset_value_port.has_driver():
                 self.output_port <<= self.reset_value_port
             else:
-                self.output_port <<= self.output_port.get_net_type().get_default_sim_value()
+                if self.output_port.is_composite():
+                    members = self.output_port.get_all_member_junctions(add_self=False)
+                    for member in members:
+                        member <<= member.get_net_type().get_default_sim_value()
+                else:
+                    self.output_port <<= self.output_port.get_net_type().get_default_sim_value()
 
         has_reset = self.reset_port.has_driver()
         has_async_reset = not self.sync_reset and has_reset
@@ -604,10 +609,19 @@ class Reg(Module):
                         # This branch is never taken for async reset
                         reset()
                     else:
-                        if self.input_port.get_sim_edge() != EdgeType.NoEdge:
-                            self.output_port <<= None
+                        if self.output_port.is_composite():
+                            out_members = self.output_port.get_all_member_junctions(add_self=False)
+                            in_members = self.input_port.get_all_member_junctions(add_self=False)
+                            for out_member, in_member in zip(out_members, in_members):
+                                if in_member.get_sim_edge() != EdgeType.NoEdge:
+                                    out_member <<= None
+                                else:
+                                    out_member <<= in_member
                         else:
-                            self.output_port <<= self.input_port
+                            if self.input_port.get_sim_edge() != EdgeType.NoEdge:
+                                self.output_port <<= None
+                            else:
+                                self.output_port <<= self.input_port
                 elif edge_type == EdgeType.Undefined:
                     self.output_port <<= None
 
