@@ -36,7 +36,7 @@ class FSMLogic(Module):
     def construct(self) -> None:
         self._state_transition_table = OrderedDict()
 
-    
+
     def add_transition(self, current_state: Any, condition: Junction, new_state: Any) -> None:
         if is_junction_or_member(current_state):
             raise SyntaxErrorException(f"Current state must be a constant, not a net.")
@@ -106,7 +106,7 @@ class FSM(GenericModule):
         #self._max_state_val = None
         self._state_type = None
         self._state_net_type = None
-    
+
     def add_transition(self, current_state: Any, condition: Junction, new_state: Any) -> None:
         # We have to be a little shifty here: can't connect condition directly to the logic instance
         # as that would skip hierarchy levels. We'll have to create an intermediary input port and
@@ -120,6 +120,8 @@ class FSM(GenericModule):
             raise SyntaxErrorException(f"All states of an FSM must of the same type. In this case all are expected to be of {self._state_type}, yet current_state {new_state} is of type {type(new_state)}")
         if self._state_net_type is None:
             self._state_net_type = get_net_type_for_const(current_state)
+        if self._state_net_type is None:
+            raise SyntaxErrorException(f"State junction type can't be determined for state value type {self._state_type}")
         current_state_net_type = get_net_type_for_const(current_state)
         new_state_net_type = get_net_type_for_const(new_state)
         self._state_net_type = self._state_net_type.result_type((current_state_net_type, new_state_net_type), "SELECT")
