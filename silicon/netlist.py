@@ -306,10 +306,10 @@ class Netlist(object):
             for port in module.get_ports().values():
                 if port not in self.junction_to_xnet_map and not port.is_composite():
                     raise SyntaxErrorException(
-                        f"""Can't create XNet for port {port}.\n
-Possible reasons:\n
-    - Port is connected to itself somehow, creating a trivial combinatorial loop\n
-    - Port is driven by an unassigned junction"""
+                        f"Can't create XNet for port {port}.\n"\
+                        "Possible reasons:\n"\
+                        "    - Port is connected to itself somehow, creating a trivial combinatorial loop\n"\
+                        "    - Port is driven by an unassigned junction"
                     )
 
     def _fill_xnet_names(self):
@@ -373,8 +373,8 @@ Possible reasons:\n
                         def get_xnet_names(xnet):
                             return ' a.k.a. '.join(xnet.names)
                         def xnet_trace_names():
-                            return " ".join(get_xnet_names(xnet) for xnet in xnet_trace)
-                        raise SyntaxErrorException(f"Combinatorial loop found:{xnet_trace_names()}")
+                            return "\n    ".join(get_xnet_names(xnet) for xnet in xnet_trace)
+                        raise SyntaxErrorException(f"Combinatorial loop found:\n    {xnet_trace_names()}")
                     visited_xnets.add(source_xnet)
                 if len(source_xnets) == 0:
                     rank = 0

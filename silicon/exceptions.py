@@ -14,7 +14,7 @@ class SyntaxErrorException(Exception):
         except Exception:
             loc = "<<NO LOCATION>>"
         from textwrap import indent, wrap
-        message = indent("\n".join(wrap(message, width=70)), "    ")
+        message = "\n".join(indent("\n".join(wrap(line, width=70)), "    ") for line in message.split("\n"))
         super().__init__(f"{loc}\n{message}")
 
 class SimulationException(Exception):
