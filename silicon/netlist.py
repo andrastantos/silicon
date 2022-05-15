@@ -84,7 +84,7 @@ class XNet(object):
             if make_name_used:
                 self.use_name(scope, name)
             return name, 0 # This will put the returned value into self.assigned_names
-    
+
     def get_lhs_name(self, scope: 'Module', *, allow_implicit: bool = True, mark_assigned: bool = True) -> Optional[str]:
         assert scope is None or is_module(scope)
         name = self.get_best_name(scope, allow_implicit=allow_implicit)
@@ -137,7 +137,7 @@ class XNet(object):
         def do_filter(entry) -> bool:
             return (
                 not entry[1].is_input and (
-                    ((entry[1].is_explicit or (add_used and entry[1].is_used)) and (not exclude_assigned or entry[0] != self.assigned_names.get(scope, None))) or 
+                    ((entry[1].is_explicit or (add_used and entry[1].is_used)) and (not exclude_assigned or entry[0] != self.assigned_names.get(scope, None))) or
                     ((add_assigned and not exclude_assigned) and (entry[0] == self.assigned_names.get(scope, None)))
                 )
             )
@@ -269,7 +269,7 @@ class Netlist(object):
                                     x_net.transitions.add(sink)
                             self.junction_to_xnet_map[sink] = x_net
                             trace_x_net(sink)
-                    
+
                     self.junction_to_xnet_map[for_junction] = x_net
                     trace_x_net(for_junction)
 
@@ -305,7 +305,12 @@ class Netlist(object):
         for module in self.modules:
             for port in module.get_ports().values():
                 if port not in self.junction_to_xnet_map and not port.is_composite():
-                    raise SyntaxErrorException(f"Can't create XNet for port {port}. Most likely reason is that it's connected to itself somehow, creating a trivial combinatorial loop")
+                    raise SyntaxErrorException(
+                        f"""Can't create XNet for port {port}.\n
+Possible reasons:\n
+    - Port is connected to itself somehow, creating a trivial combinatorial loop\n
+    - Port is driven by an unassigned junction"""
+                    )
 
     def _fill_xnet_names(self):
         # Fill-in names for xnets
@@ -473,7 +478,7 @@ class Netlist(object):
                         module_class_name += "_" + str(variant_cnt+1)
                     self.module_variants[module_class_base_name][module_class_name] = [module]
                     self.module_to_class_map[module] = module_class_name
-            
+
             _populate_module_variants(module)
 
         def register_modules(module: 'Module'):
@@ -492,7 +497,7 @@ class Netlist(object):
         # Make sure we've to everyone
         for module in self.modules:
             assert module in self.module_to_class_map
-    
+
     def get_module_class_name(self, module_instance: 'Module') -> Optional[str]:
         assert is_module(module_instance)
         if module_instance not in self.module_to_class_map:
@@ -510,7 +515,7 @@ class Netlist(object):
 
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> None:
         from .utils import str_block
-        
+
         streams = back_end.generate_order(self)
 
         self.top_level._impl._generate_needed = True
@@ -560,4 +565,4 @@ class Netlist(object):
             module_class_base_name = fully_qualified_name(module)
             assert module_class_name in self.module_variants[module_class_base_name]
             assert module in self.module_variants[module_class_base_name][module_class_name]
-    
+
