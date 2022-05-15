@@ -147,7 +147,7 @@ class Z80Alu(Module):
         rotate_bit_in = Select(shift_left_not_right, self.in_a[0], self.in_a[7])
         shift_in = Select(self.op[2:1],
             rotate_bit_in,                              # RLC/RRC
-            self.in_f[self.flagC],                           # RL/RR
+            self.in_f[self.flagC],                      # RL/RR
             Select(self.op[0], "1'b0", self.in_a[7]),   # SLA/SRA
             ~self.op[0]                                 # SLL/SRL
         )
@@ -223,7 +223,7 @@ class Z80Alu(Module):
         # Large group
         ######################
         large_in = concat(Select(self.op[3], "8'b0", self.in_b), self.in_a)
-        large_res = Select(self.op[1:0], 
+        large_res = Select(self.op[1:0],
             large_in,
             (large_in + 1)[15:0],
             (large_in - 1)[15:0]
@@ -521,7 +521,7 @@ def test_sim():
                         ex_s = ((a - b) >> 7) & 1
                         ex_h = (((a & 15) - (b & 15)) >> 4) & 1
                         ex_v = int(sign_bit(to_sign(a) - to_sign(b)) != ex_r >> 7)
-                
+
                 print(f"testing {op_to_str(op)}({a:3},{b:3} with C={c:1})... ", end="")
                 self.in_a = a
                 self.in_b = b
@@ -593,7 +593,7 @@ def test_sim():
                 op = self.opOR
                 ex_r = (a & 255) | (b & 255)
                 yield from _test_logic(a, b, set_flags, op, ex_r)
-            
+
             def test_and(a, b, set_flags):
                 op = self.opAND
                 ex_r = (a & 255) & (b & 255)
@@ -955,7 +955,7 @@ def test_sim():
 
             def test_scf(a, flags: str = ""):
                 yield from _test_carry(a, self.opSCF, 1, flags)
-            
+
             def test_ccf(a, flags: str = ""):
                 in_f = str_to_flags(flags)
                 ex_c = 1 - ((in_f >> self.flagC) & 1)
@@ -1105,7 +1105,7 @@ def test_sim():
                 yield from test_rr(129, 0)
                 yield from test_rrc(129, 1)
                 yield from test_rr(129, 1)
-                
+
                 yield from test_sll(3, 1)
                 yield from test_sla(3, 1)
                 yield from test_srl(3, 1)

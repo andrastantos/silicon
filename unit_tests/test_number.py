@@ -51,7 +51,7 @@ class full_adder(Module):
     in_c = Input(logic)
     out_a = Output(logic)
     out_c = Output(logic)
-    
+
     def body(self):
         self.out_a = xor_gate(self.in_a, xor_gate(self.in_b, self.in_c))
         self.out_c = or_gate(
@@ -221,7 +221,7 @@ def test_closure():
 
         def body(self):
             self.uout11[0] = (self.uin1 & self.uin2)[0]
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_closure1():
@@ -232,7 +232,7 @@ def test_closure1():
 
         def body(self):
             self.uout11 = (self.uin1 & self.uin2)[0]
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_closure2():
@@ -243,7 +243,7 @@ def test_closure2():
 
         def body(self):
             self.uout11[0] = (self.uin1 | self.uin2)[0]
-            
+
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_slices():
@@ -413,7 +413,7 @@ def test_precedence():
         in2 = Input(Unsigned(8))
         alpha = Input(Unsigned(8))
         outp = Output(Unsigned(8))
-        
+
         def body(self):
             #pix1 = self.in1 * self.alpha
             pix2 = self.in2 * (255-self.alpha)

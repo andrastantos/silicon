@@ -109,7 +109,7 @@ class intel_8255(Module):
             #(cw_sel | pc_bit_sel) & ~self.n_cs & ~self.n_rd, (ConstantModule(logic, 0), ctrl) # For reads, always return ctrl word, independent of data_in[7] as that was not available on the bi-directional data-bus of the original design.
             (cw_sel | pc_bit_sel) & ~self.n_cs & ~self.n_rd, concat("1'b1", ctrl) # For reads, always return ctrl word, independent of data_in[7] as that was not available on the bi-directional data-bus of the original design.
         )
-    
+
 def test_verilog():
     test.rtl_generation(intel_8255, "intel_8255")
 
@@ -142,7 +142,7 @@ def test_sim():
             self.rst = 0
             for i in range(5):
                 yield from clk()
-            
+
             def read(addr: int) -> Optional[int]:
                 self.n_cs = 0
                 self.n_rd = 0

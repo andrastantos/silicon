@@ -43,7 +43,7 @@ class Gate(Module):
         return output_type
     def get_operation_str(self) -> str:
         raise NotImplementedError
-    
+
     def body(self) -> None:
         new_net_type = self.generate_output_type()
         assert not self.output_port.is_specialized()
@@ -61,7 +61,7 @@ class Gate(Module):
             return Input()
         else:
             return None
-    
+
     def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
         raise NotImplementedError
 
