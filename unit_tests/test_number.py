@@ -433,6 +433,17 @@ def test_fractional1():
 
     test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
+def test_fractional2():
+    class Top(Module):
+        in1 = Input(Number(length=8, signed=True, precision=3))
+        in2 = Input(Number(length=8, signed=False, precision=4))
+        outp = Output(Number(length=10, signed=True, precision=3))
+
+        def body(self):
+            self.outp <<= self.in1 + self.in2
+
+    test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+
 def test_fractional1_sim():
     class Top(Module):
         in1 = Input(Number(length=8, signed=False, precision=3))
@@ -444,7 +455,7 @@ def test_fractional1_sim():
 
         def simulate(self) -> TSimEvent:
             print("Simulation started")
-            self.in1 = 1.1
+            self.in1 = 1.1 # should get rounded to 1.125
             self.in2 = 2
             now = yield 10
             assert self.outp.sim_value == 3.125
@@ -730,6 +741,7 @@ if __name__ == "__main__":
     #test_partial_assign()
     #test_precedence()
     #test_fractional1()
+    #test_fractional2()
     test_fractional1_sim()
     #test_float_convert()
     pass

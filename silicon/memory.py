@@ -83,7 +83,7 @@ from dataclasses import dataclass
 from .composite import Struct
 from .utils import str_block, is_power_of_two
 from .exceptions import SyntaxErrorException
-from typing import Optional, Sequence, Generator
+from typing import Optional, Sequence, Generator, Any
 from .number import logic, Unsigned
 from .utils import TSimEvent, explicit_adapt
 from textwrap import indent
@@ -467,12 +467,18 @@ class _Memory(GenericModule):
         for port_config in self.config.port_configs[1:]:
             mem_data_bits = min(mem_data_bits, port_config.data_bits)
             mem_addr_bits = min(mem_addr_bits, port_config.addr_bits)
-
-        def get_sim_value(port):
+        def get_sim_value(port: Junction) -> Any:
+            if port is None:
+                return None
             if port.get_sim_edge() != EdgeType.NoEdge:
                 return None
             else:
                 return port.sim_value
+
+        def get_int_sim_value(port: Junction) -> Optional[int]:
+            val = get_sim_value(port)
+            if val is None: return None
+            return int(val)
 
         def set_mem_val(addr, data):
             while len(memory_content) <= addr:
@@ -493,7 +499,7 @@ class _Memory(GenericModule):
                 write = False
                 read = False
                 read_invalid = False
-                addr_val = get_sim_value(addr_port)
+                addr_val = get_int_sim_value(addr_port)
                 data_in_val = get_sim_value(data_in_port)
                 write_en_val = get_sim_value(write_en_port)
                 if port_config.registered_input:

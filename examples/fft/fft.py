@@ -8,8 +8,10 @@ class ComplexType(Struct):
     real = DataType
     img  = DataType
 
-    def __eq__(self, other):
-        return self.real == other.real and self.img == other.img
+    #def __eq__(self, other):
+    #    if not super().__eq__(other):
+    #        return False
+    #    return self.real == other.real and self.img == other.img
     def __str__(self):
         return f"({self.real}+{self.img}j)"
     def __repr__(self):

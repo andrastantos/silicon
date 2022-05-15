@@ -259,9 +259,9 @@ def test_number_to_struct(mode: str = "rtl"):
             def test(r,g,b):
                 self.in1 <<= r << pixel_width * 2 | g << pixel_width | b
                 yield 0
-                assert self.outp.r == r, f"Expected R {r:x}, got {self.outp.r:x} for rgb: {r:x},{g:x},{b:x}"
-                assert self.outp.g == g, f"Expected G {g:x}, got {self.outp.g:x} for rgb: {r:x},{g:x},{b:x}"
-                assert self.outp.b == b, f"Expected B {b:x}, got {self.outp.b:x} for rgb: {r:x},{g:x},{b:x}"
+                assert self.outp.r == r, f"Expected R {r:x}, got {self.outp.r.sim_value:x} for rgb: {r:x},{g:x},{b:x}"
+                assert self.outp.g == g, f"Expected G {g:x}, got {self.outp.g.sim_value:x} for rgb: {r:x},{g:x},{b:x}"
+                assert self.outp.b == b, f"Expected B {b:x}, got {self.outp.b.sim_value:x} for rgb: {r:x},{g:x},{b:x}"
 
             yield 10
             for x in range(16):
@@ -365,7 +365,7 @@ def test_interface_wire3(mode: str = "rtl"):
 
 
 if __name__ == "__main__":
-    test_select_struct()
+    #test_select_struct()
     #test_select_one_struct()
     #test_select_first_struct("rtl")
     #test_select_first_struct("sim")
@@ -381,3 +381,4 @@ if __name__ == "__main__":
     #test_interface_wire("rtl")
     #test_interface_wire2("rtl")
     #test_interface_wire3("rtl")
+    test_number_to_struct_sim()

@@ -13,14 +13,15 @@ from test_utils import *
 from fft import *
 
 
-
 def test_butterfly_mem_verilog():
     test.rtl_generation(ButterflyMem(addr_len=8,level=4), "butterfly_mem")
 
 def test_butterfly_mem_sim():
+
+    frame_size = 16
     class TB(Module):
         def body(self):
-            uut = ButterflyMem(addr_len=4, level=1)
+            uut = ButterflyMem(addr_len=frame_size.bit_length(), level=1)
 
             self.clk = Wire(logic)
             self.rst = Wire(logic)
@@ -69,9 +70,10 @@ def test_butterfly_mem_sim():
                 self.input_data.valid <<= 0
                 self.output_data.ready <<= 0
 
-            def reset():
+            def do_reset():
                 self.rst <<= 1
                 self.clk <<= 1
+                self.flush_in <<= 0
                 yield 10
                 for i in range(5):
                     yield from clk()
@@ -81,22 +83,40 @@ def test_butterfly_mem_sim():
                     yield from clk()
                 self.rst <<= 0
 
-            def create_data(real: int = 0, img: int = 0):
-                assert False, "!!!!!!!!!!!!!!!!!!!!!!! IMPLEMENT ME !!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-                pass
-            print("Simulation started")
-            reset()
-            print("Init complete")
-            for i in range(16):
-                send_data()
-            for i in range(5):
-                yield from clk()
+            def send_input(real: int = 0, img: int = 0, last: bool=False, wait: bool=False):
+                self.input_data.data <<= ComplexType()(real, img)
+                self.input_data.last <<= last
+                self.input_data.valid <<= 1
+                if wait:
+                    while True:
+                        yield from clk()
+                        if self.input_data.ready: break
+                    self.input_data.valid <<= 0
+                    self.input_data.data <<= None
+                    self.input_data.last <<= None
 
+            def test_output(real: int = 0, img: int = 0, last: bool=False, wait: bool=False):
+                pass
+
+            def send_frame():
+                for i in range(frame_size-1):
+                    yield from send_input(i, 0, last=False, wait=True)
+                yield from send_input(i,0, last=True, wait=True)
+
+            print("Simulation started")
+            yield from do_reset()
+            print("Init complete")
+            self.output_data.ready <<= 1
+            for _ in range(5):
+                yield from clk()
+            for i in range(4):
+                yield from send_frame()
+                for i2 in range(5):
+                    yield from clk()
             print(f"Done")
 
-    test.simulation(Z80RegFile_tb, "z80_reg_file")
-'''
+    test.simulation(TB, "fft_mem_tb")
 
 if __name__ == "__main__":
-    #test_sim()
-    test_butterfly_mem_verilog()
+    test_butterfly_mem_sim()
+    #test_butterfly_mem_verilog()

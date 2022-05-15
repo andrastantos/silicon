@@ -1,4 +1,5 @@
 # We will be able to rework generic modules when https://www.python.org/dev/peps/pep-0637/ becomes reality (currently targetting python 3.10)
+# Well, that PEP got rejected, so I guess there goes that...
 from typing import Union, Set, Tuple, Dict, Any, Optional, List, Iterable, Generator, Sequence, Callable
 import typing
 from collections import OrderedDict
@@ -432,6 +433,9 @@ class Module(object):
         def replace_symbol(self, name: str, object: Any) -> Any:
             ret_val = self._symbol_table[name]
             self._symbol_table[name] = object
+            return ret_val
+        def get_object(self, name: str) -> Any:
+            ret_val = self._symbol_table[name]
             return ret_val
 
     class Impl(object):
@@ -1190,19 +1194,34 @@ class Module(object):
             # 2. Add them to the associated xnet
             # 3. Give them a name if they're not named (for example, if they're part of a container such as a list or tuple)
             for my_wire in tuple(self._local_wires):
-                assert my_wire.interface_name is None
-                explicit = my_wire.local_name is not None
-                # If this wire was not assigned to a local variable directly (maybe part of a container of sorts)
-                # Give it an auto-generated name.
-                base_name = my_wire.local_name if explicit else "unnamed_wire"
-                base_name = self.symbol_table.register_symbol(base_name, my_wire)
-                xnets = netlist.get_xnets_for_junction(my_wire, base_name)
+                local_name = my_wire.local_name
+                if local_name is None: local_name = my_wire.interface_name
+                explicit = local_name is not None
+                if local_name is None:
+                    local_name = self.symbol_table.register_symbol("unnamed_wire", my_wire)
+                # Get all the sub-nets (or the net itself if it's not a composite)
+                # and handle those instead of my_wire.
+                xnets = netlist.get_xnets_for_junction(my_wire, local_name)
                 for name, (xnet, wire) in xnets.items():
-                    if name != base_name:
+                    # Test if name is already registered as either my_wire or xnet
+                    # If it is, make sure that it is the same object.
+                    # Either way, come up with a unique name, assign the xnet to that name
+                    # in symbol table, and make sure the xnet is also aware of that name.
+                    unique_name = None
+                    try:
+                        obj = self.symbol_table.get_object(name)
+                        if obj is wire:
+                            self.symbol_table.replace_symbol(name, xnet)
+                            unique_name = name
+                        elif obj is xnet:
+                            assert name in xnet.get_names(self._true_module)
+                            continue
+                        elif not explicit:
+                            raise SyntaxErrorException(f"Net name {name} already exists in module {self}, yet another explicit net tries to access it.")
+                    except KeyError:
+                        pass
+                    if unique_name is None:
                         unique_name = self.symbol_table.register_symbol(name, xnet)
-                    else:
-                        unique_name = base_name
-                        self.symbol_table.replace_symbol(base_name, xnet)
                     xnet.add_name(self._true_module, unique_name, is_explicit=explicit, is_input=False)
                     self._wires[unique_name] = wire
                     self._junctions[unique_name] = wire

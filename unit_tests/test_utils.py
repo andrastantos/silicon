@@ -224,9 +224,6 @@ class Writer(object):
             else:
                 return f"@{self.get_object_ref(thing, False)}"
 
-        if int(self.dump_level) > 10:
-            print("boo!")
-
         class_name = type(thing).__name__
 
         if name is not None:

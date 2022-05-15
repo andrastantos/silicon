@@ -431,11 +431,17 @@ class Junction(JunctionBase):
             name += self.get_parent_module()._impl.get_diagnostic_location(" at ")
         return name
 
+    @staticmethod
+    def _safe_call_by_name(obj, name, *kargs, **kwargs):
+        if obj is None:
+            return None
+        return getattr(type(obj), name)(obj, *kargs, **kwargs)
+
     def _binary_op(self, other: Any, gate: 'Module', name: str) -> Any:
         context = self.active_context()
         if context == "simulation":
             my_val = self.sim_value
-            return getattr(type(my_val), name)(my_val, other)
+            return Port._safe_call_by_name(my_val, name, other)
         elif context == "elaboration":
             return gate(self, other)
         else:
@@ -446,7 +452,7 @@ class Junction(JunctionBase):
         context = self.active_context()
         if context == "simulation":
             my_val = self.sim_value
-            return getattr(type(my_val), name)(my_val, other)
+            return Port._safe_call_by_name(my_val, name, other)
         elif context == "elaboration":
             return gate(other, self)
         else:
@@ -457,7 +463,7 @@ class Junction(JunctionBase):
         context = self.active_context()
         if context == "simulation":
             my_val = self.sim_value
-            return getattr(type(my_val), name)(my_val)
+            return Port._safe_call_by_name(my_val, name)
         elif context == "elaboration":
             return gate(self)
         else:
@@ -468,7 +474,8 @@ class Junction(JunctionBase):
         context = self.active_context()
         if context == "simulation":
             my_val = self.sim_value
-            return getattr(type(my_val), name)(my_val, other)
+            if my_val is None: return None
+            return Port._safe_call_by_name(my_val, name, other)
         elif context == "elaboration":
             return gate(self, other)
         else:
@@ -479,7 +486,7 @@ class Junction(JunctionBase):
         context = self.active_context()
         if context == "simulation":
             my_val = self.sim_value
-            return getattr(type(my_val), name)(my_val, other)
+            return Port._safe_call_by_name(my_val, name, other)
         elif context == "elaboration":
             return gate(other, self)
         else:
