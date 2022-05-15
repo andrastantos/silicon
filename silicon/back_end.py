@@ -91,7 +91,7 @@ class SystemVerilog(BackEnd):
         return f"$signed({expression})"
     def unsigned_cast(self, expression: str) -> str:
         return f"$unsigned({expression})"
-    
+
     def get_operator_precedence(self, operator: str, is_unary: bool = None) -> int:
         """
         SystemVerilog operators and their precedence:
@@ -150,6 +150,7 @@ class SystemVerilog(BackEnd):
             "extern",
             "return",
             "always_ff",
+            "always",
             "final",
             "s_always",
             "always_latch",
