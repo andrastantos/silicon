@@ -11,6 +11,7 @@ from .utils import TSimEvent, MEMBER_DELIMITER, adapt, cast
 from collections import namedtuple, OrderedDict
 from copy import copy
 from .number import Unsigned, Number
+from .port import Wire
 
 import types
 
@@ -72,7 +73,7 @@ class Composite(NetType):
                     ret_val[compose_name(prefix, member_name)] = (member_type, member_reverse)
             return ret_val
 
-        return get_sub_members(self, prefix, False)        
+        return get_sub_members(self, prefix, False)
 
     def sort_source_keys(self, keys: Dict['Key', 'Junction'], back_end: 'BackEnd') -> Tuple['Key']:
         """ Sort the set of blobs as required by the back-end """
@@ -108,7 +109,7 @@ class Composite(NetType):
 
     def get_unconnected_sim_value(self) -> Any:
         assert False, "Simulation should never enquire about unconnected values of Composites"
-    
+
     def get_default_sim_value(self) -> Any:
         assert False, "Simulation should never enquire about default values of Composites"
 
@@ -143,10 +144,12 @@ class Struct(Composite):
         assigned_names = set()
         # First assign positional arguments, only after exhausting that list, start looking at named ones
         members = self.get_members()
+        output_junction = Wire(self)
         for member_name, (member, reversed) in members.items():
-            assert not reversed
             if args_idx < len(args):
-                member(args[args_idx])
+                if (reversed):
+                    raise SyntaxErrorException("Can't assign to reversed members of a Composite type")
+                setattr(output_junction, member_name, args[args_idx])
                 assigned_names.add(member_name)
                 args_idx += 1
         # Make sure we've actually exhausted all positional arguments
@@ -156,8 +159,12 @@ class Struct(Composite):
         for member_name, value in kwargs.items():
             if member_name in assigned_names:
                 raise SyntaxErrorException(f"Struct member {member_name} is already assigned")
-            members[member_name](value)
+            member, reversed = members[member_name]
+            if (reversed):
+                raise SyntaxErrorException("Can't assign to reversed members of a Composite type")
+            setattr(output_junction, member_name, value)
             assigned_names.add(member_name)
+        return output_junction
 
     @classmethod
     def result_type(cls, net_types: Sequence[Optional['NetType']], operation: str) -> 'NetType':
@@ -381,7 +388,7 @@ class Interface(Composite):
             input_expression, _ = self.input_port.get_rhs_expression(back_end, target_namespace, None, op_precedence)
             return f"{input_expression}.{self.member}", op_precedence
 
-        
+
         def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
             assert False
 
