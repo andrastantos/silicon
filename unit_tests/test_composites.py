@@ -299,25 +299,14 @@ def test_multi_assign(mode: str = "rtl"):
             self.outp2 <<= Pixel(pixel_width)(0x10,0x11,b=0x12)
             #self.outp3 <<= Pixel(pixel_width)(0x20,b=0x22)
 
-        '''
         def simulate(self):
-            def test(r,g,b):
-                self.in1 <<= r << pixel_width * 2 | g << pixel_width | b
-                yield 0
-                assert self.outp.r == r, f"Expected R {r:x}, got {self.outp.r.sim_value:x} for rgb: {r:x},{g:x},{b:x}"
-                assert self.outp.g == g, f"Expected G {g:x}, got {self.outp.g.sim_value:x} for rgb: {r:x},{g:x},{b:x}"
-                assert self.outp.b == b, f"Expected B {b:x}, got {self.outp.b.sim_value:x} for rgb: {r:x},{g:x},{b:x}"
-
             yield 10
-            for x in range(16):
-                yield from test(x, 2*x, 3*x)
             print("Done")
-        '''
 
     if mode == "rtl":
         test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
     else:
-        test.simulation(Top, "test_struct_to_number")
+        test.simulation(Top, "test_multi_assign")
 
 
 
@@ -426,4 +415,4 @@ if __name__ == "__main__":
     #test_interface_wire2("rtl")
     #test_interface_wire3("rtl")
     #test_number_to_struct_sim()
-    test_multi_assign("rtl")
+    test_multi_assign("sim")

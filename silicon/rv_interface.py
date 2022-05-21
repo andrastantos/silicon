@@ -13,6 +13,9 @@ class ReadyValid(Interface):
     valid = logic
 
     class Behaviors(Interface.Behaviors):
+        def get_data_member_type(self) -> NetType:
+            return self.get_net_type().get_data_member_type()
+
         def get_data_members(self) -> Junction:
             output_type = self.get_net_type().get_data_member_type()
             ret_val = Wire(output_type)
@@ -30,7 +33,7 @@ class ReadyValid(Interface):
             for name, (junction, _) in data_members.get_member_junctions().items():
                 my_wire = getattr(self, name)
                 my_wire <<= junction
-            
+
 
     def __init__(self):
         super().__init__()

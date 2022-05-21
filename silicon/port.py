@@ -4,7 +4,7 @@ from .net_type import NetType, KeyKind
 from .tracer import no_trace, NoTrace
 from .ordered_set import OrderedSet
 from .exceptions import SyntaxErrorException, SimulationException
-from .utils import convert_to_junction, is_junction, is_input_port, is_output_port, is_wire, get_caller_local_junctions, is_junction_member, BoolMarker, is_module, implicit_adapt, MEMBER_DELIMITER
+from .utils import convert_to_junction, is_iterable, is_junction, is_input_port, is_output_port, is_wire, get_caller_local_junctions, is_junction_member, BoolMarker, is_module, implicit_adapt, MEMBER_DELIMITER
 from .port import KeyKind
 from collections import OrderedDict
 from enum import Enum
@@ -86,7 +86,7 @@ class Junction(JunctionBase):
             ret_val |= sink.get_all_sinks()
         return ret_val
 
-    
+
     def set_parent_module(self, parent_module: 'Module') -> None:
         assert parent_module is None or is_module(parent_module)
         assert self._parent_module is None or self._parent_module is parent_module
@@ -177,7 +177,7 @@ class Junction(JunctionBase):
         return self.get_net_type().is_abstract()
 
     def set_source(self, source: 'Junction') -> None:
-        old_source = f"{id(self.source):x}" if self.source is not None else "--NONE--" 
+        old_source = f"{id(self.source):x}" if self.source is not None else "--NONE--"
         def del_source() -> None:
             """
             Removes the potentially existing binding between this port and its source
@@ -269,7 +269,7 @@ class Junction(JunctionBase):
         if self.is_abstract():
             raise SyntaxErrorException(f"Can't iterate through the elements of an abstract port {self}")
         return self.get_net_type().get_iterator(self)
-    
+
     def __len__(self) -> int:
         if self.is_typeless():
             raise SyntaxErrorException(f"Can't determine the length of a typeless port {self}")
@@ -280,33 +280,33 @@ class Junction(JunctionBase):
             raise SyntaxErrorException(f"Net {self} of type {net_type} doesn't support 'len'")
         return net_type.get_length()
 
-    
+
     def __getitem__(self, key: Any) -> Any:
         if self.active_context() == "simulation":
             return self.get_net_type().get_slice(key, self)
         else:
             from .member_access import MemberGetter
             return MemberGetter(self, [(key, KeyKind.Index)])
-    
+
     def __setitem__(self, key: Any, value: Any) -> None:
         if is_junction_member(value) and value.get_parent_junction() is self:
             return
         if hasattr(self.get_net_type(), "set_member_access"):
             return self.get_net_type().set_member_access([(key, KeyKind.Index)], value, self)
         raise TypeError()
-    
+
     def __delitem__(self, key: Any) -> None:
         # I'm not sure what this even means in this context
         raise TypeError()
 
-    
+
     def __getattr__(self, name: str) -> Any:
         if "_member_junctions" in dir(self) and name in self._member_junctions:
             return self._member_junctions[name][0]
         if not self.is_typeless() and hasattr(self.get_net_type(), "get_junction_member"):
             return self.get_net_type().get_junction_member(self, name)
         raise AttributeError
-    
+
     def __setattr__(self, name: str, value: Any) -> None:
         if "_member_junctions" in dir(self) and name in self._member_junctions:
             if value is self._member_junctions[name][0]:
@@ -320,7 +320,7 @@ class Junction(JunctionBase):
     def allow_bind(self) -> bool:
         """
         Determines if binding to this junction is allowed.
-        Defaults to True, but for scoped junctions, get set to 
+        Defaults to True, but for scoped junctions, get set to
         False to disallow shananingans, like this:
             with my_port as x:
                 x <<= 3
@@ -335,7 +335,7 @@ class Junction(JunctionBase):
         """
         return self._allow_auto_bind
 
-    
+
     def __enter__(self) -> 'Junction':
         assert not self._in_with_block
         self._in_with_block = True
@@ -344,7 +344,7 @@ class Junction(JunctionBase):
         self._junctions_before_scope = get_caller_local_junctions(3)
         return self._scoped_port
 
-    
+
     def __exit__(self, exception_type, exception_value, traceback):
         assert self._in_with_block
         self._in_with_block = False
@@ -384,6 +384,12 @@ class Junction(JunctionBase):
         #    return None
         #assert not self.is_composite(), "Simulator should never ask for the value of compound types"
         #return self._xnet.sim_state.value
+
+        if self.is_composite():
+            sim_value = []
+            for member_name, (member_junction, reversed) in self.get_member_junctions().items():
+                sim_value.append(member_junction.sim_value)
+            return tuple(sim_value)
         return self._xnet.sim_value
 
     @property
@@ -493,86 +499,86 @@ class Junction(JunctionBase):
             sup = super()
             return getattr(sup, name)(other)
 
-    
+
     def __add__(self, other: Any) -> Any:
         from .gates import sum_gate as gate
         return self._ninput_op(other, gate, "__add__")
-    
+
     def __sub__(self, other: Any) -> Any:
         from .gates import sub_gate as gate
         return self._binary_op(other, gate, "__sub__")
-    
+
     def __mul__(self, other: Any) -> Any:
         from .gates import prod_gate as gate
         return self._ninput_op(other, gate, "__mul__")
-    
+
     #def __floordiv__(self, other: Any) -> Any:
     #def __mod__(self, other: Any) -> Any:
     #def __divmod__(self, other: Any) -> Any:
     #def __pow__(self, other: Any, modulo = None) -> Any:
     #def __truediv__(self, other: Any) -> Any:
-    
+
     def __lshift__(self, other: Any) -> Any:
         from .gates import lshift_gate as gate
         return self._binary_op(other, gate, "__lshift__")
-    
+
     def __rshift__(self, other: Any) -> Any:
         from .gates import rshift_gate as gate
         return self._binary_op(other, gate, "__rshift__")
-    
+
     def __and__(self, other: Any) -> Any:
         from .gates import and_gate as gate
         return self._ninput_op(other, gate, "__and__")
-    
+
     def __xor__(self, other: Any) -> Any:
         from .gates import xor_gate as gate
         return self._ninput_op(other, gate, "__xor__")
-    
+
     def __or__(self, other: Any) -> Any:
         from .gates import or_gate as gate
         return self._ninput_op(other, gate, "__or__")
-    
 
-    
+
+
     def __radd__(self, other: Any) -> Any:
         from .gates import sum_gate as gate
         return self._rninput_op(other, gate, "__radd__")
-    
+
     def __rsub__(self, other: Any) -> Any:
         from .gates import sub_gate as gate
         return self._rbinary_op(other, gate, "__rsub__")
-    
+
     def __rmul__(self, other: Any) -> Any:
         from .gates import prod_gate as gate
         return self._rninput_op(other, gate, "__rmul__")
-    
+
     #def __rtruediv__(self, other: Any) -> Any:
     #def __rfloordiv__(self, other: Any) -> Any:
     #def __rmod__(self, other: Any) -> Any:
     #def __rdivmod__(self, other: Any) -> Any:
     #def __rpow__(self, other: Any) -> Any:
-    
+
     def __rlshift__(self, other: Any) -> Any:
         from .gates import lshift_gate as gate
         return self._rbinary_op(other, gate, "__rlshift__")
-    
+
     def __rrshift__(self, other: Any) -> Any:
         from .gates import rshift_gate as gate
         return self._rbinary_op(other, gate, "__rrshift__")
-    
+
     def __rand__(self, other: Any) -> Any:
         from .gates import and_gate as gate
         return self._rninput_op(other, gate, "__rand__")
-    
+
     def __rxor__(self, other: Any) -> Any:
         from .gates import xor_gate as gate
         return self._rninput_op(other, gate, "__rxor__")
-    
+
     def __ror__(self, other: Any) -> Any:
         from .gates import or_gate as gate
         return self._rninput_op(other, gate, "__ror__")
 
-    
+
     #def __iadd__(self, other: Any) -> Any:
     #def __isub__(self, other: Any) -> Any:
     #def __imul__(self, other: Any) -> Any:
@@ -587,7 +593,7 @@ class Junction(JunctionBase):
     #def __ixor__(self, other: Any) -> Any:
     #def __ior__(self, other: Any) -> Any:
 
-    
+
     def __ilshift__elab(self, other: Any) -> 'Junction':
         try:
             junction_value = convert_to_junction(other)
@@ -610,15 +616,34 @@ class Junction(JunctionBase):
 
     def __ilshift__sim(self, other: Any) -> 'Junction':
         if self.is_composite():
-            if other is not None and other.source is not None and (not isinstance(other, Junction) or self.get_net_type() != other.get_net_type()):
-                raise SimulationException(f"Assignment to compound types during simulation is only supported between identical net types", self)
-            # If something is connected to an otherwise unconnected port, we should support that.
-            if other is None or other.source is None:
+            if other is None:
                 for self_member in self.get_all_member_junctions(add_self=False):
                     self_member._set_sim_val(None)
+            elif isinstance(other, Junction):
+                # If something is connected to an otherwise unconnected port, we should support that.
+                if other.source is None:
+                    for self_member in self.get_all_member_junctions(add_self=False):
+                        self_member._set_sim_val(None)
+                else:
+                    if self.get_net_type() != other.get_net_type():
+                        raise SimulationException(f"Assignment to compound types during simulation is only supported between identical net types", self)
+                    for self_member, other_member in zip(self.get_all_member_junctions(add_self=False), other.get_all_member_junctions(add_self=False)):
+                        self_member._set_sim_val(other_member)
+            elif is_iterable(other):
+                members = self.get_member_junctions()
+                if len(other) != len(members):
+                    raise SimulationException(f"Assignment to composite type should contain {len(members)} elements. It has {len(other)} elements", self)
+                # Try it as a dict first, and if it fails, use it as a list
+                try:
+                    for name, value in other.item():
+                        if name not in members:
+                            raise SimulationException(f"Attempt to assign to nonexistent member {name}", self)
+                        members[name] <<= value
+                except AttributeError:
+                    for (member, _), value in zip(members.values(), other):
+                        member <<= value
             else:
-                for self_member, other_member in zip(self.get_all_member_junctions(add_self=False), other.get_all_member_junctions(add_self=False)):
-                    self_member._set_sim_val(other_member)
+                raise SimulationException(f"Unsupported assignment to composite type simulation", self)
         else:
             self._set_sim_val(other)
         return self
@@ -644,18 +669,18 @@ class Junction(JunctionBase):
         if self._xnet.source is self:
             self._xnet.sim_state.sim_context.schedule_value_change(self._xnet, new_sim_value, when)
 
-    
+
     def __neg__(self) -> Any:
         from .gates import neg_gate as gate
         return self._unary_op(gate, "__neg__")
-    
+
     def __pos__(self) -> Any:
         return self
-    
+
     def __abs__(self) -> Any:
         from .gates import abs_gate as gate
         return self._unary_op(gate, "__abs__")
-    
+
     def __invert__(self) -> Any:
         from .gates import not_gate as gate
         context = self.active_context()
@@ -668,7 +693,7 @@ class Junction(JunctionBase):
         else:
             return self._unary_op(gate, "__invert__")
 
-    
+
     #def __complex__(self) -> Any:
     #def __int__(self) -> Any:
     #def __long__(self) -> Any:
@@ -677,31 +702,31 @@ class Junction(JunctionBase):
     #def __hex__(self) -> Any:
     #def __index__(self) -> Any:
 
-    
+
     def __bool__(self) -> bool:
         from .gates import bool_gate as gate
         return self._unary_op(gate, "__bool__")
-    
+
     def __lt__(self, other: Any) -> bool:
         from .gates import lt_gate as gate
         return self._binary_op(other, gate, "__lt__")
-    
+
     def __le__(self, other: Any) -> bool:
         from .gates import le_gate as gate
         return self._binary_op(other, gate, "__le__")
-    
+
     def __eq__(self, other: Any) -> bool:
         from .gates import eq_gate as gate
         return self._binary_op(other, gate, "__eq__")
-    
+
     def __ne__(self, other: Any) -> bool:
         from .gates import ne_gate as gate
         return self._binary_op(other, gate, "__ne__")
-    
+
     def __gt__(self, other: Any) -> bool:
         from .gates import gt_gate as gate
         return self._binary_op(other, gate, "__gt__")
-    
+
     def __ge__(self, other: Any) -> bool:
         from .gates import ge_gate as gate
         return self._binary_op(other, gate, "__ge__")
@@ -746,7 +771,7 @@ class Junction(JunctionBase):
             member.set_interface_name(f"{self.interface_name}{MEMBER_DELIMITER}{name}")
         member._parent_junction = self
         self._member_junctions[name] = [member, reversed]
-    
+
     def is_composite(self) -> bool:
         return len(self._member_junctions) > 0
 
@@ -794,7 +819,7 @@ class Junction(JunctionBase):
 
 
 class Port(Junction):
-    
+
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False):
         super().__init__(net_type, parent_module, keyword_only=keyword_only)
         self._auto = False # Set to true for auto-ports
@@ -812,7 +837,7 @@ class Port(Junction):
 
 
 class Input(Port):
-    
+
     def bind(self, other_junction: Junction) -> None:
         assert is_junction(other_junction), "Can only bind to junction"
         assert self.get_parent_module() is not None, "Can't bind free-standing junction"
@@ -853,7 +878,7 @@ class Input(Port):
 
 
 class Output(Port):
-    
+
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None):
         super().__init__(net_type, parent_module)
         self.rhs_expression: Optional[Tuple[str, int]] = None # Filled-in by the parent_module during the 'generation' phase to contain the expression for the right-hand-side value, if inline expressions are supported for this port.
@@ -906,7 +931,7 @@ class Output(Port):
         def __ilshift__(self, other: Any) -> 'Junction':
             return other
 
-    
+
     def __getitem__(self, key: Any) -> Any:
         # Since we don't allow reading of outputs, we will have to return a special value that only supports the "<<=" notation
         return Output.OutputSliceGetter()
@@ -915,7 +940,7 @@ class Output(Port):
 # Wires are special ports that only exist within a Module and aren't part of the interface.
 # These special ports can be created within the body of a Module and can be checked/assigned within simulate.
 class Wire(Junction):
-    
+
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None):
         from .module import Module
         if parent_module is None:
@@ -996,7 +1021,7 @@ class ScopedPort(JunctionBase):
     def allow_bind(self) -> bool:
         """
         Determines if port binding to this port is allowed.
-        Defaults to True, but for scoped ports, get set to 
+        Defaults to True, but for scoped ports, get set to
         False to disallow shananingans, like this:
             with my_port as x:
                 x <<= 3
@@ -1054,7 +1079,7 @@ class AutoInput(Input):
             for member_name, (member_junction, _) in self._member_junctions.items():
                 ret_val += member_junction.generate_interface(back_end, f"{port_name}{MEMBER_DELIMITER}{member_name}")
             return ret_val
-        
+
 
 
 
