@@ -1,12 +1,12 @@
 from .composite import Interface, Reverse, Struct
 from .number import logic
-from collections import OrderedDict
-from typing import Dict, Tuple, Union
+from typing import Union, Callable, Optional
 from .net_type import NetType
-from .port import Junction, Input, Output, Wire
-from .utils import get_composite_member_name
-from .module import Module
+from .port import Junction, Input, Output, Wire, AutoInput, EdgeType
+from .module import GenericModule
 from .exceptions import SyntaxErrorException
+from .utils import TSimEvent, is_iterable
+from random import randint
 
 class ReadyValid(Interface):
     ready = Reverse(logic)
@@ -52,3 +52,96 @@ class ReadyValid(Interface):
         if isinstance(member, Reverse) and name != "ready":
             raise SyntaxErrorException(f"ReadyValid interface {type(self)} doesn't support reverse members")
         super().add_member(name, member)
+
+
+class RvSimSource(GenericModule):
+    output_port = Output()
+    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
+    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=True)
+
+    def construct(self, data_type: NetType = None, generator: Optional[Callable] = None, max_wait_state: int = 5) -> None:
+        if data_type is not None:
+            self.output_port.set_net_type(data_type)
+        if generator is not None:
+            self.generator = generator
+        self.max_wait_state = max_wait_state
+
+    def body(self) -> None:
+        self.data_members = Wire(self.output_port.get_data_member_type())
+        self.output_port.set_data_members(self.data_members)
+
+    def simulate(self) -> TSimEvent:
+        def reset():
+            self.output_port.valid <<= 0
+            self.wait_state = randint(1,self.max_wait_state+1)
+
+        reset()
+        while True:
+            yield (self.clock_port, )
+            edge_type = self.clock_port.get_sim_edge()
+            if edge_type == EdgeType.Positive:
+                if self.reset_port.sim_value == 1:
+                    reset()
+                else:
+                    if self.wait_state == 0 and self.output_port.ready.sim_value == 1:
+                        self.wait_state = randint(1,self.max_wait_state+1)
+                    if self.wait_state != 0:
+                        self.wait_state -= 1
+                        if self.wait_state == 0:
+                            next_val = self.generator()
+                            if next_val is not None and not is_iterable(next_val):
+                                try:
+                                    next_val_net_type = next_val.get_net_type()
+                                except AttributeError:
+                                    # We get here if next_val doesn't have 'get_net_type()'
+                                    next_val_net_type = None
+                                except TypeError:
+                                    # We get here if next_val.get_net_type is not callable
+                                    next_val_net_type = None
+                                if next_val_net_type == self.data_members.get_net_type():
+                                    self.data_members <<= next_val
+                                else:
+                                    self.data_members <<= (next_val, )
+                            else:
+                                # Get here for None or iterables
+                                self.data_members <<= next_val
+
+                    self.output_port.valid <<= 1 if self.wait_state == 0 else 0
+
+
+class RvSimSink(GenericModule):
+    input_port = Input()
+    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
+    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=True)
+
+    def construct(self, checker: Optional[Callable] = None, max_wait_state: int = 5) -> None:
+        if checker is not None:
+            self.checker = checker
+        self.max_wait_state = max_wait_state
+
+    def body(self) -> None:
+        self.data_members = Wire(self.input_port.get_data_member_type())
+        self.data_members <<= self.input_port.get_data_members()
+
+    def simulate(self) -> TSimEvent:
+        def reset():
+            self.input_port.ready <<= 0
+            self.wait_state = randint(1,self.max_wait_state+1)
+
+        reset()
+        while True:
+            yield (self.clock_port, )
+            edge_type = self.clock_port.get_sim_edge()
+            if edge_type == EdgeType.Positive:
+                if self.reset_port.sim_value == 1:
+                    reset()
+                else:
+                    if self.wait_state == 0 and self.input_port.valid.sim_value == 1:
+                        self.wait_state = randint(1,self.max_wait_state+1)
+                        sim_val = self.data_members.sim_value
+                        if is_iterable(sim_val) and len(sim_val) == 1:
+                            sim_val = sim_val[0]
+                        self.checker(sim_val)
+                    if self.wait_state != 0:
+                        self.wait_state -= 1
+                    self.input_port.ready <<= 1 if self.wait_state == 0 else 0
