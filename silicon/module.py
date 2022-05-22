@@ -899,15 +899,16 @@ class Module(object):
                         self._junctions.pop(wire_name)
                     else:
                         raise SyntaxErrorException(f"Wire {wire_name} is used without a source")
-            for wire in tuple(self._local_wires):
-                if not wire.is_specialized():
-                    if len(wire.sinks) == 0:
-                        print(f"WARNING: deleting unused local wire: {wire}")
-                        self._local_wires.remove(wire)
-                    else:
-                        raise SyntaxErrorException(f"Local wire {wire} is used without a source")
+
+            assert len(self._local_wires) == 0
+
             with self._in_elaborate:
                 self._body(trace) # Will create all the sub-modules
+
+            for wire in tuple(self._local_wires):
+                if len(wire.sinks) == 0 and wire.source is None:
+                    print(f"WARNING: deleting unused local wire: {wire}")
+                    self._local_wires.remove(wire)
 
             for sub_module in self._sub_modules:
                 # handle any pending auto-binds
