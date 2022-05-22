@@ -868,7 +868,7 @@ class Number(NetType):
         if sim_value is None:
             return sim_value
         if sim_value > self.max_sim_val or sim_value < self.min_sim_val:
-            raise SimulationException(f"Can't assign to net {parent_junction} a value {sim_value} that's outside of the representable range.", parent_junction)
+            raise SimulationException(f"Can't assign to net '{parent_junction}' the value '{sim_value}'. That value is outside of the representable range.", parent_junction)
         return sim_value
 
     def generate_const_val(self, value: Optional[int], back_end: 'BackEnd') -> str:
