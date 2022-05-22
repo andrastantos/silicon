@@ -665,7 +665,11 @@ class Junction(JunctionBase):
         else:
             new_sim_value = sim_const(value, self)
 
-        assert self._xnet.source is self or self._xnet.source is None
+        if self._xnet.source is not self and self._xnet.source is not None:
+            is_transition = self in self._xnet.transitions
+            is_sink = self in self._xnet.sinks
+            assert is_transition or is_sink
+            raise SimulationException(f"Can't assigned to net that has a driver during simulation. This net is a {'transition, which means it both has a driver and sink(s)' if is_transition else 'sink, which means it does not drive anything'}", self)
         if self._xnet.source is self:
             self._xnet.sim_state.sim_context.schedule_value_change(self._xnet, new_sim_value, when)
 
