@@ -66,7 +66,7 @@ class test:
             return ret_val
 
     @staticmethod
-    def rtl_generation(top_class: Union[Callable, Module], test_name: str = None, allow_new_attributes: bool = False):
+    def rtl_generation(top_class: Union[Callable, Module], test_name: str = None, allow_new_attributes: bool = False, *, add_unnamed_scopes: bool = False):
         if test_name is None:
             test_name = top_class.__name__.lower()
         import os
@@ -77,7 +77,7 @@ class test:
             top = top_class
         else:
             top = top_class()
-        netlist = elaborate(top)
+        netlist = elaborate(top, add_unnamed_scopes=add_unnamed_scopes)
         logged_system_verilog = SystemVerilog(stream_class = test.DiffedFile)
         netlist.generate(netlist, logged_system_verilog)
         #with test.DiffedFile(f"{test_name}.dmp", "w", allow_added_lines=allow_new_attributes) as dump_file:
@@ -106,14 +106,14 @@ class test:
                     pytest.fail(f"Test failed with IVerilog errors")
 
     @staticmethod
-    def simulation(top_class: Callable, test_name: str = None):
+    def simulation(top_class: Callable, test_name: str = None, *, add_unnamed_scopes: bool = False):
         if test_name is None:
             test_name = top_class.__name__.lower()
         test.clear()
         test.reference_dir = Path("reference") / Path(test_name)
         test.output_dir = Path("output") / Path(test_name)
         top = top_class()
-        netlist = elaborate(top)
+        netlist = elaborate(top, add_unnamed_scopes=add_unnamed_scopes)
         test.output_dir.mkdir(parents=True, exist_ok=True)
         vcd_filename = test.output_dir / Path(f"{test_name}.vcd")
         netlist.simulate(vcd_filename)

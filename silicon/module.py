@@ -963,7 +963,7 @@ class Module(object):
                             raise SyntaxErrorException(f"Output port {output} is not fully specialized after body call. Can't finalize interface")
             assert all((output.is_specialized() or output.source is None) for output in self.get_outputs().values())
 
-        def elaborate(self) -> Netlist:
+        def elaborate(self, *, add_unnamed_scopes: bool = False) -> Netlist:
 
             assert self not in self.netlist.modules, f"Module {self._true_module} has already been elaborated."
             assert self.parent is None, "Only top level modules can be elaborated"
@@ -980,7 +980,7 @@ class Module(object):
                 if not all_inputs_specialized:
                     raise SyntaxErrorException(f"Top level module must have all its inputs specialized before it can be elaborated")
                 self._elaborate(hier_level=0, trace=True)
-            self.netlist._post_elaborate()
+            self.netlist._post_elaborate(add_unnamed_scopes)
             return self.netlist
 
         def _body(self, trace: bool = True) -> None:
@@ -1373,6 +1373,6 @@ def module(ret_val_cnt) -> Callable:
 
     return inner
 
-def elaborate(top_level: Module) -> Netlist:
-    return top_level._impl.elaborate()
+def elaborate(top_level: Module, *, add_unnamed_scopes: bool = False) -> Netlist:
+    return top_level._impl.elaborate(add_unnamed_scopes=add_unnamed_scopes)
 

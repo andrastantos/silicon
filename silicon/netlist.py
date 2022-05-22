@@ -313,7 +313,7 @@ class Netlist(object):
                         "    - Port is driven by an unassigned junction"
                     )
 
-    def _fill_xnet_names(self):
+    def _fill_xnet_names(self, add_unnamed_scopes: bool):
         # Fill-in names for xnets
         for xnet in self.xnets:
             from .utils import FQN_DELIMITER
@@ -322,7 +322,7 @@ class Netlist(object):
                     self.module_to_xnet_map[scope] = OrderedSet()
                 self.module_to_xnet_map[scope].add(xnet)
                 module_name = scope._impl.get_fully_qualified_name()
-                if scope._impl.has_explicit_name:
+                if scope._impl.has_explicit_name or add_unnamed_scopes:
                     names_in_scope = xnet.get_names(scope)
                     for name in names_in_scope:
                         xnet.names.add(module_name + FQN_DELIMITER + name)
@@ -419,7 +419,7 @@ class Netlist(object):
             return set()
         return self.module_to_xnet_map[module]
 
-    def _post_elaborate(self) -> None:
+    def _post_elaborate(self, add_unnamed_scopes: bool) -> None:
         """
         Called from the elaborate of the top level module.
 
@@ -490,7 +490,7 @@ class Netlist(object):
         register_modules(self.top_level)
         self._create_xnets()
         populate_names(self.top_level)
-        self._fill_xnet_names()
+        self._fill_xnet_names(add_unnamed_scopes)
         self.rank_list, self.rank_map = self._rank_netlist()
         self.module_variants = OrderedDict()
         self.module_to_class_map = OrderedDict()
