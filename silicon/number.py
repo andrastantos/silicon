@@ -1398,7 +1398,7 @@ def str_to_sim(value: str, target_net_type: NetType) -> int:
 def float_to_sim(value: float, target_net_type: NetType) -> int:
     # We are converting a float to the (nearest) representanble fixed-point value
     if not isinstance(target_net_type, Number):
-        raise SimulationException(f"Can only assign a floating point value to a Number")
+        raise SimulationException(f"Can only assign a floating point value to a Number", self)
     value_as_int = round(value * (2 ** target_net_type.precision))
     return Number.SimValue(value_as_int, target_net_type.precision)
 
