@@ -29,7 +29,7 @@ class NetType(object):
         class ExplicitAdaptor(Module):
             input_port = Input()
             output_port = Output(self)
-   
+
             def body(self):
                 # Determine if inlining is possible.
                 if self.input_port.get_net_type() == self.output_port.get_net_type():
@@ -46,10 +46,7 @@ class NetType(object):
                 assert back_end.language == "SystemVerilog"
 
                 return self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
-            def simulate(self) -> 'TSimEvent':
-                while True:
-                    yield self.input_port
-                    self.output_port <<= self.input_port
+
             def is_combinational(self) -> bool:
                 """
                 Returns True if the module is purely combinational, False otherwise
@@ -163,9 +160,9 @@ class NetType(object):
         Validates the new sim value before assignment.
 
         Raises exceptions with appropriate error messages in case of a validation error.
-        
+
         Has the option to change/correct the sim_value prior to assignment.
-        
+
         Returns potentially modified sim_value for assignment.
         """
         return sim_value
@@ -232,7 +229,7 @@ class NetType(object):
             ABS
         """
         all_net_type_names = " ".join(str(net_type) for net_type in net_types)
-        
+
         raise SyntaxErrorException(f"No result type can be found for the specified set of NetTypes: {all_net_type_names}")
 
     @classmethod
