@@ -505,23 +505,24 @@ class _Memory(GenericModule):
                 if port_config.registered_input:
                     clk_edge_type = clk_port.get_sim_edge()
                     if clk_edge_type == EdgeType.Positive:
-                        write = write_en_port is None or write_en_val != 0
+                        write = write_en_port is not None and write_en_val != 0
                         read = True
                         if port_config.registered_output:
                             data_out_port <<= last_read_values[idx]
                     if clk_edge_type == EdgeType.Undefined:
                         # In this case we don't know if a write or read happens or not. So make sure that data is X-ed out
-                        write = write_en_port is None or write_en_val != 0
+                        write = write_en_port is not None and write_en_val != 0
                         read = True
                         data_in_val = None
                         read_invalid = True
                 else:
-                    write_edge_type = write_en_port.get_sim_edge()
-                    if write_edge_type == EdgeType.Positive:
-                        write = True
-                    if write_edge_type == EdgeType.Undefined:
-                        write = True
-                        data_in_val = None
+                    if write_en_port is not None:
+                        write_edge_type = write_en_port.get_sim_edge()
+                        if write_edge_type == EdgeType.Positive:
+                            write = True
+                        if write_edge_type == EdgeType.Undefined:
+                            write = True
+                            data_in_val = None
                     read = addr_port.get_sim_edge() != EdgeType.NoEdge
                 if write:
                     if addr_val is None:
