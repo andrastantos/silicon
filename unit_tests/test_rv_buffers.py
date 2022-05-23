@@ -216,6 +216,8 @@ def test_fifo(mode: str = "rtl"):
 
             print("Simulation started")
 
+            self.generator.max_wait_state = 10
+            self.checker.max_wait_state = 2
             self.rst <<= 1
             self.clk <<= 1
             yield 10
@@ -224,13 +226,21 @@ def test_fifo(mode: str = "rtl"):
             self.rst <<= 0
             for i in range(500):
                 yield from clk()
+            self.generator.max_wait_state = 5
+            self.checker.max_wait_state = 5
+            for i in range(500):
+                yield from clk()
+            self.generator.max_wait_state = 2
+            self.checker.max_wait_state = 10
+            for i in range(500):
+                yield from clk()
             now = yield 10
             print(f"Done at {now}")
 
     if mode == "rtl":
         test.rtl_generation(top, inspect.currentframe().f_code.co_name)
     else:
-        test.simulation(sim_top, inspect.currentframe().f_code.co_name)
+        test.simulation(sim_top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 
 if __name__ == "__main__":

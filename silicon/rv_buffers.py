@@ -1,7 +1,7 @@
 from .module import Module, GenericModule
 from .rv_interface import ReadyValid
 from .port import Input, Output, Wire, AutoInput
-from .primitives import Select, Reg
+from .primitives import Select, Reg, SelectOne
 from .exceptions import SyntaxErrorException
 from .utils import is_input_port, is_output_port
 from .number import Number, logic
@@ -95,6 +95,8 @@ class Fifo(GenericModule):
     def body(self):
         full = Wire(logic)
         empty = Wire(logic)
+        next_full = Wire(logic)
+        next_empty = Wire(logic)
 
         self.output_port.set_net_type(self.input_port.get_net_type())
 
@@ -104,39 +106,60 @@ class Fifo(GenericModule):
         self.output_port.valid <<= ~empty
 
         addr_type = Number(min_val=0, max_val=self.depth-1)
-
         data_type = input_data.get_net_type()
 
         output_data = Wire(data_type)
 
         push_addr = Wire(addr_type)
+        next_push_addr = Wire(addr_type)
         pop_addr = Wire(addr_type)
+        next_pop_addr = Wire(addr_type)
 
         push = ~full & self.input_port.valid
         pop = ~empty & self.output_port.ready
 
         looped = Wire(logic)
+        next_looped = Wire(logic)
 
         push_will_wrap = push_addr == self.depth-1
         pop_will_wrap = pop_addr == self.depth-1
-        push_addr <<= Reg(Select(push, push_addr, Select(push_will_wrap, addr_type(push_addr+1), 0)))
-        pop_addr <<= Reg(Select(pop, pop_addr, Select(pop_will_wrap, addr_type(pop_addr+1), 0)))
+        next_push_addr <<= Select(push, push_addr, addr_type(Select(push_will_wrap, push_addr+1, 0)))
+        next_pop_addr <<= Select(pop, pop_addr, addr_type(Select(pop_will_wrap, pop_addr+1, 0)))
 
-        next_looped = Select(push, Select(pop, looped, Select(pop_will_wrap, looped, 0)), Select(push_will_wrap, looped, 1))
+        next_looped <<= SelectOne(
+            (push != 1) & (pop != 1), looped,
+            (push == 1) & (pop != 1), Select(push_will_wrap, looped, 1),
+            (push != 1) & (pop == 1), Select(pop_will_wrap, looped, 0),
+            (push == 1) & (pop == 1), SelectOne(
+                (push_will_wrap != 1) & (pop_will_wrap != 1), looped,
+                (push_will_wrap == 1) & (pop_will_wrap != 1), 1,
+                (push_will_wrap != 1) & (pop_will_wrap == 1), 0,
+                (push_will_wrap == 1) & (pop_will_wrap == 1), looped
+            ),
+        )
+
+        next_empty_or_full = next_push_addr == next_pop_addr
+        next_empty <<= Select(next_empty_or_full, 0, ~next_looped)
+        next_full <<= Select(next_empty_or_full, 0, next_looped)
+
+        push_addr <<= Reg(next_push_addr)
+        pop_addr <<= Reg(next_pop_addr)
+        empty <<= Reg(next_empty)
+        full <<= Reg(next_full)
         looped <<= Reg(next_looped)
 
-        empty_or_full = push_addr == pop_addr
-        empty <<= Reg(Select(empty_or_full, 0, ~next_looped))
-        full <<= Reg(Select(empty_or_full, 0, next_looped))
-
         # Buffer memory
-        mem_config = MemoryConfig((MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False),MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False)))
+        mem_config = MemoryConfig((
+            MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False),
+            MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False)
+        ))
         buffer = Memory(mem_config)
 
         buffer.port1_data_in <<= input_data
         buffer.port1_addr <<= push_addr
         buffer.port1_write_en <<= push
         output_data <<= buffer.port2_data_out
-        buffer.port2_addr <<= pop_addr
+        buffer.port2_addr <<= next_pop_addr
+        self.output_port.set_data_members(output_data)
 
 
