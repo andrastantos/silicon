@@ -243,11 +243,138 @@ def test_fifo(mode: str = "rtl"):
         test.simulation(sim_top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 
+def test_delay_line(mode: str = "rtl"):
+    class top(Module):
+        in1 = Input(RvData())
+        out1 = Output(RvData())
+        clk = Input(logic)
+        rst = Input(logic)
+
+        def body(self):
+            dut = DelayLine(depth=5)
+            self.out1 = dut(self.in1)
+
+    class sim_top(Module):
+        clk = Input(logic)
+        rst = Input(logic)
+        def body(self):
+            self.data = Wire(RvData())
+            self.checker = Checker()
+            self.generator = Generator()
+            self.data <<= self.generator.output_port
+            dut = top()
+            dut.rst <<= self.rst
+            dut.clk <<= self.clk
+            self.checker.input_port <<= dut(self.data)
+
+        def simulate(self) -> TSimEvent:
+            def clk() -> int:
+                yield 10
+                self.clk <<= ~self.clk & self.clk
+                yield 10
+                self.clk <<= ~self.clk
+                yield 0
+
+            print("Simulation started")
+
+            self.rst <<= 1
+            self.clk <<= 1
+            yield 10
+            for i in range(5):
+                yield from clk()
+            self.rst <<= 0
+
+            #self.generator.max_wait_state = 10
+            #self.checker.max_wait_state = 2
+            #for i in range(500):
+            #    yield from clk()
+            self.generator.max_wait_state = 5
+            self.checker.max_wait_state = 5
+            for i in range(500):
+                yield from clk()
+            #self.generator.max_wait_state = 2
+            #self.checker.max_wait_state = 10
+            #for i in range(500):
+            #    yield from clk()
+            now = yield 10
+            print(f"Done at {now}")
+
+    if mode == "rtl":
+        test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+    else:
+        test.simulation(sim_top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+
+def test_pacer(mode: str = "rtl"):
+    class top(Module):
+        in1 = Input(RvData())
+        out1 = Output(RvData())
+        clk = Input(logic)
+        rst = Input(logic)
+
+        def body(self):
+            dut = Pacer(3)
+            self.out1 = dut(self.in1)
+
+    class sim_top(Module):
+        clk = Input(logic)
+        rst = Input(logic)
+        def body(self):
+            self.data = Wire(RvData())
+            self.checker = Checker()
+            self.generator = Generator()
+            self.data <<= self.generator.output_port
+            dut = top()
+            dut.rst <<= self.rst
+            dut.clk <<= self.clk
+            self.checker.input_port <<= dut(self.data)
+
+        def simulate(self) -> TSimEvent:
+            def clk() -> int:
+                yield 10
+                self.clk <<= ~self.clk & self.clk
+                yield 10
+                self.clk <<= ~self.clk
+                yield 0
+
+            print("Simulation started")
+
+            self.rst <<= 1
+            self.clk <<= 1
+            yield 10
+            for i in range(5):
+                yield from clk()
+            self.rst <<= 0
+
+            self.generator.max_wait_state = 1
+            self.checker.max_wait_state = 1
+            for i in range(500):
+                yield from clk()
+            self.generator.max_wait_state = 2
+            self.checker.max_wait_state = 5
+            for i in range(500):
+                yield from clk()
+            self.generator.max_wait_state = 5
+            self.checker.max_wait_state = 2
+            for i in range(500):
+                yield from clk()
+            now = yield 10
+            print(f"Done at {now}")
+
+    if mode == "rtl":
+        test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+    else:
+        test.simulation(sim_top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
 if __name__ == "__main__":
     #test_forward_buf("rtl")
     #test_reverse_buf("rtl")
     #test_fifo("rtl")
     #test_forward_buf("sim")
     #test_reverse_buf("sim")
-    test_fifo("sim")
+    #test_fifo("sim")
     #test_gen_chk("sim")
+    #test_delay_line("sim")
+    test_pacer("sim")

@@ -163,3 +163,114 @@ class Fifo(GenericModule):
         self.output_port.set_data_members(output_data)
 
 
+class DelayLine(GenericModule):
+    input_port = Input()
+    output_port = Output()
+    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
+    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=False)
+
+    def construct(self, depth:int):
+        if not isinstance(depth, int):
+            raise SyntaxErrorException("Fifo depth must be an integer")
+        self.depth = depth
+
+    def body(self):
+        full = Wire(logic)
+        next_full = Wire(logic)
+
+        self.output_port.set_net_type(self.input_port.get_net_type())
+
+        input_data = self.input_port.get_data_members()
+
+        self.input_port.ready <<= ~full
+        self.output_port.valid <<= full
+
+        addr_type = Number(min_val=0, max_val=self.depth-1)
+        data_type = input_data.get_net_type()
+
+        output_data = Wire(data_type)
+
+        push_addr = Wire(addr_type)
+        next_push_addr = Wire(addr_type)
+        pop_addr = Wire(addr_type)
+        next_pop_addr = Wire(addr_type)
+
+        push = ~full & self.input_port.valid
+        pop = full & self.output_port.ready
+
+        looped = Wire(logic)
+        next_looped = Wire(logic)
+
+        push_will_wrap = push_addr == self.depth-1
+        pop_will_wrap = pop_addr == self.depth-1
+        next_push_addr <<= Select(push, push_addr, addr_type(Select(push_will_wrap, push_addr+1, 0)))
+        next_pop_addr <<= Select(pop, pop_addr, addr_type(Select(pop_will_wrap, pop_addr+1, 0)))
+
+        next_looped <<= SelectOne(
+            (push != 1) & (pop != 1), looped,
+            (push == 1) & (pop != 1), Select(push_will_wrap, looped, 1),
+            (push != 1) & (pop == 1), Select(pop_will_wrap, looped, 0),
+            (push == 1) & (pop == 1), SelectOne(
+                (push_will_wrap != 1) & (pop_will_wrap != 1), looped,
+                (push_will_wrap == 1) & (pop_will_wrap != 1), 1,
+                (push_will_wrap != 1) & (pop_will_wrap == 1), 0,
+                (push_will_wrap == 1) & (pop_will_wrap == 1), looped
+            ),
+        )
+
+        next_empty_or_full = next_push_addr == next_pop_addr
+        next_full <<= Select(next_empty_or_full, 0, next_looped)
+
+        push_addr <<= Reg(next_push_addr)
+        pop_addr <<= Reg(next_pop_addr)
+        full <<= Reg(next_full)
+        looped <<= Reg(next_looped)
+
+        # Buffer memory
+        mem_config = MemoryConfig((
+            MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False),
+            MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False)
+        ))
+        buffer = Memory(mem_config)
+
+        buffer.port1_data_in <<= input_data
+        buffer.port1_addr <<= push_addr
+        buffer.port1_write_en <<= push
+        output_data <<= buffer.port2_data_out
+        buffer.port2_addr <<= next_pop_addr
+        self.output_port.set_data_members(output_data)
+
+
+class Pacer(GenericModule):
+    input_port = Input()
+    output_port = Output()
+    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
+    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=False)
+
+    def construct(self, wait_states:int):
+        if not isinstance(wait_states, int):
+            raise SyntaxErrorException("Number of wait states must be an integer")
+        self.wait_states = wait_states
+
+    def body(self):
+        wait_cnt_type = Number(min_val=0, max_val=self.wait_states-1)
+
+        wait_cnt = Wire(wait_cnt_type)
+        next_wait_cnt = Wire(wait_cnt_type)
+
+
+        self.output_port.set_net_type(self.input_port.get_net_type())
+
+        input_data = self.input_port.get_data_members()
+
+        wait_done = wait_cnt == self.wait_states-1
+
+        self.input_port.ready <<= wait_done & self.output_port.ready
+        self.output_port.valid <<= wait_done & self.input_port.valid
+
+        transfer = self.input_port.valid & self.output_port.ready & wait_done
+
+        next_wait_cnt <<= Select(transfer, wait_cnt_type(Select(wait_done, wait_cnt+1, self.wait_states-1)), 0)
+        wait_cnt <<= Reg(next_wait_cnt)
+
+        self.output_port.set_data_members(input_data)
