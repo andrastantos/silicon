@@ -43,29 +43,34 @@ class FSMLogic(Module):
         if is_junction_or_member(new_state):
             raise SyntaxErrorException(f"New state must be a constant, not a net.")
         edge = (current_state, new_state)
-        if edge in self._state_transition_table:
-            raise SyntaxErrorException(f"State transition from {current_state} to {new_state} already exists in FSM {self}")
-        port_name = f"input_{_format_state_name(current_state)}_to_{_format_state_name(new_state)}"
+        #if edge in self._state_transition_table:
+        #    raise SyntaxErrorException(f"State transition from {current_state} to {new_state} already exists in FSM {self}")
         input = Input()
+        if edge in self._state_transition_table:
+            port_name = f"input_{_format_state_name(current_state)}_to_{_format_state_name(new_state)}_{len(self._state_transition_table[edge])}"
+            self._state_transition_table[edge].append(input)
+        else:
+            port_name = f"input_{_format_state_name(current_state)}_to_{_format_state_name(new_state)}"
+            self._state_transition_table[edge] = [input,]
         setattr(self, port_name, input)
         input <<= condition
-        self._state_transition_table[edge] = input
 
     def body(self) -> None:
         # Transform edges to the appropriate format to be able to iterate in the right way
         transitions = OrderedDict()
-        for (current_state, new_state), condition_port in self._state_transition_table.items():
+        for (current_state, new_state), condition_ports in self._state_transition_table.items():
             if current_state not in transitions:
                 transitions[current_state] = OrderedDict()
-            transitions[current_state][new_state] = condition_port
+            transitions[current_state][new_state] = condition_ports
 
         # Generate the outer (current state) and inner (next state) selectors
         next_state_args = []
         for current_state, edges in transitions.items():
             args = []
-            for new_state, condition_port in edges.items():
-                args.append(condition_port)
-                args.append(new_state)
+            for new_state, condition_ports in edges.items():
+                for condition_port in condition_ports:
+                    args.append(condition_port)
+                    args.append(new_state)
             condition_selector = SelectOne(*args, default_port = self.default_state)
             next_state_args.append(self.state == current_state)
             next_state_args.append(condition_selector)
@@ -85,9 +90,10 @@ class FSMLogic(Module):
         f.edge("__others__", str(default_value), style="dashed")
 
         f.attr('node', shape='circle')
-        for (current_state, new_state), condition_port in self._state_transition_table.items():
-            condition_str, _ = condition_port.get_rhs_expression(back_end, scope, logic)
-            f.edge(_get_state_name(current_state), _get_state_name(new_state), label=condition_str)
+        for (current_state, new_state), condition_ports in self._state_transition_table.items():
+            for condition_port in condition_ports:
+                condition_str, _ = condition_port.get_rhs_expression(back_end, scope, logic)
+                f.edge(_get_state_name(current_state), _get_state_name(new_state), label=condition_str)
         return f
 
 
