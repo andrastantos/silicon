@@ -76,7 +76,8 @@
 # Essentially 'contact your foundry'
 
 from .module import GenericModule, has_port, Module, InlineBlock, InlineStatement
-from .port import Input, Output, Wire, AutoInput, Port, EdgeType, Junction
+from .port import Input, Output, Wire, Port, EdgeType, Junction
+from .auto_input import ClkPort
 from .net_type import NetType
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -138,9 +139,7 @@ class _Memory(GenericModule):
             setattr(
                 self,
                 f"{port_config.real_prefix}clk",
-                AutoInput(
-                    logic,
-                    keyword_only = True,
+                ClkPort(
                     auto_port_names = (
                         f"{port_config.real_prefix}clk",
                         f"{port_config.real_prefix}clock",
@@ -150,8 +149,7 @@ class _Memory(GenericModule):
                         f"{port_config.real_prefix}clock_port",
                         "clk_port",
                         "clock_port"
-                    ),
-                    optional = False
+                    )
                 )
             )
 
@@ -582,9 +580,7 @@ class Memory(GenericModule):
             setattr(
                 self,
                 f"{port_config.real_prefix}clk",
-                AutoInput(
-                    logic,
-                    keyword_only = True,
+                ClkPort(
                     auto_port_names = (
                         f"{port_config.real_prefix}clk",
                         f"{port_config.real_prefix}clock",
@@ -594,8 +590,7 @@ class Memory(GenericModule):
                         f"{port_config.real_prefix}clock_port",
                         "clk_port",
                         "clock_port"
-                    ),
-                    optional = False
+                    )
                 )
             )
 

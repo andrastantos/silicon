@@ -16,8 +16,8 @@ import inspect
 TByte = Unsigned(length=8)
 
 class timing(Module):
-    rst = Input(logic)
-    clk = Input(logic) # 16MHz clock input
+    rst = RstPort()
+    clk = ClkPort() # 16MHz clock input
 
     # The phase relationship between these three clocks is important, though TBD.
     cclk = Output(logic) # clock to CCRT, but also user as A0 for memory addressing, allowing 16-bits/character readout from memory. This is a 1MHz 50% duty-cycle clock
@@ -67,7 +67,7 @@ class timing(Module):
 
         self.clk_1mhz_en_reg = Wire(logic)
         self.clk_1mhz_en_reg <<= Reg(self.prescaler == 0)
-        self.clk_1mhz_en <<= self.clk_1mhz_en_reg 
+        self.clk_1mhz_en <<= self.clk_1mhz_en_reg
 
 def test_verilog():
     test.rtl_generation(timing, "timing")

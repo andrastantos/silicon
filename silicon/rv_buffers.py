@@ -1,6 +1,7 @@
 from .module import Module, GenericModule
 from .rv_interface import ReadyValid
-from .port import Input, Output, Wire, AutoInput
+from .port import Input, Output, Wire
+from .auto_input import ClkPort, RstPort
 from .primitives import Select, Reg, SelectOne
 from .exceptions import SyntaxErrorException
 from .utils import is_input_port, is_output_port
@@ -12,8 +13,8 @@ from .memory import MemoryPortConfig, MemoryConfig, Memory
 class ForwardBuf(Module):
     input_port = Input()
     output_port = Output()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=False)
+    clock_port = ClkPort()
+    reset_port = RstPort()
 
     def body(self):
         in_ready = self.input_port.ready
@@ -45,8 +46,8 @@ class ForwardBuf(Module):
 class ReverseBuf(Module):
     input_port = Input()
     output_port = Output()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=False)
+    clock_port = ClkPort()
+    reset_port = RstPort()
 
     def body(self):
         buf_valid = Wire(logic)
@@ -84,8 +85,8 @@ class ReverseBuf(Module):
 class Fifo(GenericModule):
     input_port = Input()
     output_port = Output()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=False)
+    clock_port = ClkPort()
+    reset_port = RstPort()
 
     def construct(self, depth:int):
         if not isinstance(depth, int):
@@ -177,8 +178,8 @@ TODO:
 class DelayLine(GenericModule):
     input_port = Input()
     output_port = Output()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=False)
+    clock_port = ClkPort()
+    reset_port = RstPort()
 
     def construct(self, depth:int):
         if not isinstance(depth, int):
@@ -195,8 +196,8 @@ class DelayLine(GenericModule):
 class Pacer(GenericModule):
     input_port = Input()
     output_port = Output()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=False)
+    clock_port = ClkPort()
+    reset_port = RstPort()
 
     def construct(self, wait_states:int):
         if not isinstance(wait_states, int):

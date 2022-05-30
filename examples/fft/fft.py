@@ -58,10 +58,10 @@ class ComplexSub(Module):
 class RegEn(Module):
     output_port = Output()
     input_port = Input()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=True)
-    reset_value_port = AutoInput(auto_port_names=("rst_val", "rst_val_port", "reset_value", "reset_value_port"), optional=True)
-    clock_en = AutoInput(auto_port_names=("clk_en", "clock_en", "clock_enable"), optional=False)
+    clock_port = ClkPort()
+    reset_port = RstPort()
+    reset_value_port = RstValPort()
+    clock_en = ClkEnPort()
 
     def body(self):
         value = Wire(self.input_port.get_net_type())
@@ -75,7 +75,7 @@ class Butterfly(Module):
     """
     A one-number-per-clock radix-2 butterfly imlementation
 
-    This is a bit tricky, because normally a butterfly likes to see 
+    This is a bit tricky, because normally a butterfly likes to see
     two inputs at a time and produce two outputs.
 
     Of course one could feed it at half rate, but that would just mean
@@ -84,7 +84,7 @@ class Butterfly(Module):
     So, instead, we do a pipeline implementation.
 
     There's a little state-machine here, that
-    
+
     1. accepts the first input, but produces no output.
     2. accepts the second input, produces first output
     3. accepts first input (of second butterfly) while producing second output
@@ -96,8 +96,8 @@ class Butterfly(Module):
     There's also a pipeline stage needed for the twiddle-ROM read, but that can be folded in.
     We do need a ping-pong buffer to allow for both inputs to be present for two cycles.
     """
-    clk = Input(logic)
-    rst = Input(logic)
+    clk = ClkPort()
+    rst = RstPort()
 
     input_data = Input(ComplexStream())
     output_data = Output(ComplexStream())
@@ -122,9 +122,9 @@ class Butterfly(Module):
         # NOTE: bit 0 is used to select ping-pong buffer
         self.twiddle_addr = Unsigned(self.twiddle_len+1)
         self.twiddle_addr <<= Reg(
-            Select(self.input_data.valid & self.input_data.ready, 
-                self.twiddle_addr, 
-                Select(self.input_data.last, 
+            Select(self.input_data.valid & self.input_data.ready,
+                self.twiddle_addr,
+                Select(self.input_data.last,
                     (self.twiddle_addr + 1)[self.twiddle_len-1:0],
                     0
                 )
@@ -136,7 +136,7 @@ class Butterfly(Module):
         # Twiddle memory takes a cycle to read the data, so delay input by one cycle
         delayed_input_data = ForwardBuf(self.input_data)
         # Compute the butterfly (might need some pipelining, though the multipliers should support this sort of operation)
-        twiddle_factor = mem.data_out 
+        twiddle_factor = mem.data_out
         twiddled_data = ComplexMult(delayed_input_data.data2, twiddle_factor)
         self.output_data.data1 <<= ComplexAdd(delayed_input_data.data1, twiddled_data)
         self.output_data.data2 <<= ComplexAdd(delayed_input_data.data2, twiddled_data)
@@ -173,8 +173,8 @@ class ButterflyMem(GenericModule):
     """
     Memory stage between butterflies
     """
-    clk = Input(logic)
-    rst = Input(logic)
+    clk = ClkPort()
+    rst = RstPort()
 
     input_data = Input(ComplexStream())
     output_data = Output(ComplexStream())

@@ -37,7 +37,7 @@ def test_sim_update():
             self.data_in = 0
             self.addr = 0
             yield from clk()
-            
+
             def read(addr: int) -> Optional[int]:
                 self.n_cs = 0
                 self.n_rd = 0
@@ -66,7 +66,7 @@ def test_sim_update():
 def test_reg2():
     class top(Module):
         def body(self):
-            self.clk = Wire(logic)
+            self.clk = ClkPort()
 
             c1 = self.clk
             c2 = ~self.clk

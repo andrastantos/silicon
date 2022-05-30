@@ -1,6 +1,7 @@
 from .module import Module, InlineBlock, InlineExpression, InlineStatement, InlineComposite, GenericModule, has_port
 from typing import Dict, Optional, Tuple, Any, Generator, Union, Sequence
-from .port import Junction, Input, Output, Port, AutoInput, EdgeType, Wire
+from .port import Junction, Input, Output, Port, EdgeType, Wire
+from .auto_input import ClkPort, ClkEnPort, RstPort, RstValPort
 from .net_type import NetType, KeyKind
 from .exceptions import SyntaxErrorException, SimulationException
 from .tracer import no_trace
@@ -507,9 +508,9 @@ def concat(*args, **kwargs):
 class Reg(Module):
     output_port = Output()
     input_port = Input()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=True)
-    reset_value_port = AutoInput(auto_port_names=("rst_val", "rst_val_port", "reset_value", "reset_value_port"), optional=True)
+    clock_port = ClkPort()
+    reset_port = RstPort()
+    reset_value_port = RstValPort()
 
     def construct(self) -> None:
         self.sync_reset = True
@@ -539,7 +540,7 @@ class Reg(Module):
             if not self.reset_value_port.is_typeless():
                 if self.input_port.get_net_type() != self.reset_value_port.get_net_type():
                     raise SyntaxErrorException(f"Can only register composite types if the input and reset_value_port types are the same.")
-                reset_value_members = self.input_port.get_all_member_junctions(add_self=False)
+                reset_value_members = self.reset_value_port.get_all_member_junctions(add_self=False)
             else:
                 assert not self.reset_value_port.has_driver(), f"Strange: didn't expect a typeless input to have a driver..."
                 # will cause the logic inside generate_inline_statement to go down the proper path to generate default reset values
@@ -628,10 +629,10 @@ class Reg(Module):
 class RegEn(Module):
     output_port = Output()
     input_port = Input()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=True)
-    reset_value_port = AutoInput(auto_port_names=("rst_val", "rst_val_port", "reset_value", "reset_value_port"), optional=True)
-    clock_en = AutoInput(auto_port_names=("clk_en", "clock_en", "clock_enable"), optional=False)
+    clock_port = ClkPort()
+    reset_port = RstPort()
+    reset_value_port = RstValPort()
+    clock_en = ClkEnPort()
 
     def body(self):
         value = Wire(self.input_port.get_net_type())

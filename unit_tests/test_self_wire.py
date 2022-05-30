@@ -18,8 +18,8 @@ class test_self_wire(Module):
     data_in = Input(TByte)
     data_out = Output(TByte)
     n_wr = Input(logic)
-    clk = Input(logic)
-    rst = Input(logic)
+    clk = ClkPort()
+    rst = RstPort()
 
     def body(self):
         # Register file
@@ -59,7 +59,7 @@ def test_sim():
             self.rst = 0
             for i in range(5):
                 yield from clk()
-            
+
             def read() -> Optional[int]:
                 # Select register by writing to the index
                 self.n_cs = 0

@@ -132,7 +132,7 @@ class Junction(JunctionBase):
             net_type.setup_junction(self)
         # We need to ensure port type compatibility with all sinks/source
         if self.is_specialized():
-            for sink in self.sinks:
+            for sink in tuple(self.sinks): # set_source can modify the list, so make an immutable copy
                 if sink.is_specialized():
                     # Insert adaptor if needed (through set_source)
                     sink.set_source(self)
@@ -153,6 +153,9 @@ class Junction(JunctionBase):
                 junction = junction.source
             else:
                 return True
+        # There's no driver. However, we should assume that top level ports have drivers, no matter what
+        if junction.get_parent_module()._impl.is_top_level():
+            return True
         return False
 
     def get_net_type(self) -> Optional[NetType]:
@@ -1040,52 +1043,6 @@ class JunctionRef(object):
         self.junction = junction
     def get_underlying_junction(self) -> 'Junction':
         return self.junction.get_underlying_junction()
-
-class AutoInput(Input):
-    """
-    An input port variant that supports automatic binding to a set of named nets in the enclosing namespace.
-    """
-    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False, auto_port_names: Union[str, Sequence[str]], optional: bool = True):
-        super().__init__(net_type=net_type, parent_module=parent_module, keyword_only=keyword_only)
-        if isinstance(auto_port_names, str):
-            auto_port_names = (auto_port_names,)
-        self._auto_port_names = tuple(auto_port_names)
-        self._optional = optional
-        self._candidate = None
-        self._auto = True
-    def find_cadidates(self):
-        assert self.get_parent_module() is not None
-        self._candidate = junction_ref(self.get_parent_module()._impl.get_auto_port_to_bind(self._auto_port_names))
-    def auto_bind(self):
-        # If someone bound to this port, let's not override that
-        if self.source is not None:
-            return
-        if self._candidate is None and not self._optional:
-            raise SyntaxErrorException(f"Can't auto-connect port {self}: none of the names {self._auto_port_names} could be found in the enclosing module")
-        if self._candidate is not None:
-            self.set_source(self._candidate.junction)
-    def is_deleted(self) -> bool:
-        """
-        Returns True if the port (an optional auto-port with no driver) got deleted from the interface
-        """
-        return not self.has_driver() and self._optional
-
-    def generate_interface(self, back_end: 'BackEnd', port_name: str) -> Sequence[str]:
-        if self.is_typeless():
-            assert self.is_deleted()
-            return []
-
-        assert back_end.language == "SystemVerilog"
-        if not self.is_composite():
-            return [f"{self.get_net_type().generate_net_type_ref(self, back_end)} {port_name}"]
-        else:
-            ret_val = []
-            for member_name, (member_junction, _) in self._member_junctions.items():
-                ret_val += member_junction.generate_interface(back_end, f"{port_name}{MEMBER_DELIMITER}{member_name}")
-            return ret_val
-
-
-
 
 def junction_ref(junction: Optional[Junction]) -> Optional[JunctionRef]:
     if junction is None:

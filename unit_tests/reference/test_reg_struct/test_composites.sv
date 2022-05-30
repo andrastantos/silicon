@@ -59,12 +59,12 @@ module top (
 	always_ff @(posedge clk1) uout3_g <= reset ? 8'h0 : uin1_g;
 	always_ff @(posedge clk1) uout3_r <= reset ? 8'h0 : uin1_r;
 	assign reset = uin2_r[0];
-	always_ff @(posedge clk1) reset_reg_b <= uin1_b;
-	always_ff @(posedge clk1) reset_reg_g <= uin1_g;
-	always_ff @(posedge clk1) reset_reg_r <= uin1_r;
-	always_ff @(posedge clk1) reset_reg2_b <= reset ? uin1_b : uin1_b;
-	always_ff @(posedge clk1) reset_reg2_g <= reset ? uin1_g : uin1_g;
-	always_ff @(posedge clk1) reset_reg2_r <= reset ? uin1_r : uin1_r;
+	always_ff @(posedge clk1) reset_reg_b <= uin2_r[4] ? uin2_b : uin1_b;
+	always_ff @(posedge clk1) reset_reg_g <= uin2_r[4] ? uin2_g : uin1_g;
+	always_ff @(posedge clk1) reset_reg_r <= uin2_r[4] ? uin2_r : uin1_r;
+	always_ff @(posedge clk1) reset_reg2_b <= reset ? uin2_b : uin1_b;
+	always_ff @(posedge clk1) reset_reg2_g <= reset ? uin2_g : uin1_g;
+	always_ff @(posedge clk1) reset_reg2_r <= reset ? uin2_r : uin1_r;
 
 	assign uout4_b = 8'hx;
 	assign uout4_g = 8'hx;

@@ -16,8 +16,8 @@ import inspect
 TByte = Unsigned(length=8)
 
 class gate_array(Module):
-    rst = Input(logic)
-    clk = Input(logic) # 16MHz clock input
+    rst = RstPort()
+    clk = ClkPort() # 16MHz clock input
 
     n_m1 = Input(logic) # Low during op-code fetch also low during interrupt vector read (one with mreq the other with iorq)
     n_wr = Input(logic)
@@ -142,9 +142,9 @@ class gate_array(Module):
         self.hsync_after_vsync_cnt <<= Reg(Select(hsync_after_vsync_counting, 0, (self.hsync_after_vsync_cnt + hsync_falling_edge)[1:0]))
 
         next_hsync_cnt = Select(int_delay | hsync_after_vsync_stop,
-            Select(hsync_falling_edge, 
-                self.hsync_cnt, 
-                Select(hsync_at_limit, 
+            Select(hsync_falling_edge,
+                self.hsync_cnt,
+                Select(hsync_at_limit,
                     (self.hsync_cnt + 1)[5:0],
                     0
                 )
@@ -224,7 +224,7 @@ def test_sim():
             self.rst = 0
             for i in range(5):
                 yield from clk()
-            
+
             def read(reg_idx: int) -> Optional[int]:
                 # Select register by writing to the index
                 self.n_cs = 0
@@ -285,7 +285,7 @@ def test_sim():
             yield from write(13, 0) # start address low
             yield from write(14, 1) # cursor address high
             yield from write(15, 0) # cursor address low
-            
+
             print(f"All registers programmed")
             for i in range(3000):
                 now = yield from clk()

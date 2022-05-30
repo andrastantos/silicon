@@ -13,8 +13,8 @@ from enum import Enum
 
 class UseFSM(Module):
     # We're implementing a simple checksum module: get inputs until 'last', then output the sum of all received inputs
-    clk = Input(logic)
-    rst = Input(logic)
+    clk = ClkPort()
+    rst = RstPort()
 
     data_in_valid = Input(logic)
     data_last = Input(logic)
@@ -152,8 +152,8 @@ def test_fsm_sim():
 
 def test_const_fsm(mode="rtl"):
     class Top(Module):
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
 
         def body(self):
             self.decode_fsm = FSM()
@@ -179,6 +179,6 @@ def test_const_fsm(mode="rtl"):
         test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 if __name__ == "__main__":
-    #test_fsm_gen()
+    test_fsm_gen()
     #test_fsm_sim()
-    test_const_fsm()
+    #test_const_fsm()

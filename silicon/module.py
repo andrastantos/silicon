@@ -972,6 +972,9 @@ class Module(object):
                             raise SyntaxErrorException(f"Output port {output} is not fully specialized after body call. Can't finalize interface")
             assert all((output.is_specialized() or output.source is None) for output in self.get_outputs().values())
 
+        def is_top_level(self) -> bool:
+            return self.netlist.top_level is self._true_module
+
         def elaborate(self, *, add_unnamed_scopes: bool = False) -> Netlist:
 
             assert self not in self.netlist.modules, f"Module {self._true_module} has already been elaborated."

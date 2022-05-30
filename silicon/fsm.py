@@ -4,7 +4,8 @@
 # Below, I spelled things out using SelectOne though...
 
 from .module import GenericModule, Module
-from .port import Input, Output, AutoInput, Wire, Junction
+from .port import Input, Output, Wire, Junction
+from .auto_input import ClkPort, RstPort, RstValPort
 from .net_type import NetType
 from .primitives import SelectOne, Reg
 from .tracer import no_trace
@@ -102,9 +103,9 @@ class FSMLogic(Module):
 
 
 class FSM(GenericModule):
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=True)
-    reset_value = AutoInput(auto_port_names=("rst_val", "rst_val_port", "reset_value", "reset_value_port"), optional=True)
+    clock_port = ClkPort()
+    reset_port = RstPort()
+    reset_value = RstValPort()
     state = Output()
     next_state = Output()
     default_state = Input()

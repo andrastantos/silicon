@@ -29,9 +29,9 @@ RegEn = Reg
 '''
 
 class Z80MemIf(Module):
-    clk = Input(logic)
+    clk = ClkPort()
     clk_en = Input(logic)
-    rst = Input(logic)
+    rst = RstPort()
 
     # Interface to the memory
     paddr   = Output(Unsigned(16))
@@ -107,9 +107,9 @@ def test_verilog():
 
 def test_sim():
     class PDBSlave(Module):
-        clk = Input(logic)
+        clk = ClkPort()
         clk_en = Input(logic)
-        rst = Input(logic)
+        rst = RstPort()
 
         paddr   = Input(Unsigned(16))
         pm1     = Input(logic)

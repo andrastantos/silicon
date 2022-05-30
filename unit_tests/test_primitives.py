@@ -116,7 +116,7 @@ def test_reg_with_adaptor():
     class top(Module):
         uout1 = Output(Signed(length=5))
         uin2 = Input(Unsigned(length=4))
-        clk = Input(logic)
+        clk = ClkPort()
 
         def body(self):
             registered = Reg(self.uin2)
@@ -133,8 +133,8 @@ def test_reg3():
         uout4 = Output(Signed(length=5))
         uin1 = Input(Unsigned(length=2))
         uin2 = Input(Unsigned(length=4))
-        clk = Input(logic)
-        clk2 = Input(logic)
+        clk = ClkPort()
+        clk2 = ClkPort(auto_port_names = ("clk2", "clk2_port", "clock2", "clock2_port"))
 
         def body(self):
             clk = self.clk
@@ -175,8 +175,8 @@ def test_partial_assign():
 @skip_iverilog
 def test_unassigned_net_repro():
     class top(Module):
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
 
         fetch = Input(Unsigned(32))
         push_data = Output(Unsigned(32))

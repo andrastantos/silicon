@@ -62,10 +62,10 @@ That pretty much means the reg-file to be done in flops (yuck), but then port-co
 class RegEn(Module):
     output_port = Output()
     input_port = Input()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=True)
-    reset_value_port = AutoInput(auto_port_names=("rst_val", "rst_val_port", "reset_value", "reset_value_port"), optional=True)
-    clock_en = AutoInput(auto_port_names=("clk_en", "clock_en", "clock_enable"), optional=False)
+    clock_port = ClkPort()
+    reset_port = RstPort()
+    reset_value_port = RstValPort()
+    clock_en = ClkEnPort()
 
     def body(self):
         value = Wire(self.input_port.get_net_type())
@@ -76,9 +76,9 @@ RegEn = Reg
 '''
 
 class Z80RegFile(Module):
-    clk = Input(logic)
+    clk = ClkPort()
     clk_en = Input(logic)
-    rst = Input(logic)
+    rst = RstPort()
 
     wr_a = Input(Unsigned(4))
     wr_l = Input(TByte)

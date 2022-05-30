@@ -33,7 +33,7 @@ def _test_single_port_ram(mode: str, registered_input: bool, registered_output: 
         data_out = Output(Unsigned(8))
         addr = Input(Unsigned(8))
         write_en = Input(logic)
-        clk = Input(logic)
+        clk = ClkPort()
 
         def body(self):
             config = MemoryConfig(
@@ -112,7 +112,7 @@ def test_single_port_async_rom(mode: str = "rtl"):
     class Top(Module):
         data_out = Output(Unsigned(8))
         addr = Input(Unsigned(8))
-        clk = Input(logic)
+        clk = ClkPort()
 
         def body(self):
             config = MemoryConfig(
@@ -136,7 +136,7 @@ def test_single_port_rom(mode: str = "rtl"):
     class Top(Module):
         data_out = Output(Unsigned(8))
         addr = Input(Unsigned(8))
-        clk = Input(logic)
+        clk = ClkPort()
 
         def body(self):
             config = MemoryConfig(
@@ -160,7 +160,7 @@ def test_single_port_rom2(mode: str = "rtl"):
     class Top(Module):
         data_out = Output(Unsigned(8))
         addr = Input(Unsigned(8))
-        clk = Input(logic)
+        clk = ClkPort()
 
         def body(self):
             def rom_content(data_bits, addr_bits):
@@ -190,7 +190,7 @@ def test_single_port_rom3(mode: str = "rtl"):
     class Top(Module):
         data_out = Output(Unsigned(8))
         addr = Input(Unsigned(8))
-        clk = Input(logic)
+        clk = ClkPort()
 
         def body(self):
             def rom_content(data_bits, addr_bits):
@@ -220,7 +220,7 @@ def test_single_port_rom4(mode: str = "rtl"):
     class Top(Module):
         data_out = Output(Unsigned(8))
         addr = Input(Unsigned(8))
-        clk = Input(logic)
+        clk = ClkPort()
 
         def body(self):
             def rom_content(data_bits, addr_bits):
@@ -259,7 +259,7 @@ def _test_simple_dual_port_ram(mode: str, registered_input_a: bool, registered_o
         addr_b = Input(Unsigned(6))
         write_en_a = Input(logic)
         write_en_b = Input(logic)
-        clk = Input(logic)
+        clk = ClkPort()
 
         def body(self):
             config = MemoryConfig(
@@ -369,7 +369,7 @@ def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered
         data_out = Output(Pixel())
         addr = Input(Unsigned(8))
         write_en = Input(logic)
-        clk = Input(logic)
+        clk = ClkPort()
 
         def body(self):
             config = MemoryConfig(

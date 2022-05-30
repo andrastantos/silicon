@@ -94,7 +94,7 @@ def test_reg_struct():
             self.sout1 = Reg(self.uin1, clock_port=self.clk1)
             registered = Reg(self.uin2)
             self.uout1 = registered
-            reset_reg = Reg(self.uin1, reset_value_port=self.uin1, reset_port=self.uin2)
+            reset_reg = Reg(self.uin1, reset_value_port=self.uin2, reset_port=self.uin2.r[4])
             reset = self.uin2.r[0]
             reset_reg2 = Reg(self.uin1, reset_value_port=self.uin2)
             with self.clk2 as clk:
@@ -402,7 +402,7 @@ if __name__ == "__main__":
     #test_select_one_struct()
     #test_select_first_struct("rtl")
     #test_select_first_struct("sim")
-    #test_reg_struct()
+    test_reg_struct()
     #test_struct_of_struct()
     #test_generic_struct()
     #test_struct_with_method()
@@ -415,4 +415,4 @@ if __name__ == "__main__":
     #test_interface_wire2("rtl")
     #test_interface_wire3("rtl")
     #test_number_to_struct_sim()
-    test_multi_assign("sim")
+    #test_multi_assign("sim")

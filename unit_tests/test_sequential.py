@@ -14,8 +14,8 @@ import inspect
 TByte = Unsigned(length=8)
 
 class mc6845(Module):
-    rst = Input(logic)
-    clk = Input(logic)
+    rst = ClkPort()
+    clk = RstPort()
 
     n_cs = Input(logic)
     data_in = Input(logic)

@@ -2,7 +2,8 @@ from .composite import Interface, Reverse, Struct
 from .number import logic
 from typing import Union, Callable, Optional
 from .net_type import NetType
-from .port import Junction, Input, Output, Wire, AutoInput, EdgeType
+from .port import Junction, Input, Output, Wire, EdgeType
+from .auto_input import ClkPort, RstPort
 from .module import GenericModule
 from .exceptions import SyntaxErrorException
 from .utils import TSimEvent, is_iterable
@@ -56,8 +57,8 @@ class ReadyValid(Interface):
 
 class RvSimSource(GenericModule):
     output_port = Output()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=True)
+    clock_port = ClkPort()
+    reset_port = RstPort()
 
     def construct(self, data_type: NetType = None, generator: Optional[Callable] = None, max_wait_state: int = 5) -> None:
         if data_type is not None:
@@ -111,8 +112,8 @@ class RvSimSource(GenericModule):
 
 class RvSimSink(GenericModule):
     input_port = Input()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=True)
+    clock_port = ClkPort()
+    reset_port = RstPort()
 
     def construct(self, checker: Optional[Callable] = None, max_wait_state: int = 5) -> None:
         if checker is not None:
@@ -139,9 +140,51 @@ class RvSimSink(GenericModule):
                     if self.wait_state == 0 and self.input_port.valid.sim_value == 1:
                         self.wait_state = randint(1,self.max_wait_state+1)
                         sim_val = self.data_members.sim_value
-                        if is_iterable(sim_val) and len(sim_val) == 1:
-                            sim_val = sim_val[0]
-                        self.checker(sim_val)
+                        #if is_iterable(sim_val) and len(sim_val) == 1:
+                        #    sim_val = sim_val[0]
+                        self.checker(*sim_val)
                     if self.wait_state != 0:
                         self.wait_state -= 1
                     self.input_port.ready <<= 1 if self.wait_state == 0 else 0
+
+"""
+It feels like there should be a way to create a generic state-machine for ready-valid
+handshaking that abstracts away *why* data can be consumed or produced by the datapath
+and only deals with the ready/valid signalling.
+
+Especially since it's such a PITA to debug those control FSM issues every single time.
+But, I can't figure out a good abstraction at the moment.
+
+class RvController(GenericModule):
+    input_port = Input()
+    output_port = Output()
+
+    input_data = Output()
+    output_data = Input()
+
+    can_consume_data = Input(logic)
+    do_consume_data = Output(logic)
+    producing_data = Input(logic)
+    data_consumed = Output(logic)
+
+    clock_port = ClkPort()
+    reset_port = RstPort()
+
+    def construct(self, output_interface_type: NetType = None) -> None:
+        if output_interface_type is not None:
+            self.output_port.set_net_type(output_interface_type)
+        else:
+            for name, member in self.output_data.get_members():
+                self.output_port.add_member(name, member)
+
+        self.input_data.set_net_type(self.input_port.get_data_member_type())
+
+    def body(self) -> None:
+        self.input_data <<= self.input_port.get_data_members()
+        self.output_port.set_data_members(self.output_data)
+
+        self.input_port.ready <<= self.can_consume_data & self.producing_data
+        self.output_port.valid <<= self.producing_data
+
+        self.do_consume_data
+"""

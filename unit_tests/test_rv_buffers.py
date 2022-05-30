@@ -44,8 +44,8 @@ class Checker(RvSimSink):
 
 def test_gen_chk(mode: str = "rtl"):
     class top(Module):
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
 
         def body(self):
             self.data = Wire(RvData())
@@ -85,8 +85,8 @@ def test_forward_buf(mode: str = "rtl"):
     class top(Module):
         in1 = Input(RvData())
         out1 = Output(RvData())
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
 
         def body(self):
             fb = ForwardBuf()
@@ -94,8 +94,8 @@ def test_forward_buf(mode: str = "rtl"):
             self.out1 <<= fb.output_port
 
     class sim_top(Module):
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
         def body(self):
             self.data = Wire(RvData())
             self.checker = Checker()
@@ -136,15 +136,15 @@ def test_reverse_buf(mode: str = "rtl"):
     class top(Module):
         in1 = Input(RvData())
         out1 = Output(RvData())
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
 
         def body(self):
             self.out1 = ReverseBuf(self.in1)
 
     class sim_top(Module):
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
         def body(self):
             self.data = Wire(RvData())
             self.checker = Checker()
@@ -186,16 +186,16 @@ def test_fifo(mode: str = "rtl"):
     class top(Module):
         in1 = Input(RvData())
         out1 = Output(RvData())
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
 
         def body(self):
             dut = Fifo(depth=10)
             self.out1 = dut(self.in1)
 
     class sim_top(Module):
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
         def body(self):
             self.data = Wire(RvData())
             self.checker = Checker()
@@ -247,16 +247,16 @@ def test_delay_line(mode: str = "rtl"):
     class top(Module):
         in1 = Input(RvData())
         out1 = Output(RvData())
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
 
         def body(self):
             dut = DelayLine(depth=5)
             self.out1 = dut(self.in1)
 
     class sim_top(Module):
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
         def body(self):
             self.data = Wire(RvData())
             self.checker = Checker()
@@ -310,16 +310,16 @@ def test_pacer(mode: str = "rtl"):
     class top(Module):
         in1 = Input(RvData())
         out1 = Output(RvData())
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
 
         def body(self):
             dut = Pacer(3)
             self.out1 = dut(self.in1)
 
     class sim_top(Module):
-        clk = Input(logic)
-        rst = Input(logic)
+        clk = ClkPort()
+        rst = RstPort()
         def body(self):
             self.data = Wire(RvData())
             self.checker = Checker()

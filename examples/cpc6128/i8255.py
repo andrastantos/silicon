@@ -24,8 +24,8 @@ class OneHotDecode(Module):
         self.output_port[3] = self.input_port == 3
 
 class intel_8255(Module):
-    rst = Input(logic)
-    clk = Input(logic)
+    rst = RstPort()
+    clk = ClkPort()
 
     n_rd = Input(logic)
     n_wr = Input(logic)

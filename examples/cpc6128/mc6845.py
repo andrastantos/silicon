@@ -14,8 +14,8 @@ import inspect
 TByte = Unsigned(length=8)
 
 class mc6845(Module):
-    rst = Input(logic)
-    clk = Input(logic)
+    rst = RstPort()
+    clk = ClkPort()
 
     pclk_en = Input(logic)
 
@@ -89,7 +89,7 @@ class mc6845(Module):
         r13_start_addr                <<= Reg(Select(wr_reg & (reg_idx == 13), r13_start_addr, self.data_in))
         r14_cursor                    <<= Reg(Select(wr_reg & (reg_idx == 14), r14_cursor, self.data_in[5:0]))
         r15_cursor                    <<= Reg(Select(wr_reg & (reg_idx == 15), r15_cursor, self.data_in))
-        
+
         # On some variants of the chip, there is a status register. For now, we're going to leave that out
         #stat_reg = Wire(TByte)
         stat_reg = 0
@@ -97,7 +97,7 @@ class mc6845(Module):
         self.data_out = Select(self.addr, stat_reg, Select(reg_idx, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, self.r14_r15_cursor[13:8], self.r14_r15_cursor[7:0], self.r16_r17_light_pen[13:8], self.r16_r17_light_pen[7:0]))
 
         # TODO: what to do with the difference between bus-clock and character-clock?
-        # In the CPC6128 the CCLK is 1MHz, while the CPU clock is 4MHz. The oscillator is running at 16MHz. nCPU also seems to be a 1MHz clock, which also drives the audio chip. nCPU drives the address muxes, so 
+        # In the CPC6128 the CCLK is 1MHz, while the CPU clock is 4MHz. The oscillator is running at 16MHz. nCPU also seems to be a 1MHz clock, which also drives the audio chip. nCPU drives the address muxes, so
         # out of the 4MHz pulses 2 is given to the CPU and 2 to the CRTC. Given that during this time the DRAM RAS/CAS sequencing also needs to take place (using another ULA-generated signal), chances are these
         # two cycles are simply used to generate the RAS/CAS access. The 'E' or 'bus_en' pin is driven by ~(nIORD & nIOWR) so that's not really a clock in the system.
         # Overall, I think it's common that the character clock is some multiple of the bus clock, so a clock-enable should suffice, but can we take that as a design constraint? For now, probably.
@@ -123,11 +123,11 @@ class mc6845(Module):
         next_h_sync_cnt = Select(h_sync_start & self.pclk_en, (h_sync_cnt + self.pclk_en)[3:0], 0)
         h_sync_cnt <<= Reg(next_h_sync_cnt)
         h_sync_end = next_h_sync_cnt == self.r3_sync_width
-        
+
         self.hs = Reg(
-            Select(self.pclk_en, 
+            Select(self.pclk_en,
                 self.hs,
-                Select(h_sync_end, 
+                Select(h_sync_end,
                     Select(h_sync_start, self.hs, 1),
                     0
                 ),
@@ -136,8 +136,8 @@ class mc6845(Module):
 
         h_disp_valid = Wire(logic)
         next_h_disp_valid = Select(self.pclk_en,
-            h_disp_valid, 
-            Select(h_line_end, 
+            h_disp_valid,
+            Select(h_line_end,
                 Select(h_disp_end, h_disp_valid, 0),
                 1
             )
@@ -192,11 +192,11 @@ class mc6845(Module):
         char_addr = Wire(Unsigned(length=14))
         line_start_addr = Wire(Unsigned(length=14))
 
-        next_char_addr = Select( v_end, 
-            Select( h_line_end & ~scan_line_end & self.pclk_en, 
-                char_addr + (self.pclk_en & disp_valid), 
+        next_char_addr = Select( v_end,
+            Select( h_line_end & ~scan_line_end & self.pclk_en,
+                char_addr + (self.pclk_en & disp_valid),
                 line_start_addr
-            )[13:0], 
+            )[13:0],
             self.r12_r13_start_addr
         )
 
@@ -220,7 +220,7 @@ class mc6845(Module):
         cursor_rows_end = scan_line_cnt == cursor_end
         next_cursor_rows = Select(vclk_en,
             cursor_rows,
-            Select(cursor_rows_start, 
+            Select(cursor_rows_start,
                 Select(cursor_rows_end,
                     cursor_rows,
                     0
@@ -277,7 +277,7 @@ def test_sim():
             self.rst = 0
             for i in range(5):
                 yield from clk()
-            
+
             def read(reg_idx: int) -> Optional[int]:
                 # Select register by writing to the index
                 self.n_cs = 0
@@ -338,7 +338,7 @@ def test_sim():
             yield from write(13, 0) # start address low
             yield from write(14, 1) # cursor address high
             yield from write(15, 0) # cursor address low
-            
+
             print(f"All registers programmed")
             for i in range(1000):
                 now = yield from clk()

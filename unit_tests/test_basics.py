@@ -204,8 +204,8 @@ def test_full_adder():
 
 def test_loop_finder(mode="rtl"):
     class Top(si.Module):
-        clk = si.Input(si.logic)
-        rst = si.Input(si.logic)
+        clk = si.ClkPort()
+        rst = si.RstPort()
 
         def body(self):
             """
