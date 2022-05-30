@@ -1,6 +1,6 @@
 from .module import Module, InlineBlock, InlineExpression, InlineStatement, InlineComposite, GenericModule, has_port
 from typing import Dict, Optional, Tuple, Any, Generator, Union, Sequence
-from .port import Junction, Input, Output, Port, AutoInput, EdgeType
+from .port import Junction, Input, Output, Port, AutoInput, EdgeType, Wire
 from .net_type import NetType, KeyKind
 from .exceptions import SyntaxErrorException, SimulationException
 from .tracer import no_trace
@@ -625,6 +625,18 @@ class Reg(Module):
                 elif edge_type == EdgeType.Undefined:
                     self.output_port <<= None
 
+class RegEn(Module):
+    output_port = Output()
+    input_port = Input()
+    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
+    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=True)
+    reset_value_port = AutoInput(auto_port_names=("rst_val", "rst_val_port", "reset_value", "reset_value_port"), optional=True)
+    clock_en = AutoInput(auto_port_names=("clk_en", "clock_en", "clock_enable"), optional=False)
+
+    def body(self):
+        value = Wire(self.input_port.get_net_type())
+        value <<= Reg(Select(self.clock_en, value, self.input_port))
+        self.output_port <<= value
 
 
 
