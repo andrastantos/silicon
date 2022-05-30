@@ -93,76 +93,87 @@ class Fifo(GenericModule):
         self.depth = depth
 
     def body(self):
-        full = Wire(logic)
-        empty = Wire(logic)
-        next_full = Wire(logic)
-        next_empty = Wire(logic)
+        if self.depth == 0:
+            self.output_port <<= self.input_port
+        elif self.depth == 1:
+            self.output_port <<= ForwardBuf(self.input_port)
+        else:
+            full = Wire(logic)
+            empty = Wire(logic)
+            next_full = Wire(logic)
+            next_empty = Wire(logic)
 
-        self.output_port.set_net_type(self.input_port.get_net_type())
+            self.output_port.set_net_type(self.input_port.get_net_type())
 
-        input_data = self.input_port.get_data_members()
+            input_data = self.input_port.get_data_members()
 
-        self.input_port.ready <<= ~full
-        self.output_port.valid <<= ~empty
+            self.input_port.ready <<= ~full
+            self.output_port.valid <<= ~empty
 
-        addr_type = Number(min_val=0, max_val=self.depth-1)
-        data_type = input_data.get_net_type()
+            addr_type = Number(min_val=0, max_val=self.depth-1)
+            data_type = input_data.get_net_type()
 
-        output_data = Wire(data_type)
+            output_data = Wire(data_type)
 
-        push_addr = Wire(addr_type)
-        next_push_addr = Wire(addr_type)
-        pop_addr = Wire(addr_type)
-        next_pop_addr = Wire(addr_type)
+            push_addr = Wire(addr_type)
+            next_push_addr = Wire(addr_type)
+            pop_addr = Wire(addr_type)
+            next_pop_addr = Wire(addr_type)
 
-        push = ~full & self.input_port.valid
-        pop = ~empty & self.output_port.ready
+            push = ~full & self.input_port.valid
+            pop = ~empty & self.output_port.ready
 
-        looped = Wire(logic)
-        next_looped = Wire(logic)
+            looped = Wire(logic)
+            next_looped = Wire(logic)
 
-        push_will_wrap = push_addr == self.depth-1
-        pop_will_wrap = pop_addr == self.depth-1
-        next_push_addr <<= Select(push, push_addr, addr_type(Select(push_will_wrap, push_addr+1, 0)))
-        next_pop_addr <<= Select(pop, pop_addr, addr_type(Select(pop_will_wrap, pop_addr+1, 0)))
+            push_will_wrap = push_addr == self.depth-1
+            pop_will_wrap = pop_addr == self.depth-1
+            next_push_addr <<= Select(push, push_addr, addr_type(Select(push_will_wrap, push_addr+1, 0)))
+            next_pop_addr <<= Select(pop, pop_addr, addr_type(Select(pop_will_wrap, pop_addr+1, 0)))
 
-        next_looped <<= SelectOne(
-            (push != 1) & (pop != 1), looped,
-            (push == 1) & (pop != 1), Select(push_will_wrap, looped, 1),
-            (push != 1) & (pop == 1), Select(pop_will_wrap, looped, 0),
-            (push == 1) & (pop == 1), SelectOne(
-                (push_will_wrap != 1) & (pop_will_wrap != 1), looped,
-                (push_will_wrap == 1) & (pop_will_wrap != 1), 1,
-                (push_will_wrap != 1) & (pop_will_wrap == 1), 0,
-                (push_will_wrap == 1) & (pop_will_wrap == 1), looped
-            ),
-        )
+            next_looped <<= SelectOne(
+                (push != 1) & (pop != 1), looped,
+                (push == 1) & (pop != 1), Select(push_will_wrap, looped, 1),
+                (push != 1) & (pop == 1), Select(pop_will_wrap, looped, 0),
+                (push == 1) & (pop == 1), SelectOne(
+                    (push_will_wrap != 1) & (pop_will_wrap != 1), looped,
+                    (push_will_wrap == 1) & (pop_will_wrap != 1), 1,
+                    (push_will_wrap != 1) & (pop_will_wrap == 1), 0,
+                    (push_will_wrap == 1) & (pop_will_wrap == 1), looped
+                ),
+            )
 
-        next_empty_or_full = next_push_addr == next_pop_addr
-        next_empty <<= Select(next_empty_or_full, 0, ~next_looped)
-        next_full <<= Select(next_empty_or_full, 0, next_looped)
+            next_empty_or_full = next_push_addr == next_pop_addr
+            next_empty <<= Select(next_empty_or_full, 0, ~next_looped)
+            next_full <<= Select(next_empty_or_full, 0, next_looped)
 
-        push_addr <<= Reg(next_push_addr)
-        pop_addr <<= Reg(next_pop_addr)
-        empty <<= Reg(next_empty)
-        full <<= Reg(next_full)
-        looped <<= Reg(next_looped)
+            push_addr <<= Reg(next_push_addr)
+            pop_addr <<= Reg(next_pop_addr)
+            empty <<= Reg(next_empty)
+            full <<= Reg(next_full)
+            looped <<= Reg(next_looped)
 
-        # Buffer memory
-        mem_config = MemoryConfig((
-            MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False),
-            MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False)
-        ))
-        buffer = Memory(mem_config)
+            # Buffer memory
+            mem_config = MemoryConfig((
+                MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False),
+                MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False)
+            ))
+            buffer = Memory(mem_config)
 
-        buffer.port1_data_in <<= input_data
-        buffer.port1_addr <<= push_addr
-        buffer.port1_write_en <<= push
-        output_data <<= buffer.port2_data_out
-        buffer.port2_addr <<= next_pop_addr
-        self.output_port.set_data_members(output_data)
+            buffer.port1_data_in <<= input_data
+            buffer.port1_addr <<= push_addr
+            buffer.port1_write_en <<= push
+            output_data <<= buffer.port2_data_out
+            buffer.port2_addr <<= next_pop_addr
+            self.output_port.set_data_members(output_data)
 
 
+"""
+TODO:
+
+- DelayLine should have an implementation variant that uses a FiFo buffer - sort of line-buffer-style behavior
+- These two delay-line implementations should be checked against one another for no difference in behavior
+"""
 class DelayLine(GenericModule):
     input_port = Input()
     output_port = Output()
@@ -175,70 +186,10 @@ class DelayLine(GenericModule):
         self.depth = depth
 
     def body(self):
-        full = Wire(logic)
-        next_full = Wire(logic)
-
-        self.output_port.set_net_type(self.input_port.get_net_type())
-
-        input_data = self.input_port.get_data_members()
-
-        self.input_port.ready <<= ~full
-        self.output_port.valid <<= full
-
-        addr_type = Number(min_val=0, max_val=self.depth-1)
-        data_type = input_data.get_net_type()
-
-        output_data = Wire(data_type)
-
-        push_addr = Wire(addr_type)
-        next_push_addr = Wire(addr_type)
-        pop_addr = Wire(addr_type)
-        next_pop_addr = Wire(addr_type)
-
-        push = ~full & self.input_port.valid
-        pop = full & self.output_port.ready
-
-        looped = Wire(logic)
-        next_looped = Wire(logic)
-
-        push_will_wrap = push_addr == self.depth-1
-        pop_will_wrap = pop_addr == self.depth-1
-        next_push_addr <<= Select(push, push_addr, addr_type(Select(push_will_wrap, push_addr+1, 0)))
-        next_pop_addr <<= Select(pop, pop_addr, addr_type(Select(pop_will_wrap, pop_addr+1, 0)))
-
-        next_looped <<= SelectOne(
-            (push != 1) & (pop != 1), looped,
-            (push == 1) & (pop != 1), Select(push_will_wrap, looped, 1),
-            (push != 1) & (pop == 1), Select(pop_will_wrap, looped, 0),
-            (push == 1) & (pop == 1), SelectOne(
-                (push_will_wrap != 1) & (pop_will_wrap != 1), looped,
-                (push_will_wrap == 1) & (pop_will_wrap != 1), 1,
-                (push_will_wrap != 1) & (pop_will_wrap == 1), 0,
-                (push_will_wrap == 1) & (pop_will_wrap == 1), looped
-            ),
-        )
-
-        next_empty_or_full = next_push_addr == next_pop_addr
-        next_full <<= Select(next_empty_or_full, 0, next_looped)
-
-        push_addr <<= Reg(next_push_addr)
-        pop_addr <<= Reg(next_pop_addr)
-        full <<= Reg(next_full)
-        looped <<= Reg(next_looped)
-
-        # Buffer memory
-        mem_config = MemoryConfig((
-            MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False),
-            MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False)
-        ))
-        buffer = Memory(mem_config)
-
-        buffer.port1_data_in <<= input_data
-        buffer.port1_addr <<= push_addr
-        buffer.port1_write_en <<= push
-        output_data <<= buffer.port2_data_out
-        buffer.port2_addr <<= next_pop_addr
-        self.output_port.set_data_members(output_data)
+        intermediate = self.input_port
+        for i in range(self.depth):
+            intermediate = ForwardBuf(intermediate)
+        self.output_port <<= intermediate
 
 
 class Pacer(GenericModule):

@@ -284,18 +284,18 @@ def test_delay_line(mode: str = "rtl"):
                 yield from clk()
             self.rst <<= 0
 
-            #self.generator.max_wait_state = 10
-            #self.checker.max_wait_state = 2
-            #for i in range(500):
-            #    yield from clk()
-            self.generator.max_wait_state = 5
-            self.checker.max_wait_state = 5
-            for i in range(500):
+            self.generator.max_wait_state = 10
+            self.checker.max_wait_state = 2
+            for i in range(100):
                 yield from clk()
-            #self.generator.max_wait_state = 2
-            #self.checker.max_wait_state = 10
-            #for i in range(500):
-            #    yield from clk()
+            self.generator.max_wait_state = 0
+            self.checker.max_wait_state = 0
+            for i in range(100):
+                yield from clk()
+            self.generator.max_wait_state = 2
+            self.checker.max_wait_state = 10
+            for i in range(100):
+                yield from clk()
             now = yield 10
             print(f"Done at {now}")
 
@@ -376,5 +376,5 @@ if __name__ == "__main__":
     #test_reverse_buf("sim")
     #test_fifo("sim")
     #test_gen_chk("sim")
-    #test_delay_line("sim")
-    test_pacer("sim")
+    test_delay_line("sim")
+    #test_pacer("sim")
