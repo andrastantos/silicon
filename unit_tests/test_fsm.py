@@ -85,7 +85,7 @@ def test_fsm_sim():
                 yield 10
                 self.clk <<= ~self.clk
                 yield 0
-            
+
             def send_packet(byte_cnt: int, wait_cnt: int, initial_sum: int = 0):
                 from random import randint
                 chksum = initial_sum
@@ -150,6 +150,35 @@ def test_fsm_sim():
 
     test.simulation(UseFSM_tb, "test_fsm_sim")
 
+def test_const_fsm(mode="rtl"):
+    class Top(Module):
+        clk = Input(logic)
+        rst = Input(logic)
+
+        def body(self):
+            self.decode_fsm = FSM()
+
+            self.decode_fsm.reset_value <<= 11
+            self.decode_fsm.default_state <<= 12
+
+            # We have serious problems with constant generation IFF we access state before any of the edge assignments
+            # This doesn't happen if:
+            # - We create some other gates (compare clk for example)
+            # - If the access happens *after* the transition declarations
+            # It does happen though if either state or next_state is accessed
+            shouldnt_matter = Wire(Number(min_val=11,max_val=12))
+            shouldnt_matter <<= self.decode_fsm.next_state
+
+            # We're in a state where we don't have anything partial
+            terminal_fsm_state = Wire(logic)
+            self.decode_fsm.add_transition(11, 1, 12)
+
+    if mode == "rtl":
+        test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
 if __name__ == "__main__":
-    test_fsm_gen()
+    #test_fsm_gen()
     #test_fsm_sim()
+    test_const_fsm()
