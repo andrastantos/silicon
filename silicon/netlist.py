@@ -398,7 +398,6 @@ class Netlist(object):
         for module in self.modules:
             from .primitives import SelectOne
             visited_modules = set()
-            visited_xnets = set()
             _rank_module(module)
         for module in self.modules:
             assert module in rank_map

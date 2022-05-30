@@ -202,6 +202,46 @@ def test_full_adder():
     print(rtl)
 """
 
+def test_loop_finder(mode="rtl"):
+    class Top(si.Module):
+        clk = si.Input(si.logic)
+        rst = si.Input(si.logic)
+
+        def body(self):
+            """
+            Testing for diverging, then re-combining combinatorial
+            graphs. These have non-directed loops in them, but
+            still are DAGs, so the loop finder should not get triggered.
+            """
+            self.decode_fsm = si.FSM()
+
+            self.decode_fsm.reset_value <<= 0
+            self.decode_fsm.default_state <<= 0
+
+            aaa = (self.decode_fsm.state == 0)
+            ddd = (self.decode_fsm.state == 0)
+            self.decode_fsm.add_transition(0, aaa, 1)
+            self.decode_fsm.add_transition(0, ddd, 3)
+
+
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
     #test_module_decorator1()
     #test_module_decorator()
@@ -214,3 +254,4 @@ if __name__ == "__main__":
     #test_slice_bind()
     #test_double_port_assign()
     #test_full_adder()
+    test_loop_finder("rtl")
