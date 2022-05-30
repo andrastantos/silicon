@@ -46,8 +46,9 @@ class Gate(Module):
 
     def body(self) -> None:
         new_net_type = self.generate_output_type()
-        assert not self.output_port.is_specialized()
-        self.output_port.set_net_type(new_net_type)
+        assert not self.output_port.is_specialized() or new_net_type is None
+        if new_net_type is not None:
+            self.output_port.set_net_type(new_net_type)
     def create_positional_port(self, idx: int) -> Optional[Union[str, Port]]:
         name = f"input_port_{idx}"
         return (name, self.create_named_port(name))
@@ -292,14 +293,17 @@ class abs_gate(UnaryGate):
         return adjust_precision(input, input_expression, input_precedence, self.output_port.precision, back_end)
 
 class bool_gate(UnaryGate):
+    def construct(self):
+        super().construct()
+        from .number import logic
+        self.output_port.set_net_type(logic)
     def sim_op(cls, input: Port) -> Any:
         input = _sim_value(input)
         if input is None:
             return None
         return bool(input)
     def generate_output_type(self) -> Optional['Number']:
-        from .number import logic
-        return logic
+        return None
     def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
         op_precedence = back_end.get_operator_precedence("==", True)
@@ -402,9 +406,12 @@ class rshift_gate(BinaryGate):
 
 
 class ComparisonGate(BinaryGate):
-    def generate_output_type(self) -> Optional['Number']:
+    def construct(self):
+        super().construct()
         from .number import logic
-        return logic
+        self.output_port.set_net_type(logic)
+    def generate_output_type(self) -> Optional['Number']:
+        return None
 
 class lt_gate(ComparisonGate):
     def sim_op(cls, input_0: Port, input_1: Any) -> Any:
