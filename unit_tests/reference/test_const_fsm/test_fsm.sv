@@ -8,7 +8,7 @@ module Top (
 
 	logic [3:0] shouldnt_matter;
 	logic [3:0] u2_state;
-	logic unnamed_wire_1;
+	logic u3_output_port;
 
 	FSM u2 (
 		.clock_port(clk),
@@ -17,10 +17,10 @@ module Top (
 		.state(u2_state),
 		.next_state(shouldnt_matter),
 		.default_state(4'hc),
-		.input_11_to_12(unnamed_wire_1)
+		.input_11_to_12(u3_output_port)
 	);
 
-	assign unnamed_wire_1 = 1'h1;
+	assign u3_output_port = 1'h1;
 endmodule
 
 
