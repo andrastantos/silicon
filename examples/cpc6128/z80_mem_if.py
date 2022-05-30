@@ -24,18 +24,6 @@ lines for 'refresh', 'io access' and 'm1'.
 
 """
 
-class RegEn(Module):
-    output_port = Output()
-    input_port = Input()
-    clock_port = AutoInput(auto_port_names=("clk", "clk_port", "clock", "clock_port"), optional=False)
-    reset_port = AutoInput(auto_port_names=("rst", "rst_port", "reset", "reset_port"), optional=True)
-    reset_value_port = AutoInput(auto_port_names=("rst_val", "rst_val_port", "reset_value", "reset_value_port"), optional=True)
-    clock_en = AutoInput(auto_port_names=("clk_en", "clock_en", "clock_enable"), optional=False)
-
-    def body(self):
-        value = Wire(self.input_port.get_net_type())
-        value <<= Reg(Select(self.clock_en, value, self.input_port))
-        self.output_port <<= value
 '''
 RegEn = Reg
 '''
@@ -252,7 +240,7 @@ def test_sim():
                 yield from clk()
                 #assert self.done
                 #assert self.data_in == data
-                
+
             print("Simulation started")
             self.clk_en <<= 1
 
