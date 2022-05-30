@@ -365,18 +365,18 @@ class Netlist(object):
             if module in rank_map:
                 if xnet is not None: xnet_trace.pop()
                 return rank_map[module]
+            # Check for loops (i.e. if graph truly is a DAG)
+            if module in visited_modules:
+                def get_xnet_names(xnet):
+                    return ' a.k.a. '.join(xnet.names)
+                def xnet_trace_names():
+                    return "\n    ".join(get_xnet_names(xnet) for xnet in xnet_trace)
+                raise SyntaxErrorException(f"Combinatorial loop found:\n    {xnet_trace_names()}")
+            visited_modules.add(module)
             if not module.is_combinational():
                 rank = 0
             else:
                 source_xnets = get_sinked_xnets(module)
-                for source_xnet in source_xnets:
-                    if source_xnet in visited_xnets:
-                        def get_xnet_names(xnet):
-                            return ' a.k.a. '.join(xnet.names)
-                        def xnet_trace_names():
-                            return "\n    ".join(get_xnet_names(xnet) for xnet in xnet_trace)
-                        raise SyntaxErrorException(f"Combinatorial loop found:\n    {xnet_trace_names()}")
-                    visited_xnets.add(source_xnet)
                 if len(source_xnets) == 0:
                     rank = 0
                 else:
@@ -392,9 +392,12 @@ class Netlist(object):
                 rank_list.append(OrderedSet())
             rank_list[rank].add(module)
             if xnet is not None: xnet_trace.pop()
+            visited_modules.remove(module)
             return rank
 
         for module in self.modules:
+            from .primitives import SelectOne
+            visited_modules = set()
             visited_xnets = set()
             _rank_module(module)
         for module in self.modules:
