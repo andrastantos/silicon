@@ -9,12 +9,12 @@ from .net_type import NetType
 from .primitives import SelectOne, Reg
 from .tracer import no_trace
 from .exceptions import SyntaxErrorException
-from .utils import is_junction, is_junction_member, is_junction_or_member
+from .utils import is_junction, is_junction_member, is_junction_or_member, convert_to_junction
 from .number import Number, logic
 from .constant import get_net_type_for_const
 from .back_end import str_to_id
 from collections import OrderedDict
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 from enum import Enum
 
 def _format_state_name(state: Any):
@@ -37,7 +37,7 @@ class FSMLogic(Module):
         self._state_transition_table = OrderedDict()
 
 
-    def add_transition(self, current_state: Any, condition: Junction, new_state: Any) -> None:
+    def create_transition(self, current_state: Any, new_state: Any) -> Tuple[Junction, str]:
         if is_junction_or_member(current_state):
             raise SyntaxErrorException(f"Current state must be a constant, not a net.")
         if is_junction_or_member(new_state):
@@ -53,6 +53,10 @@ class FSMLogic(Module):
             port_name = f"input_{_format_state_name(current_state)}_to_{_format_state_name(new_state)}"
             self._state_transition_table[edge] = [input,]
         setattr(self, port_name, input)
+        return input, port_name
+
+    def add_transition(self, current_state: Any, condition: Junction, new_state: Any) -> None:
+        input, _ = self.create_transition(current_state, new_state)
         input <<= condition
 
     def body(self) -> None:
@@ -132,12 +136,16 @@ class FSM(GenericModule):
         new_state_net_type = get_net_type_for_const(new_state)
         self._state_net_type = self._state_net_type.result_type((current_state_net_type, new_state_net_type), "SELECT")
 
-        port_name = f"input_{_format_state_name(current_state)}_to_{_format_state_name(new_state)}"
+        with self._impl._inside:
+            logic_input, port_name = self.fsm_logic.create_transition(current_state, new_state)
+
         input = Input()
         setattr(self, port_name, input)
         input <<= condition
+
         with self._impl._inside:
-            self.fsm_logic.add_transition(current_state, input, new_state)
+            logic_input <<= input
+
     def body(self) -> None:
         # Create a wire containing the current state (since outputs can't be read within the body)
         #state_type = Number(min_val=self._min_state_val, max_val=self._max_state_val)
