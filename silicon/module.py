@@ -952,7 +952,15 @@ class Module(object):
 
             propagate_net_types()
             if len(incomplete_sub_modules) != 0:
-                raise SyntaxErrorException(f"Can't determine all net types")
+                # Collect all nets that don't have a type, but must to continue
+                input_list = []
+                for sub_module in tuple(incomplete_sub_modules):
+                    input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or not input.has_driver()))
+                if len(input_list) > 10:
+                    list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list[:5]) + "\n    ...\n    " + "\n    ".join(i.get_diagnostic_name() for i in input_list[-5:])
+                else:
+                    list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list)
+                raise SyntaxErrorException(f"Can't determine net types for:\n    {list_str}")
 
             # Propagate output types, if needed
             for output in self.get_outputs().values():
