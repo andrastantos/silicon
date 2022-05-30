@@ -62,12 +62,11 @@ class XNet(object):
         if scope in self.assigned_names:
             return self.assigned_names[scope], 0
         make_name_used = False
-        if scope in self.rhs_expressions:
-            if allow_expression:
-                return self.rhs_expressions[scope]
-            else:
-                # We are going to return a name. We have to make sure that an eventual assignment to that name is made
-                make_name_used = True
+        if scope in self.rhs_expressions and allow_expression:
+            return self.rhs_expressions[scope]
+        else:
+            # We are going to return a name. We have to make sure that an eventual assignment to that name is made
+            make_name_used = True
         # If we're asked to return the name in the source context, we should return the unconnected value.
         # That is because an XNet is either sourced by a primitive (which would never ask for the RHS name of its output)
         # or it's unconnected, in which case we should return the unconnected value.
@@ -311,6 +310,7 @@ class Netlist(object):
                         "Possible reasons:\n"\
                         "    - Port is connected to itself somehow, creating a trivial combinatorial loop\n"\
                         "    - Port is driven by an unassigned junction"
+                        "    - Port is driven by local wire that accidentally assigned to (=) instead of bound (<<=)"
                     )
 
     def _fill_xnet_names(self, add_unnamed_scopes: bool):
@@ -403,6 +403,8 @@ class Netlist(object):
         return rank_list, rank_map
 
     def get_xnet_for_junction(self, junction: 'Junction') -> 'XNet':
+        if junction not in self.junction_to_xnet_map:
+            raise SyntaxErrorException(f"Can't associate {junction} with any Xnet. Most likely reason is that it doesn't have a source.")
         return self.junction_to_xnet_map[junction]
 
     def get_xnets_for_junction(self, junction: 'Junction', base_name: str = "<unknown>") -> Dict[str, Tuple['XNet', 'Junction']]:
