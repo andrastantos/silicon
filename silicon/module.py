@@ -1264,7 +1264,10 @@ class Module(object):
                                     source_port = sub_port
                                     source_module = sub_module
                             assert source_module is not None, "Strange: I don't think it's possible that an xnet is sourced by a floating port..."
-                            name = f"{source_module._impl.name}{MEMBER_DELIMITER}{source_port.interface_name}{name_suffix}"
+                            if source_module is self._true_module:
+                                name = source_port.interface_name
+                            else:
+                                name = f"{source_module._impl.name}{MEMBER_DELIMITER}{source_port.interface_name}"
                             unique_name = self.symbol_table.register_symbol(name, xnet)
                             assert unique_name == name
                             xnet.add_name(self._true_module, unique_name, is_explicit=False, is_input=False) # These ports are not inputs, at least not as far is this context is concerned.
