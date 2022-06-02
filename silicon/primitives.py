@@ -287,18 +287,24 @@ class SelectOne(_SelectOneHot):
         while True:
             yield self.get_inputs().values()
             found = False
+            selected_value = None
             for selector in self.selector_ports.values():
                 if selector.sim_value is None:
                     self.output_port <<= self.default_port
                     found = True
                     break
                 if selector.sim_value != 0:
+                    # Normally we don't like several selectors being 1 at the same time (selectors being one-hot), but
+                    # if the associated values are the same, that's not an actual problem. The and-or logic behind the
+                    # synthesized logic will actually produce the expected value, so let's accept it.
                     if found:
-                        # Due to simultanious changes (that are delayed by epsilon) it's possible that we have multiple inputs set even if that should not occur in a no-delay simulation
-                        self.output_port <<= None
-                        break
-                        #raise SimulationException(f"Multiple selectors set on one-hot encoded selector", self)
+                        if selected_value != self.selector_to_value_map[selector].sim_value:
+                            # Due to simultanious changes (that are delayed by epsilon) it's possible that we have multiple inputs set even if that should not occur in a no-delay simulation
+                            self.output_port <<= None
+                            break
+                            #raise SimulationException(f"Multiple selectors set on one-hot encoded selector", self)
                     found = True
+                    selected_value = self.selector_to_value_map[selector].sim_value
                     self.output_port <<= self.selector_to_value_map[selector]
             if not found:
                 self.output_port <<= self.default_port
