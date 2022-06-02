@@ -196,7 +196,7 @@ class Simulator(object):
             self.vcd_writer = VCDWriter(vcd_stream, timescale=timescale, scope_sep=FQN_DELIMITER)
             self._last_now = None
             self._delta = 0
-        
+
         def _setup(self) -> None:
             """
             Second phase initialization of simulator context.
@@ -241,7 +241,11 @@ class Simulator(object):
                     if filter.match(name):
                         port = xnet.source #if xnet.source is not None else first(xnet.sinks)
                         if port is not None:
-                            assert not port.is_typeless() or len(xnet.sinks) == 0
+                            # This assert is incorrect: it can actually happen for cases, where auto-input ports
+                            # get connected through the hierarchy, but are left unconnected on the top level.
+                            # If we encounter such an instance, we're simply leaving it out of the dump
+                            # (since we don't know what type to export it as).
+                            #assert not port.is_typeless() or len(xnet.sinks) == 0
                             if not port.is_typeless():
                                 scopes = name.split(FQN_DELIMITER)
                                 scope = FQN_DELIMITER.join(scopes[:-1])
@@ -290,7 +294,7 @@ class Simulator(object):
             if self.vcd_writer is not None:
                 self.vcd_writer.flush()
             return self.now
-        
+
         def _done(self):
             now = self.now
             for xnet in self.simulator.netlist.xnets:
@@ -329,7 +333,7 @@ class Simulator(object):
         self.current_event = self._get_event(0)
         self.context._setup()
         return self.context
-    
+
     def __exit__(self, exception_type, exception_value, traceback):
         self.context._done()
         self.context = None
