@@ -73,7 +73,7 @@ def sim_const(value: Any, for_junction: 'Junction') -> Any:
 def ClkPort(
     net_type: Optional[NetType] = logic,
     parent_module: 'Module' = None, *,
-    keyword_only: bool = False,
+    keyword_only: bool = True,
     auto_port_names: Union[str, Sequence[str]] = ("clk", "clk_port", "clock", "clock_port"),
     optional: bool = False
 ):
@@ -88,7 +88,7 @@ def ClkPort(
 def ClkEnPort(
     net_type: Optional[NetType] = logic,
     parent_module: 'Module' = None, *,
-    keyword_only: bool = False,
+    keyword_only: bool = True,
     auto_port_names: Union[str, Sequence[str]] = ("clk_en", "clk_en_port", "clock_enable", "clock_enable_port"),
     optional: bool = False
 ):
@@ -103,7 +103,7 @@ def ClkEnPort(
 def RstPort(
     net_type: Optional[NetType] = logic,
     parent_module: 'Module' = None, *,
-    keyword_only: bool = False,
+    keyword_only: bool = True,
     auto_port_names: Union[str, Sequence[str]] = ("rst", "rst_port", "reset", "reset_port"),
     optional: bool = True
 ):
@@ -118,7 +118,7 @@ def RstPort(
 def RstValPort(
     net_type: Optional[NetType] = None,
     parent_module: 'Module' = None, *,
-    keyword_only: bool = False,
+    keyword_only: bool = True,
     auto_port_names: Union[str, Sequence[str]] = ("rst_val", "rst_val_port", "reset_value", "reset_value_port"),
     optional: bool = True
 ):
