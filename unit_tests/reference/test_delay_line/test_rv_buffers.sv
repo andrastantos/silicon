@@ -47,77 +47,77 @@ module DelayLine (
 );
 
 	logic intermediate_ready;
-	logic [7:0] u_output_port_data_data;
-	logic u_output_port_valid_valid;
-	logic [7:0] u1_output_port_data_data;
-	logic u1_output_port_valid_valid;
-	logic u_output_port_ready_ready;
-	logic [7:0] u2_output_port_data_data;
-	logic u2_output_port_valid_valid;
-	logic u1_output_port_ready_ready;
-	logic [7:0] u3_output_port_data_data;
-	logic u3_output_port_valid_valid;
-	logic u2_output_port_ready_ready;
+	logic [7:0] u_output_port_data;
+	logic u_output_port_valid;
+	logic [7:0] u1_output_port_data;
+	logic u1_output_port_valid;
+	logic u_output_port_ready;
+	logic [7:0] u2_output_port_data;
+	logic u2_output_port_valid;
+	logic u1_output_port_ready;
+	logic [7:0] u3_output_port_data;
+	logic u3_output_port_valid;
+	logic u2_output_port_ready;
 	logic [7:0] intermediate_data;
 	logic intermediate_valid;
-	logic u3_output_port_ready_ready;
+	logic u3_output_port_ready;
 
 	ForwardBuf u (
 		.input_port_data(input_port_data),
 		.input_port_ready(input_port_ready),
 		.input_port_valid(input_port_valid),
 
-		.output_port_data(u_output_port_data_data),
-		.output_port_ready(u_output_port_ready_ready),
-		.output_port_valid(u_output_port_valid_valid),
+		.output_port_data(u_output_port_data),
+		.output_port_ready(u_output_port_ready),
+		.output_port_valid(u_output_port_valid),
 
 		.clock_port(clock_port),
 		.reset_port(reset_port)
 	);
 
 	ForwardBuf_2 u1 (
-		.input_port_data(u_output_port_data_data),
-		.input_port_ready(u_output_port_ready_ready),
-		.input_port_valid(u_output_port_valid_valid),
+		.input_port_data(u_output_port_data),
+		.input_port_ready(u_output_port_ready),
+		.input_port_valid(u_output_port_valid),
 
-		.output_port_data(u1_output_port_data_data),
-		.output_port_ready(u1_output_port_ready_ready),
-		.output_port_valid(u1_output_port_valid_valid),
+		.output_port_data(u1_output_port_data),
+		.output_port_ready(u1_output_port_ready),
+		.output_port_valid(u1_output_port_valid),
 
 		.clock_port(clock_port),
 		.reset_port(reset_port)
 	);
 
 	ForwardBuf_3 u2 (
-		.input_port_data(u1_output_port_data_data),
-		.input_port_ready(u1_output_port_ready_ready),
-		.input_port_valid(u1_output_port_valid_valid),
+		.input_port_data(u1_output_port_data),
+		.input_port_ready(u1_output_port_ready),
+		.input_port_valid(u1_output_port_valid),
 
-		.output_port_data(u2_output_port_data_data),
-		.output_port_ready(u2_output_port_ready_ready),
-		.output_port_valid(u2_output_port_valid_valid),
+		.output_port_data(u2_output_port_data),
+		.output_port_ready(u2_output_port_ready),
+		.output_port_valid(u2_output_port_valid),
 
 		.clock_port(clock_port),
 		.reset_port(reset_port)
 	);
 
 	ForwardBuf_4 u3 (
-		.input_port_data(u2_output_port_data_data),
-		.input_port_ready(u2_output_port_ready_ready),
-		.input_port_valid(u2_output_port_valid_valid),
+		.input_port_data(u2_output_port_data),
+		.input_port_ready(u2_output_port_ready),
+		.input_port_valid(u2_output_port_valid),
 
-		.output_port_data(u3_output_port_data_data),
-		.output_port_ready(u3_output_port_ready_ready),
-		.output_port_valid(u3_output_port_valid_valid),
+		.output_port_data(u3_output_port_data),
+		.output_port_ready(u3_output_port_ready),
+		.output_port_valid(u3_output_port_valid),
 
 		.clock_port(clock_port),
 		.reset_port(reset_port)
 	);
 
 	ForwardBuf_5 u4 (
-		.input_port_data(u3_output_port_data_data),
-		.input_port_ready(u3_output_port_ready_ready),
-		.input_port_valid(u3_output_port_valid_valid),
+		.input_port_data(u3_output_port_data),
+		.input_port_ready(u3_output_port_ready),
+		.input_port_valid(u3_output_port_valid),
 
 		.output_port_data(intermediate_data),
 		.output_port_ready(output_port_ready),
