@@ -72,9 +72,28 @@ class RvSimSource(GenericModule):
         self.output_port.set_data_members(self.data_members)
 
     def simulate(self) -> TSimEvent:
+        def set_data(next_val):
+            if next_val is not None and not is_iterable(next_val):
+                try:
+                    next_val_net_type = next_val.get_net_type()
+                except AttributeError:
+                    # We get here if next_val doesn't have 'get_net_type()'
+                    next_val_net_type = None
+                except TypeError:
+                    # We get here if next_val.get_net_type is not callable
+                    next_val_net_type = None
+                if next_val_net_type == self.data_members.get_net_type():
+                    self.data_members <<= next_val
+                else:
+                    self.data_members <<= (next_val, )
+            else:
+                # Get here for None or iterables
+                self.data_members <<= next_val
+
         def reset():
             self.output_port.valid <<= 0
             self.wait_state = randint(1,self.max_wait_state+1)
+            set_data(self.generator(True))
 
         reset()
         while True:
@@ -89,23 +108,7 @@ class RvSimSource(GenericModule):
                     if self.wait_state != 0:
                         self.wait_state -= 1
                         if self.wait_state == 0:
-                            next_val = self.generator()
-                            if next_val is not None and not is_iterable(next_val):
-                                try:
-                                    next_val_net_type = next_val.get_net_type()
-                                except AttributeError:
-                                    # We get here if next_val doesn't have 'get_net_type()'
-                                    next_val_net_type = None
-                                except TypeError:
-                                    # We get here if next_val.get_net_type is not callable
-                                    next_val_net_type = None
-                                if next_val_net_type == self.data_members.get_net_type():
-                                    self.data_members <<= next_val
-                                else:
-                                    self.data_members <<= (next_val, )
-                            else:
-                                # Get here for None or iterables
-                                self.data_members <<= next_val
+                            set_data(self.generator(False))
 
                     self.output_port.valid <<= 1 if self.wait_state == 0 else 0
 

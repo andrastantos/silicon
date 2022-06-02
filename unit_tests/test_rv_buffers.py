@@ -23,7 +23,9 @@ class Generator(RvSimSource):
     def construct(self, max_wait_state: int = 5):
         super().construct(RvData(), None, max_wait_state)
         self.cnt = -1
-    def generator(self):
+    def generator(self, is_reset):
+        if is_reset:
+            return None
         self.cnt += 1
         if self.cnt == 256:
             self.cnt = 0
