@@ -309,7 +309,8 @@ class Number(NetType):
                 return None
             return self.value / (1 << self.precision)
 
-         #def __index__(self) -> Any:
+        def __index__(self) -> Any:
+            return self.__int__()
 
         def __bool__(self) -> bool:
             return bool(self.value)
