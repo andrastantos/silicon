@@ -135,7 +135,7 @@ class FSM(GenericModule):
             raise SyntaxErrorException(f"State junction type can't be determined for state value type {self._state_type}")
         current_state_net_type = get_net_type_for_const(current_state)
         new_state_net_type = get_net_type_for_const(new_state)
-        self._state_net_type = self._state_net_type.result_type((current_state_net_type, new_state_net_type), "SELECT")
+        self._state_net_type = self._state_net_type.result_type((self._state_net_type, current_state_net_type, new_state_net_type), "SELECT")
 
         with self._impl._inside:
             logic_input, port_name = self.fsm_logic.create_transition(current_state, new_state)
