@@ -145,7 +145,7 @@ class RvSimSink(GenericModule):
                         sim_val = self.data_members.sim_value
                         #if is_iterable(sim_val) and len(sim_val) == 1:
                         #    sim_val = sim_val[0]
-                        self.checker(*sim_val)
+                        self.checker(sim_val)
                     if self.wait_state != 0:
                         self.wait_state -= 1
                     self.input_port.ready <<= 1 if self.wait_state == 0 else 0

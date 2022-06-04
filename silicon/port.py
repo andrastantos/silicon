@@ -48,6 +48,14 @@ class Junction(JunctionBase):
         self._parent_junction = None # Reverences back to the container for struct/interface/vector members
         self._net_type = None
         if net_type is not None:
+            try:
+                if issubclass(net_type, NetType):
+                    try:
+                        net_type = net_type()
+                    except:
+                        raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType, or at least default-constructable.")
+            except:
+                pass
             if not isinstance(net_type, NetType):
                 raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType. (Did you forget to construct an instance?)")
             self.set_net_type(net_type)
@@ -387,12 +395,14 @@ class Junction(JunctionBase):
         #    return None
         #assert not self.is_composite(), "Simulator should never ask for the value of compound types"
         #return self._xnet.sim_state.value
+        class CompositeSimValue(object):
+            pass
 
         if self.is_composite():
-            sim_value = []
+            sim_value = CompositeSimValue()
             for member_name, (member_junction, reversed) in self.get_member_junctions().items():
-                sim_value.append(member_junction.sim_value)
-            return tuple(sim_value)
+                setattr(sim_value, member_name, member_junction.sim_value)
+            return sim_value
         return self._xnet.sim_value
 
     @property
