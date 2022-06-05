@@ -102,6 +102,8 @@ class Number(NetType):
 
             from .gates import _sim_value
             thing = _sim_value(thing)
+            if thing is None:
+                return None, None
             return thing.precision, thing.value
         @staticmethod
         def _value_in_precision(value: int, precision: int, out_precision: int) -> int:
@@ -116,6 +118,8 @@ class Number(NetType):
 
         def _coerce_precisions(self, other) -> Tuple[int, int, int]:
             other_precision, other_value = Number.SimValue._precision_and_value(other)
+            if other_precision is None or other_value is None:
+                return None, None, None
             my_precision = self.precision
             result_precision = max(my_precision, other_precision)
             other_value = Number.SimValue._value_in_precision(other_value, other_precision, result_precision)
