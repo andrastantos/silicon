@@ -1,27 +1,28 @@
 # Memories have soooooo many variants, not even counting memory-compilers.
-# What we support at the moment:
-# MEMORY TYPE
+# What we support probably should support:
+#
+# MEMORY TYPE (both are supported)
 # - ROM
 # - RAM
-# PORT CONFIGURATION
-# - Arbitrary number of ports
+# PORT CONFIGURATION (all supported)
+# - Up to 2 ports
 # - Read-only ports
 # - Write-only ports
 # - Read-write ports
 # - Independent widths on each port
-# READ PORTS
+# READ PORTS (all supported)
 # - 0-cycle latency (asynchronous access)
 # - 1-cycle latency (registered data)
 # - 2-cycle latency (registered address and data)
 # WRITE PORTS
-# - Byte-enables (or maybe section-enables?)
+# - Byte-enables (or maybe section-enables?) <--- WE ONLY SUPPORT A SINGLE WRITE_ENABLE SIGNAL
 # - 0-cycle latency
 # - 1-cycle latency (registered address and data)
 # READ-WRITE PORTS
 # - All of the above, plus:
-# - WRITE_FIRST (output data = write data during writes)
-# - READ_FIRST (output data = old memory condent during writes)
-# - NO_CHANGE (output data = data from last read during writes)
+# - WRITE_FIRST (output data = write data during writes)        <--- I DON'T THINK WE SUPPORT THIS!!!
+# - READ_FIRST (output data = old memory condent during writes) <--- THIS IS WHAT WE SUPPORT
+# - NO_CHANGE (output data = data from last read during writes) <--- I DON'T THINK WE SUPPORT THIS!!!
 # PORT CONFLICTS (SYNC PORTS)
 # - read  while write to same address: results in old memory content
 # - read  while write to same address: results in data written (not supported by XILINX or ALTERA)
@@ -37,20 +38,20 @@
 # - read  while write to different address: as expected
 # - read  while read  to different address: as expected
 # - write while write to different address: as expected
-# ERROR-CORRECTION
+# ERROR-CORRECTION (only 'none' is supported)
 # - None
 # - Parity
 # - ECC (might add extra latency)
 # - ECC with auto-correct (needs read-modify-write cycles for failed reads)
-# POWER MANAGEMENT (what is the latency of each of these??)
+# POWER MANAGEMENT (only 'none' is supported)
 # - None
 # - Clock-gating (retention)
 # - Power-gating
-# CONTENT MANAGEMENT (RAM)
+# CONTENT MANAGEMENT (RAM) (only 'initial content' is supported)
 # - Initial content
 # - Reset to zero (sync/async)
 # - Undefined on power-on
-# CONTENT MANAGEMENT (ROM)
+# CONTENT MANAGEMENT (ROM) (supported)
 # - Initial content
 # ALTERA SPECIALTIES:
 # - Input and output registers can be independently clocked (that is different clock for read address and read data)
@@ -63,17 +64,15 @@
 # - Lots of technology parameters (ASIC only)
 #
 # Other notes:
-# - There's a 'fake' memory generator, called 'OpenRAM' that can be used for experimentation
-# - There's another 'fake' memory generator, called CACTI (https://www.hpl.hp.com/research/cacti/) that only generates size/power models but can still be useful potentially.
-#
-# !!!!! IT APPEARS THAT NOONE SUPPORTS MORE THAN 2 PORTS ON SRAM ARRAYS !!!!
-#
-# That still leaves out register files, that can have many many ports. It might be worth breaking that application out though.
-#
-# Memory compiler vendors:
-# Synopsys
-# ARM (Artisan)
-# Essentially 'contact your foundry'
+# - It appears that no one (not even ASIC vendors) support more than 2 ports on SRAM arrays. So the two-port restriction seems prudent.
+#    - That still leaves out register files, that can have many many ports. It might be worth breaking that application out though.
+# - Memory compiler vendors:
+#    - Synopsys
+#    - ARM (Artisan)
+#    - Essentially 'contact your foundry'
+#    - There's a 'fake' memory generator, called 'OpenRAM' that can be used for experimentation
+#    - There's another 'fake' memory generator, called CACTI (https://www.hpl.hp.com/research/cacti/)
+#      that only generates size/power models but can still be useful potentially.
 
 from .module import GenericModule, has_port, Module, InlineBlock, InlineStatement
 from .port import Input, Output, Wire, Port, EdgeType, Junction
@@ -452,12 +451,8 @@ class _Memory(GenericModule):
                 if write_en_port is not None:
                     trigger_ports.append(write_en_port)
 
-        addr_val = None
-        data_in_val = None
-        write_en_val = None
-
         # Memory holds entries for the narrowest port.
-        # Wider ports do multiple consequtive accesses based on endienness.
+        # Wider ports do multiple consecutive accesses based on endienness.
         memory_content = []
 
         mem_data_bits = self.config.port_configs[0].data_bits
@@ -488,56 +483,52 @@ class _Memory(GenericModule):
             return memory_content[addr]
 
         last_read_values = [None] * self.get_port_count()
-
+        reads = [None] * self.get_port_count()
+        read_invalids = [None] * self.get_port_count()
+        writes = [None] * self.get_port_count()
+        data_in_vals = [None] * self.get_port_count()
         while True:
             yield trigger_ports
+            # We simulate READ_FIRST mode only (since that's the one we synthesize as well)
+            # That means that we loop through the ports twice: first doing the reads, then doing the writes
+            # In fact, we're looping three times: first, we're dealing with the input/output registers, then the actual reads, and finally the actual writes
+
             for idx, port_config in enumerate(self.config.port_configs):
                 data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
                 # Deal with the inputs first
-                write = False
-                read = False
-                read_invalid = False
-                addr_val = get_int_sim_value(addr_port)
-                data_in_val = get_sim_value(data_in_port)
+                reads[idx] = False
+                writes[idx] = False
+                read_invalids[idx] = False
+                data_in_vals[idx] = get_sim_value(data_in_port)
                 write_en_val = get_sim_value(write_en_port)
                 if port_config.registered_input:
                     clk_edge_type = clk_port.get_sim_edge()
                     if clk_edge_type == EdgeType.Positive:
-                        write = write_en_port is not None and write_en_val != 0
-                        read = True
+                        writes[idx] = write_en_port is not None and write_en_val != 0
+                        reads[idx] = True
                         if port_config.registered_output:
                             data_out_port <<= last_read_values[idx]
                     if clk_edge_type == EdgeType.Undefined:
                         # In this case we don't know if a write or read happens or not. So make sure that data is X-ed out
-                        write = write_en_port is not None and write_en_val != 0
-                        read = True
-                        data_in_val = None
-                        read_invalid = True
+                        writes[idx] = write_en_port is not None and write_en_val != 0
+                        reads[idx] = True
+                        data_in_vals[idx] = None
+                        read_invalids[idx] = True
                 else:
                     if write_en_port is not None:
                         write_edge_type = write_en_port.get_sim_edge()
                         if write_edge_type == EdgeType.Positive:
-                            write = True
+                            writes[idx] = True
                         if write_edge_type == EdgeType.Undefined:
-                            write = True
-                            data_in_val = None
-                    read = addr_port.get_sim_edge() != EdgeType.NoEdge
-                if write:
-                    if addr_val is None:
-                        # We don't know where we write. For now, let's invalidate the whole memory...
-                        memory_content = []
-                    else:
-                        burst_size = port_config.data_bits // mem_data_bits
-                        start_addr = addr_val * burst_size
-                        data_mask = (1 << port_config.data_bits) - 1
-                        for addr in range(start_addr, start_addr + burst_size):
-                            if data_in_val is None:
-                                set_mem_val(addr, None)
-                            else:
-                                set_mem_val(addr, data_in_val & data_mask)
-                                data_in_val >>= port_config.data_bits
-                if read and data_out_port is not None:
-                    if read_invalid or addr_val is None:
+                            writes[idx] = True
+                            data_in_vals[idx] = None
+                    reads[idx] = addr_port.get_sim_edge() != EdgeType.NoEdge
+
+            for idx, port_config in enumerate(self.config.port_configs):
+                data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
+                if reads[idx] and data_out_port is not None:
+                    addr_val = get_int_sim_value(addr_port)
+                    if read_invalids[idx] or addr_val is None:
                         data_out_port <<= None
                     else:
                         data_out_val = 0
@@ -553,6 +544,24 @@ class _Memory(GenericModule):
                         last_read_values[idx] = data_out_val
                         if not port_config.registered_output:
                             data_out_port <<= data_out_val
+
+            for idx, port_config in enumerate(self.config.port_configs):
+                data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
+                if writes[idx]:
+                    addr_val = get_int_sim_value(addr_port)
+                    if addr_val is None:
+                        # We don't know where we write. For now, let's invalidate the whole memory...
+                        memory_content = []
+                    else:
+                        burst_size = port_config.data_bits // mem_data_bits
+                        start_addr = addr_val * burst_size
+                        data_mask = (1 << port_config.data_bits) - 1
+                        for addr in range(start_addr, start_addr + burst_size):
+                            if data_in_vals[idx] is None:
+                                set_mem_val(addr, None)
+                            else:
+                                set_mem_val(addr, data_in_vals[idx] & data_mask)
+                                data_in_vals[idx] >>= port_config.data_bits
 
 
 class Memory(GenericModule):

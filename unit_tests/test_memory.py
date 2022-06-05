@@ -358,6 +358,97 @@ def test_simple_dual_port_ram_tttt(mode: str = "rtl"):
 def test_simple_dual_port_ram_rw(mode: str = "rtl"):
     _test_simple_dual_port_ram(mode, True, False, True, False, READ, WRITE)
 
+
+
+
+
+
+def test_simple_dual_port_ram_sim():
+
+    class Top(Module):
+        data_in_a = Input(Unsigned(14))
+        data_out_a = Output(Unsigned(14))
+        data_in_b = Input(Unsigned(14))
+        data_out_b = Output(Unsigned(14))
+        addr_a = Input(Unsigned(6))
+        addr_b = Input(Unsigned(6))
+        write_en_a = Input(logic)
+        write_en_b = Input(logic)
+        clk = ClkPort()
+
+        def body(self):
+            config = MemoryConfig(
+                (MemoryPortConfig(
+                    addr_type = self.addr_a.get_net_type(),
+                    data_type = self.data_in_a.get_net_type(),
+                    registered_input = True,
+                    registered_output = False
+                ),
+                MemoryPortConfig(
+                    addr_type = self.addr_b.get_net_type(),
+                    data_type = self.data_in_b.get_net_type(),
+                    registered_input = True,
+                    registered_output = False
+                ),),
+                reset_content = "config.bin"
+            )
+            mem = Memory(config)
+            self.data_out_a <<= mem.port1_data_out
+            mem.port1_data_in <<= self.data_in_a
+            mem.port1_write_en = self.write_en_a
+            mem.port1_addr <<= self.addr_a
+
+            self.data_out_b <<= mem.port2_data_out
+            mem.port2_data_in <<= self.data_in_b
+            mem.port2_write_en = self.write_en_b
+            mem.port2_addr <<= self.addr_b
+
+        def simulate(self) -> TSimEvent:
+            def clk() -> int:
+                yield 10
+                self.clk <<= ~self.clk
+                yield 10
+                self.clk <<= ~self.clk
+                yield 0
+
+            self.clk <<= 1
+            self.write_en_a <<= 0
+            self.write_en_b <<= 0
+            for i in range(10):
+                yield from clk()
+            # Write from port a
+            self.write_en_a <<= 1
+            self.write_en_b <<= 0
+            for i in range(10):
+                self.data_in_a <<= i
+                self.addr_a <<= i
+                yield from clk()
+
+            # Write from port b
+            self.write_en_a <<= 0
+            self.write_en_b <<= 1
+            for i in range(10,20):
+                self.data_in_b <<= i
+                self.addr_b <<= i
+                yield from clk()
+
+            # Write from port a, read from port b
+            self.write_en_a <<= 1
+            self.write_en_b <<= 0
+            for i in range(10):
+                self.data_in_a <<= i+100
+                self.addr_a <<= i
+                self.addr_b <<= i
+                yield from clk()
+                yield 0 # We need to wait for not just the clock edge, but all other async signal propagation to occur, before we can check
+                assert self.data_out_a == self.data_out_b
+                assert self.data_out_a == i
+
+    test.simulation(Top, "test_simple_dual_port_ram_sim")
+
+
+
+
 class Pixel(Struct):
     r = Unsigned(8)
     g = Unsigned(8)
@@ -434,18 +525,18 @@ def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered
 if __name__ == "__main__":
     #test_single_port_ram_ff("rtl")
     #test_single_port_ram_ft("rtl")
-    test_single_port_ram_tf("rtl")
+    #test_single_port_ram_tf("rtl")
     #test_single_port_ram_tt("rtl")
     #test_single_port_rom("rtl")
     #test_single_port_rom2("rtl")
     #test_single_port_rom3("rtl")
     #test_single_port_rom4("rtl")
-    #test_simple_dual_port_ram_tftf("rtl")
+    test_simple_dual_port_ram_ffff("rtl")
     #test_simple_dual_port_ram_tftt("rtl")
     #test_simple_dual_port_ram_tttf("rtl")
     #test_simple_dual_port_ram_tttt("rtl")
     #test_single_port_async_rom("rtl")
     #test_simple_dual_port_ram_rw("rtl")
-
+    test_simple_dual_port_ram_sim()
     #test_single_port_ram_tt("sim")
     #test_struct_ram("rtl")
