@@ -351,6 +351,161 @@ class Interface(Composite):
 
 
 
+class Array(Composite):
+    def __init__(self, member_type: NetType, size: int):
+        super().__init__(support_reverse = False)
+
+        self.size = size
+        self.member_type = member_type
+        if member_type.is_abstract():
+            raise SyntaxErrorException(f"Array doesn't support abstract members")
+        for idx in range(self.size):
+            super().add_member(f"element_{idx}", member_type)
+
+    def add_member(self, name: str, member: Union[NetType, Reverse]) -> None:
+        raise SyntaxErrorException(f"Arrays don't support dynamic members")
+
+    class Accessor(GenericModule):
+        @staticmethod
+        def create_output_type(key: Number.Key, array: 'Array') -> 'Array':
+            if key.length == 1:
+                # This is a member access
+                return array.member_type
+            else:
+                # This is an array slice
+                return array(array.member_type, key.length)
+
+        """
+        Accessor instances are used to implement the following constructs:
+
+        b <<= a[3]
+        b <<= a[3:0]
+        b <<= a[3:0][2]
+
+        They are instantiated from Array.get_slice, which is called from Junction.__getitem__ and from MemberGetter.get_underlying_junction
+        """
+        def construct(self, slice: Union[int, slice], array: 'Array') -> None:
+            self.key = Number.Key(slice)
+            self.input_port = Input(array)
+            self.output_port = Output(self.create_output_type(self.key, array))
+
+        def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
+            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+        def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
+            assert back_end.language == "SystemVerilog"
+            input_type = self.input_port.get_net_type()
+
+            start = self.key.start
+            end = self.key.end
+            if start < 0 or end >= input_type.size:
+                raise SyntaxErrorException("Slice bounds are outside of Array size")
+            ret_val = ""
+            if end != start:
+                op_precedence = back_end.get_operator_precedence("{}")
+                ret_val += "{"
+            else:
+                op_precedence = 0 # I think ??
+            members = self.input_port.get_all_member_junctions(add_self=False)
+            first = True
+            for idx, (member) in reversed(tuple(enumerate(members))):
+                if idx >= start and idx <= end:
+                    name, _ = member.get_rhs_expression(back_end, target_namespace)
+                    if not first:
+                        ret_val += ", "
+                        first = False
+                    ret_val += f"{name}"
+            if end != start:
+                ret_val += "}"
+            return ret_val, op_precedence
+
+        @staticmethod
+        def static_sim(in_junction: Junction, key: 'Number.Key'):
+            output_type = Array.Accessor.create_output_type(key, in_junction.get_net_type())
+            members = in_junction.get_all_member_junctions(add_self=False)
+            important_members = []
+            for idx, (member) in reversed(enumerate(members)):
+                if idx >= key.start and idx <= key.end:
+                    important_members.append(member)
+            return output_type(*important_members)
+
+        def simulate(self) -> TSimEvent:
+            output_type = Array.Accessor.create_output_type(self.key, self.input_port.get_net_type())
+            members = self.input_port.get_all_member_junctions(add_self=False)
+            important_members = []
+            for idx, (member) in reversed(enumerate(members)):
+                if idx >= self.key.start and idx <= self.key.end:
+                    important_members.append(member)
+            while True:
+                yield important_members
+                self.output_port <<= output_type(*important_members)
+
+        def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
+            assert False
+        def is_combinational(self) -> bool:
+            """
+            Returns True if the module is purely combinational, False otherwise
+            """
+            return True
+
+    def get_slice(self, key: Any, junction: Junction) -> Any:
+        if junction.active_context() == "simulation":
+            return Array.Accessor.static_sim(junction, Number.Key(key))
+        else:
+            return Number.Accessor(slice=key, array=self)(junction)
+
+    def set_member_access(self, key: Any, value: Any, junction: Junction) -> None:
+        # The junction conversion *has* to happen before the creation of the Concatenator.
+        # Otherwise, the auto-created converter object (such as Constant) will be evaluated in the wrong order
+        # and during the evaluation of the Concatenator, the inlined expression forwarding logic will break.
+        from .utils import convert_to_junction
+        real_junction = convert_to_junction(value)
+        junction.raw_input_map.append((key, real_junction))
+    @classmethod
+    def resolve_key_sequence_for_get(cls, keys: Sequence[Tuple[Any, KeyKind]], for_junction: Junction) -> Tuple[Optional[Sequence[Tuple[Any, KeyKind]]], Junction]:
+        # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing
+        # Returns the final junction and the remaining keys if they cannot be processed.
+        # NOTE: for Numbers, this is easy, as the chain always produces more Numbers,
+        #       so we should be able to fully process the chain. For other types, such
+        #       as structs or interfaces, things get more complicated.
+        # NOTE: Again, for Numbers only, set and get variants are nearly identical.
+        remaining_keys, key = cls.resolve_key_sequence_for_set(keys)
+        if len(remaining_keys) == 0:
+            remaining_keys = None
+        return remaining_keys, Array.Accessor(slice=key, array=for_junction.get_net_type())(for_junction)
+    @classmethod
+    def resolve_key_sequence_for_set(cls, keys: Sequence[Tuple[Any, KeyKind]]) -> Any:
+        # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing for concatenators (set context)
+        # Returns remaining keys (if any) and the resolved slice
+
+        def _slice_of_slice(outer_key: Any, inner_key: Any) -> Any:
+            # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing
+            outer_key = Number.Key(outer_key)
+            inner_key = Number.Key(inner_key)
+            result_key = outer_key.apply(inner_key)
+            if result_key.start == result_key.end:
+                return result_key.start
+            else:
+                return slice(result_key.start, result_key.end, -1)
+
+        def key_length(key):
+            if isinstance(key, int):
+                return 1
+            return key.end - key.start + 1
+
+        key = keys[0]
+        assert key[1] is KeyKind.Index, "Array doesn't support member access, only slices"
+        key = key[0]
+        idx = 0
+        if key_length(key) > 1:
+            for idx, sub_key in enumerate(keys[1:]):
+                assert sub_key[1] is KeyKind.Index, "Array doesn't support member access, only slices"
+                key = _slice_of_slice(key, sub_key[0])
+                if key.length < 1:
+                    SyntaxErrorException("Invalid slicing of array: at least one member must be selected.")
+                if key_length(key) == 1:
+                    break
+        return keys[1:][idx:-1], key
+
 
 
 # DUST-BIN: these objects aren't used at the momemnt, but might be in the future...

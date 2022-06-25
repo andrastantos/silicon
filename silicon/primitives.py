@@ -3,7 +3,7 @@ from typing import Dict, Optional, Tuple, Any, Generator, Union, Sequence
 from .port import Junction, Input, Output, Port, EdgeType, Wire
 from .auto_input import ClkPort, ClkEnPort, RstPort, RstValPort
 from .net_type import NetType, KeyKind
-from .exceptions import SyntaxErrorException, SimulationException
+from .exceptions import FixmeException, SyntaxErrorException, SimulationException
 from .tracer import no_trace
 from collections import OrderedDict
 from .utils import first, get_common_net_type, BoolMarker
@@ -461,7 +461,9 @@ class Concatenator(Module):
         self.input_map = OrderedDict()
         keyed_inputs = set()
         for (raw_key, input) in self.raw_input_map:
-            final_key = common_net_type.resolve_key_sequence_for_set(raw_key)
+            remaining_key, final_key = common_net_type.resolve_key_sequence_for_set(raw_key)
+            if remaining_key is None:
+                raise FixmeException(f"We don't yet support slices that can't completely resolve within a single slice. (Example would be Array slice-followed by Number-slice)")
             key = common_net_type.Key(raw_key) # Convert the raw key into something that the common type understands
             if key in self.input_map:
                 raise SyntaxErrorException(f"Input key {raw_key} is not unique for concatenator output type {common_net_type}")

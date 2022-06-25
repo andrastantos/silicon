@@ -1,5 +1,5 @@
 from typing import Optional, Any, Tuple, Generator, Union, Dict, Set, Sequence, Union
-from .exceptions import SyntaxErrorException, SimulationException
+from .exceptions import FixmeException, SyntaxErrorException, SimulationException
 from .net_type import NetType, KeyKind
 from .module import GenericModule, Module, InlineBlock, InlineExpression, has_port
 from .port import Input, Output, Junction, Port
@@ -544,7 +544,8 @@ class Number(NetType):
                 return self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), allow_expression = False)
             op_precedence = back_end.get_operator_precedence("[]")
             rhs_name, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence, allow_expression = False)
-            assert self.key.start <= self.input_port.get_net_type().length, "FIXME: accessing slices of a Number outside it's length is not yet supported!!"
+            if self.key.start > self.input_port.get_net_type().length:
+                raise FixmeException("Accessing slices of a Number outside it's length is not yet supported!!")
             if end == start:
                 return f"{rhs_name}[{start}]", op_precedence
             else:
@@ -663,7 +664,7 @@ class Number(NetType):
             self.input_map = OrderedDict()
             keyed_inputs = set()
             for (raw_key, input) in self.raw_input_map:
-                final_key = common_net_type.resolve_key_sequence_for_set(raw_key)
+                _, final_key = common_net_type.resolve_key_sequence_for_set(raw_key)
                 key = common_net_type.Key(final_key) # Convert the raw key into something that the common type understands
                 if key in self.input_map:
                     raise SyntaxErrorException(f"Input key {raw_key} is not unique for concatenator output type {common_net_type}")
@@ -784,10 +785,13 @@ class Number(NetType):
         #       so we should be able to fully process the chain. For other types, such
         #       as structs or interfaces, things get more complicated.
         # NOTE: Again, for Numbers only, set and get variants are nearly identical.
-        key = cls.resolve_key_sequence_for_set(keys)
-        return None, Number.Accessor(slice=key, number=for_junction.get_net_type())(for_junction)
+        remaining_keys, key = cls.resolve_key_sequence_for_set(keys)
+        assert remaining_keys is None
+        return remaining_keys, Number.Accessor(slice=key, number=for_junction.get_net_type())(for_junction)
     @classmethod
     def resolve_key_sequence_for_set(cls, keys: Sequence[Tuple[Any, KeyKind]]) -> Any:
+        # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing for concatenators (set context)
+        # Returns remaining keys (nothing for Numbers) and the resolved slice
 
         def _slice_of_slice(outer_key: Any, inner_key: Any) -> Any:
             # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing
@@ -799,15 +803,13 @@ class Number(NetType):
             else:
                 return slice(result_key.start, result_key.end, -1)
 
-        # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing for concatenators (set context)
-        # Returns the resolved slice
         key = keys[0]
         assert key[1] is KeyKind.Index, "Number doesn't support member access, only slices"
         key = key[0]
         for sub_key in keys[1:]:
             assert sub_key[1] is KeyKind.Index, "Number doesn't support member access, only slices"
             key = _slice_of_slice(key, sub_key[0])
-        return key
+        return None, key
     def is_abstract(self) -> bool:
         return self.length is None and self.min_val is None and self.max_val is None
 

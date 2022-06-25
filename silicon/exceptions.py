@@ -17,6 +17,10 @@ class SyntaxErrorException(Exception):
         message = "\n".join(indent("\n".join(wrap(line, width=70)), "    ") for line in message.split("\n"))
         super().__init__(f"{loc}\n{message}")
 
+class FixmeException(SyntaxErrorException):
+    def __init__(self, message, context = None):
+        super().__init__(f"FIXME: {message}", context)
+
 class SimulationException(Exception):
     def __init__(self, message, context):
         loc = None

@@ -77,6 +77,14 @@
             "cwd": "${workspaceFolder}/unit_tests"
         },
         {
+            "name": "Python: UNIT_TEST/test_arrays",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/unit_tests/test_arrays.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/unit_tests"
+        },
+        {
             "name": "Python: UNIT_TEST/test_common_superclass",
             "type": "python",
             "request": "launch",
