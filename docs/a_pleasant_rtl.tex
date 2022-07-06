@@ -1,0 +1,1036 @@
+
+%% bare_conf_compsoc.tex
+%% V1.4b
+%% 2015/08/26
+%% by Michael Shell
+%% See:
+%% http://www.michaelshell.org/
+%% for current contact information.
+%%
+%% This is a skeleton file demonstrating the use of IEEEtran.cls
+%% (requires IEEEtran.cls version 1.8b or later) with an IEEE Computer
+%% Society conference paper.
+%%
+%% Support sites:
+%% http://www.michaelshell.org/tex/ieeetran/
+%% http://www.ctan.org/pkg/ieeetran
+%% and
+%% http://www.ieee.org/
+
+%%*************************************************************************
+%% Legal Notice:
+%% This code is offered as-is without any warranty either expressed or
+%% implied; without even the implied warranty of MERCHANTABILITY or
+%% FITNESS FOR A PARTICULAR PURPOSE!
+%% User assumes all risk.
+%% In no event shall the IEEE or any contributor to this code be liable for
+%% any damages or losses, including, but not limited to, incidental,
+%% consequential, or any other damages, resulting from the use or misuse
+%% of any information contained here.
+%%
+%% All comments are the opinions of their respective authors and are not
+%% necessarily endorsed by the IEEE.
+%%
+%% This work is distributed under the LaTeX Project Public License (LPPL)
+%% ( http://www.latex-project.org/ ) version 1.3, and may be freely used,
+%% distributed and modified. A copy of the LPPL, version 1.3, is included
+%% in the base LaTeX documentation of all distributions of LaTeX released
+%% 2003/12/01 or later.
+%% Retain all contribution notices and credits.
+%% ** Modified files should be clearly indicated as such, including  **
+%% ** renaming them and changing author support contact information. **
+%%*************************************************************************
+
+
+% *** Authors should verify (and, if needed, correct) their LaTeX system  ***
+% *** with the testflow diagnostic prior to trusting their LaTeX platform ***
+% *** with production work. The IEEE's font choices and paper sizes can   ***
+% *** trigger bugs that do not appear when using other class files.       ***                          ***
+% The testflow support page is at:
+% http://www.michaelshell.org/tex/testflow/
+
+
+
+\documentclass[conference,compsoc]{IEEEtran}
+% Some/most Computer Society conferences require the compsoc mode option,
+% but others may want the standard conference format.
+%
+% If IEEEtran.cls has not been installed into the LaTeX system files,
+% manually specify the path to it like:
+% \documentclass[conference,compsoc]{../sty/IEEEtran}
+
+
+
+
+
+% Some very useful LaTeX packages include:
+% (uncomment the ones you want to load)
+
+
+% *** MISC UTILITY PACKAGES ***
+%
+%\usepackage{ifpdf}
+% Heiko Oberdiek's ifpdf.sty is very useful if you need conditional
+% compilation based on whether the output is pdf or dvi.
+% usage:
+% \ifpdf
+%   % pdf code
+% \else
+%   % dvi code
+% \fi
+% The latest version of ifpdf.sty can be obtained from:
+% http://www.ctan.org/pkg/ifpdf
+% Also, note that IEEEtran.cls V1.7 and later provides a builtin
+% \ifCLASSINFOpdf conditional that works the same way.
+% When switching from latex to pdflatex and vice-versa, the compiler may
+% have to be run twice to clear warning/error messages.
+
+
+
+
+
+
+% *** CITATION PACKAGES ***
+%
+\ifCLASSOPTIONcompsoc
+  % IEEE Computer Society needs nocompress option
+  % requires cite.sty v4.0 or later (November 2003)
+  \usepackage[nocompress]{cite}
+\else
+  % normal IEEE
+  \usepackage{cite}
+\fi
+% cite.sty was written by Donald Arseneau
+% V1.6 and later of IEEEtran pre-defines the format of the cite.sty package
+% \cite{} output to follow that of the IEEE. Loading the cite package will
+% result in citation numbers being automatically sorted and properly
+% "compressed/ranged". e.g., [1], [9], [2], [7], [5], [6] without using
+% cite.sty will become [1], [2], [5]--[7], [9] using cite.sty. cite.sty's
+% \cite will automatically add leading space, if needed. Use cite.sty's
+% noadjust option (cite.sty V3.8 and later) if you want to turn this off
+% such as if a citation ever needs to be enclosed in parenthesis.
+% cite.sty is already installed on most LaTeX systems. Be sure and use
+% version 5.0 (2009-03-20) and later if using hyperref.sty.
+% The latest version can be obtained at:
+% http://www.ctan.org/pkg/cite
+% The documentation is contained in the cite.sty file itself.
+%
+% Note that some packages require special options to format as the Computer
+% Society requires. In particular, Computer Society  papers do not use
+% compressed citation ranges as is done in typical IEEE papers
+% (e.g., [1]-[4]). Instead, they list every citation separately in order
+% (e.g., [1], [2], [3], [4]). To get the latter we need to load the cite
+% package with the nocompress option which is supported by cite.sty v4.0
+% and later.
+
+
+
+
+
+% *** GRAPHICS RELATED PACKAGES ***
+%
+\ifCLASSINFOpdf
+  % \usepackage[pdftex]{graphicx}
+  % declare the path(s) where your graphic files are
+  % \graphicspath{{../pdf/}{../jpeg/}}
+  % and their extensions so you won't have to specify these with
+  % every instance of \includegraphics
+  % \DeclareGraphicsExtensions{.pdf,.jpeg,.png}
+\else
+  % or other class option (dvipsone, dvipdf, if not using dvips). graphicx
+  % will default to the driver specified in the system graphics.cfg if no
+  % driver is specified.
+  % \usepackage[dvips]{graphicx}
+  % declare the path(s) where your graphic files are
+  % \graphicspath{{../eps/}}
+  % and their extensions so you won't have to specify these with
+  % every instance of \includegraphics
+  % \DeclareGraphicsExtensions{.eps}
+\fi
+% graphicx was written by David Carlisle and Sebastian Rahtz. It is
+% required if you want graphics, photos, etc. graphicx.sty is already
+% installed on most LaTeX systems. The latest version and documentation
+% can be obtained at:
+% http://www.ctan.org/pkg/graphicx
+% Another good source of documentation is "Using Imported Graphics in
+% LaTeX2e" by Keith Reckdahl which can be found at:
+% http://www.ctan.org/pkg/epslatex
+%
+% latex, and pdflatex in dvi mode, support graphics in encapsulated
+% postscript (.eps) format. pdflatex in pdf mode supports graphics
+% in .pdf, .jpeg, .png and .mps (metapost) formats. Users should ensure
+% that all non-photo figures use a vector format (.eps, .pdf, .mps) and
+% not a bitmapped formats (.jpeg, .png). The IEEE frowns on bitmapped formats
+% which can result in "jaggedy"/blurry rendering of lines and letters as
+% well as large increases in file sizes.
+%
+% You can find documentation about the pdfTeX application at:
+% http://www.tug.org/applications/pdftex
+
+
+
+
+
+% *** MATH PACKAGES ***
+%
+%\usepackage{amsmath}
+% A popular package from the American Mathematical Society that provides
+% many useful and powerful commands for dealing with mathematics.
+%
+% Note that the amsmath package sets \interdisplaylinepenalty to 10000
+% thus preventing page breaks from occurring within multiline equations. Use:
+%\interdisplaylinepenalty=2500
+% after loading amsmath to restore such page breaks as IEEEtran.cls normally
+% does. amsmath.sty is already installed on most LaTeX systems. The latest
+% version and documentation can be obtained at:
+% http://www.ctan.org/pkg/amsmath
+
+
+
+
+
+% *** SPECIALIZED LIST PACKAGES ***
+%
+%\usepackage{algorithmic}
+% algorithmic.sty was written by Peter Williams and Rogerio Brito.
+% This package provides an algorithmic environment fo describing algorithms.
+% You can use the algorithmic environment in-text or within a figure
+% environment to provide for a floating algorithm. Do NOT use the algorithm
+% floating environment provided by algorithm.sty (by the same authors) or
+% algorithm2e.sty (by Christophe Fiorio) as the IEEE does not use dedicated
+% algorithm float types and packages that provide these will not provide
+% correct IEEE style captions. The latest version and documentation of
+% algorithmic.sty can be obtained at:
+% http://www.ctan.org/pkg/algorithms
+% Also of interest may be the (relatively newer and more customizable)
+% algorithmicx.sty package by Szasz Janos:
+% http://www.ctan.org/pkg/algorithmicx
+
+
+
+
+% *** ALIGNMENT PACKAGES ***
+%
+%\usepackage{array}
+% Frank Mittelbach's and David Carlisle's array.sty patches and improves
+% the standard LaTeX2e array and tabular environments to provide better
+% appearance and additional user controls. As the default LaTeX2e table
+% generation code is lacking to the point of almost being broken with
+% respect to the quality of the end results, all users are strongly
+% advised to use an enhanced (at the very least that provided by array.sty)
+% set of table tools. array.sty is already installed on most systems. The
+% latest version and documentation can be obtained at:
+% http://www.ctan.org/pkg/array
+
+
+% IEEEtran contains the IEEEeqnarray family of commands that can be used to
+% generate multiline equations as well as matrices, tables, etc., of high
+% quality.
+
+
+
+
+% *** SUBFIGURE PACKAGES ***
+%\ifCLASSOPTIONcompsoc
+%  \usepackage[caption=false,font=footnotesize,labelfont=sf,textfont=sf]{subfig}
+%\else
+%  \usepackage[caption=false,font=footnotesize]{subfig}
+%\fi
+% subfig.sty, written by Steven Douglas Cochran, is the modern replacement
+% for subfigure.sty, the latter of which is no longer maintained and is
+% incompatible with some LaTeX packages including fixltx2e. However,
+% subfig.sty requires and automatically loads Axel Sommerfeldt's caption.sty
+% which will override IEEEtran.cls' handling of captions and this will result
+% in non-IEEE style figure/table captions. To prevent this problem, be sure
+% and invoke subfig.sty's "caption=false" package option (available since
+% subfig.sty version 1.3, 2005/06/28) as this is will preserve IEEEtran.cls
+% handling of captions.
+% Note that the Computer Society format requires a sans serif font rather
+% than the serif font used in traditional IEEE formatting and thus the need
+% to invoke different subfig.sty package options depending on whether
+% compsoc mode has been enabled.
+%
+% The latest version and documentation of subfig.sty can be obtained at:
+% http://www.ctan.org/pkg/subfig
+
+
+
+
+% *** FLOAT PACKAGES ***
+%
+%\usepackage{fixltx2e}
+% fixltx2e, the successor to the earlier fix2col.sty, was written by
+% Frank Mittelbach and David Carlisle. This package corrects a few problems
+% in the LaTeX2e kernel, the most notable of which is that in current
+% LaTeX2e releases, the ordering of single and double column floats is not
+% guaranteed to be preserved. Thus, an unpatched LaTeX2e can allow a
+% single column figure to be placed prior to an earlier double column
+% figure.
+% Be aware that LaTeX2e kernels dated 2015 and later have fixltx2e.sty's
+% corrections already built into the system in which case a warning will
+% be issued if an attempt is made to load fixltx2e.sty as it is no longer
+% needed.
+% The latest version and documentation can be found at:
+% http://www.ctan.org/pkg/fixltx2e
+
+
+%\usepackage{stfloats}
+% stfloats.sty was written by Sigitas Tolusis. This package gives LaTeX2e
+% the ability to do double column floats at the bottom of the page as well
+% as the top. (e.g., "\begin{figure*}[!b]" is not normally possible in
+% LaTeX2e). It also provides a command:
+%\fnbelowfloat
+% to enable the placement of footnotes below bottom floats (the standard
+% LaTeX2e kernel puts them above bottom floats). This is an invasive package
+% which rewrites many portions of the LaTeX2e float routines. It may not work
+% with other packages that modify the LaTeX2e float routines. The latest
+% version and documentation can be obtained at:
+% http://www.ctan.org/pkg/stfloats
+% Do not use the stfloats baselinefloat ability as the IEEE does not allow
+% \baselineskip to stretch. Authors submitting work to the IEEE should note
+% that the IEEE rarely uses double column equations and that authors should try
+% to avoid such use. Do not be tempted to use the cuted.sty or midfloat.sty
+% packages (also by Sigitas Tolusis) as the IEEE does not format its papers in
+% such ways.
+% Do not attempt to use stfloats with fixltx2e as they are incompatible.
+% Instead, use Morten Hogholm'a dblfloatfix which combines the features
+% of both fixltx2e and stfloats:
+%
+% \usepackage{dblfloatfix}
+% The latest version can be found at:
+% http://www.ctan.org/pkg/dblfloatfix
+
+
+
+
+% *** PDF, URL AND HYPERLINK PACKAGES ***
+%
+%\usepackage{url}
+% url.sty was written by Donald Arseneau. It provides better support for
+% handling and breaking URLs. url.sty is already installed on most LaTeX
+% systems. The latest version and documentation can be obtained at:
+% http://www.ctan.org/pkg/url
+% Basically, \url{my_url_here}.
+
+
+
+
+% *** Do not adjust lengths that control margins, column widths, etc. ***
+% *** Do not use packages that alter fonts (such as pslatex).         ***
+% There should be no need to do such things with IEEEtran.cls V1.6 and later.
+% (Unless specifically asked to do so by the journal or conference you plan
+% to submit to, of course. )
+
+
+% We need listings, and need to set them up properly
+% TODO: this needs to be reviewed!!
+\usepackage{listings}
+\lstset{
+  frame=single,
+  language=Verilog,
+}
+\makeatletter
+\def\lst@makecaption{%
+  \def\@captype{table}%
+  \@makecaption
+}
+\makeatother
+
+
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+
+\begin{document}
+%
+% paper title
+% Titles are generally capitalized except for words such as a, an, and, as,
+% at, but, by, for, in, nor, of, on, or, the, to and up, which are usually
+% not capitalized unless they are the first or last word of the title.
+% Linebreaks \\ can be used within to get better formatting as desired.
+% Do not put math or special symbols in the title.
+\title{There must be a better way\\What's wrong with Verilog and VHDL and how to fix it?}
+
+
+% author names and affiliations
+% use a multiple column layout for up to three different
+% affiliations
+\author{\IEEEauthorblockN{Andras Tantos}
+\IEEEauthorblockA{SpaceX\\
+Email: andras@tantosonline.com}
+}
+
+% conference papers do not typically use \thanks and this command
+% is locked out in conference mode. If really needed, such as for
+% the acknowledgment of grants, issue a \IEEEoverridecommandlockouts
+% after \documentclass
+
+% for over three affiliations, or if they all won't fit within the width
+% of the page (and note that there is less available width in this regard for
+% compsoc conferences compared to traditional conferences), use this
+% alternative format:
+%
+%\author{\IEEEauthorblockN{Michael Shell\IEEEauthorrefmark{1},
+%Homer Simpson\IEEEauthorrefmark{2},
+%James Kirk\IEEEauthorrefmark{3},
+%Montgomery Scott\IEEEauthorrefmark{3} and
+%Eldon Tyrell\IEEEauthorrefmark{4}}
+%\IEEEauthorblockA{\IEEEauthorrefmark{1}School of Electrical and Computer Engineering\\
+%Georgia Institute of Technology,
+%Atlanta, Georgia 30332--0250\\ Email: see http://www.michaelshell.org/contact.html}
+%\IEEEauthorblockA{\IEEEauthorrefmark{2}Twentieth Century Fox, Springfield, USA\\
+%Email: homer@thesimpsons.com}
+%\IEEEauthorblockA{\IEEEauthorrefmark{3}Starfleet Academy, San Francisco, California 96678-2391\\
+%Telephone: (800) 555--1212, Fax: (888) 555--1212}
+%\IEEEauthorblockA{\IEEEauthorrefmark{4}Tyrell Inc., 123 Replicant Street, Los Angeles, California 90210--4321}}
+
+
+
+
+% use for special paper notices
+%\IEEEspecialpapernotice{(Invited Paper)}
+
+
+
+
+% make the title area
+\maketitle
+
+% As a general rule, do not put math, special symbols or citations
+% in the abstract
+\begin{abstract}
+Verilog and VHDL are the most popular hardware description languages (HDLs) and have been for years.
+Yet, there are several problems with both that impedes effective use of these languages. It is a small
+miracle that the industry managed to use these tools for such complex projects that modern chip design
+requires. In this article we will list key problems with existing HDL languages, then present an
+attempt at solving them. The presented solution is 'Silicon', a Python library for HDL development,
+but many of the ideas we enumerate can be implemented in other frameworks, in some cases as extensions
+to the existing languages as well. We will show through examples how these ideas not only help with
+creating complex designs but also foster a more healthy design community, the creation
+of widely reusable component libraries, true design re-use, improve code quality - especially
+readability - and shorten design cycles.
+\end{abstract}
+
+% no keywords
+
+
+
+
+% For peer review papers, you can put extra information on the cover
+% page as needed:
+% \ifCLASSOPTIONpeerreview
+% \begin{center} \bfseries EDICS Category: 3-BBND \end{center}
+% \fi
+%
+% For peerreview papers, this IEEEtran command inserts a page break and
+% creates the second title. It will be ignored for other modes.
+\IEEEpeerreviewmaketitle
+
+
+
+\section{Introduction}
+% no \IEEEPARstart
+Many Hardware Description Languages (HDL)s have been created in the past. The most popular ones,
+with the greatest following are Verilog and VHDL.
+
+Verilog was created by Prabhu Goel, Phil Moorby, Chi-Lai Huang, and Douglas Warmke at the tail
+end of 1983. Originally intended as a tool purely for simulations, a subset of the language –
+the syntesizable subset - was later adopted for synthesis purposes. Since then the language
+has been standardized as IEEE 1364. Many versions of it have been released, the latest in 2005.
+SystemVerilog, initially an off-shoot of Verilog 2005 got integrated back into mainline Verilog
+during the 2009 revision of the standard. Now Verilog is part of the SystemVerilog language,
+which is standardized as IEEE 1800.
+
+IMPORTANT!!!!
+Verilog has two types of assignments: continuous and procedural. The latter is the @always thingy.
+
+At around the same time, VHDL was created to support the needs of the U.S. Department of Defense.
+It also became an IEEE standard (1076), with the latest version released in 2019.
+
+Interestingly neither of these languages were originally intended as VLSI design tools. Verilog,
+as stated before started its life as a simulation only language, while VHDL was intended as a
+documentation tool.
+
+Of course a lot has changed since then, and both of these languages are extensively used as design
+tools for digital logic.
+
+While SytemVerilog and VHDL are extremely rich languages, their synthesizable subset is much smaller.
+While this subset to our knowledge is not formally defined for either languages, we will restrict
+our discussion to those constructs generally supported by synthesis tools. We do that because our
+main focus is on aiding the design process on not on verification.
+
+Other languages, such as BlueSpec or Chisel are more modern attempts at HDLs. Many entities
+developed and shipped various C or C-like languages to target high-level synthesis.
+
+There are many attempts at using existing programming languages, such as Python (PyMTL, MyHDL)
+or Scala (Chisel, SpinalHDL) for the development of synthesizable digital circuitry.
+
+With all of these efforts however, the vast majority of the actual production chip development
+is happening in the traditional languages: VHDL or Verilog. None of the previously mentioned
+alternatives managed to break out of the academic or small industry groups where they were developed.
+
+In the following, we will present a novel approach to RTL development. We will present a set of
+arguments, why a new tool is needed, where do both Verilog and VHDL fall short. We will argue
+that these languages ignore some very basic language development strategies, prevalent
+and successful in the SW industry. We will show how the closed language ecosystem, the slow
+evolution of the tools combined with unfortunate aspects of the languages result in a pronounced
+lack of standardized component libraries, another major feature of a successful SW development
+environment.
+
+In the second half of the article, we will present a prototype Python-based implementation that
+attempts to address these shortcomings. We show how taking the principles of composability, a
+powerful type system and a fully functional meta-programming environment results in an RTL
+development paradigm that is much more conducive to modularization and reuse. We will show
+several examples of commonly performed design tasks that can easily be expressed in this new
+paradigm without specific language support.
+
+\section{What's wrong with the V languages?}
+
+Both Verilog and VHDL is based on a dual-concept for describing a digital circuit. The high
+level decomposition of a problem involves braking up the design into modules and then
+subsequently smaller, hierarchical sub-modules. Once these modules are created, they
+are instantiated in their parent module and 'wired' together by connecting their ports
+together. This is called 'structural' decomposition and illustrated in
+Listing~\ref{lst1:structural_verilog}.
+
+\begin{lstlisting}[
+  caption=Structural decomposition in Verilog,
+  label=lst1:structural_verilog,
+]
+module fulladd (
+  input logic A,
+  input logic B,
+  input logic Cin,
+  output logic Cout,
+  output logic Sum
+);
+  logic X1, A1, A2, A3, O1;
+
+  xor XOR1(X1, A, B);
+  xor XOR2(Sum, X1, Cin);
+  and AND1(A1, A, B);
+  and AND2(A2, A, Cin);
+  and AND3(A3, B, Cin);
+  or OR1(O1, A1, A2);
+  or OR2(Cout, O1, A3);
+endmodule
+\end{lstlisting}
+
+This structural description is easily expendable, but really hard to follow. The
+flowing of data is not explicitly represented, because the inputs and outputs are mixed
+together in the instance port-maps. Not only all wires entering and exiting a module need
+to be mentioned in the same lexical block of code - which precludes a coding style where
+logical operations are grouped together, even the direction of data-flow is implicit:
+from looking at the instantiation site, it's not possible to tell what is an input
+and what is an output.
+
+If this was the only way to describe logic in these languages, it would be a painful
+experience indeed. Thankfully, it's not. A different way of describing logic is to use continuous
+assignments and procedural blocks. The code can make use of logical expressions and sequential statements
+as shown in Listing~\ref{lst1:behavioral_verilog}.
+
+\begin{lstlisting}[
+  caption=Behavioral Verilog,
+  label=lst1:behavioral_verilog,
+]
+module registered_fulladd (
+  input logic clk,
+  input logic A,
+  input logic B,
+  input logic Cin,
+  output logic Cout,
+  output logic Sum
+);
+  logic s, c;
+
+  assign s = A ^ B ^ Cin;
+  assign c = (A & B) | (A & Cin) |
+             (B & Cin);
+  always @posedge(clk) begin
+    Sum <= s;
+    Cout <= c;
+  end;
+endmodule
+\end{lstlisting}
+
+This behavioral description is much easier on the reader: the flow of the data is explicit and
+easy to follow. Sequential statements are clearly separated from combinational logic. Not
+surprisingly almost all code written in Verilog (or VHDL) follow the behavioral coding style.
+
+The trouble is that this version of code is not composeable: once one described a module using
+continuous assignments or sequential statements, it can only be instantiated in the behavioral style.
+
+There is of course the mix style, where submodule instantiations and behavioral description are
+both used within a single module. When used though, the order of statements and modules becomes
+rather unintuitive due to the need of having everything declared before use and the fact that all
+submodule ports need to be bound at the instantiation point.
+
+The result of this shortcoming is that it's very hard to create generic, base-libraries. For
+instance, using RAM modules, multiplexer primitives or even just registers
+would be rather painful if they were shipped as module libraries. Almost no one does that of course
+(with the exception of RAM modules in the form of memory compilers for ASIC targets). The way these
+design primitives are expressed is an ever-increasing set of language constructs. RAMs are described
+as arrays. Multiplexers as {\tt if} or {\tt case} statements. Registers as {\\t @always} blocks.
+Each requiring their own new language feature, compiler support and special rules, especially as
+it relates to synthesized circuitry.
+
+A further complication is that migrating back and forth between the structural and behavioral styles
+is difficult. Anyone who tried to re-target a design from FPGA (with inferred memories) to an ASIC
+process (with explicit RAM instances) knows the pain.
+
+Inserting pipeline stages into a design to achieve timing closure is also difficult. If done in the
+structural style, every connection between submodules needs to be broken and new wires need to be
+introduced with the appropriate registers (using {\tt @always} statements or other means) inserted
+in between. If performed in the behavioral style, all nets still need to be broken in two and the
+appropriate sequential statements be introduced in between. In both cases, this is a rather
+error-prone process: no language-level guarantees exist to warn the coder if some wires are left
+unregistered or - maybe even worse - are registered, but bypassed due to a simple search-and-replace
+error. This is especially problematic in the structural coding style, where signal flow doesn't
+follow code-flow, so sinks routinely appear prior to drivers. A consequence of this is that logical
+errors can sneak their way into the design at a late stage of the project - during timing closure.
+
+The type-system of the traditional languages is also severely lacking. Here though, VHDL has some
+advantages. Verilog however is notorious in its lack of sophistication. Every net (in the
+synthesisable subset) needs to be essentially either a single wire or an N-bit bus. While all nets
+must have a predefined width, automatic type-conversions are performed between mismatched wire sizes.
+This of course is convenient, because it avoids the excessive clutter of the explicit
+width-conversions of VHDL, but results in many a design errors where the language
+silently truncates some bits from a value.
+
+<<<<TODO: figure out what's the story with sign- and zero-extension!>>>
+
+When it comes to even slightly more complex types however, Verilog especially is hopelessly
+inadequate. In many DSP applications for instance, fixed-fractional numbers are used. When dealing
+with these values, special care must be taken during multiplication: a different subset of bits
+are relevant from the result and the question of rounding needs to be addressed. Verilog doesn't
+have native support for these types, which is to be expected. The problem is that it
+isn't possible to create a library that provides primitives for these numeric representations:
+the previously mentioned issues conspire to prevent that. While there is a way to create
+unique {\tt nettype} in the language, many synthesis tools lack support for it.
+
+More complex types, such as structs are supported in a limited way. For instance, one can create
+a complex number by grouping two wires into a struct, but then one can't infer a RAM of such numbers.
+
+<<<<TODO: check if this is true!>>>
+
+Arrays are supported, but they are re-purposed for describing inferred memories. Thus, they are
+not really a complex data structure, more a language feature.
+
+Verilog does provide support for 'interfaces', where complex signaling between modules can be
+encapsulated. This feature would be quite powerful, if not for one fatal flaw: interfaces can't
+contain interfaces. While it's possible to create, for instance an interface for any of the five
+sub-buses of the AXI4 interface spec, they can't at a higher level be combined into a single
+AXI4 interface.
+
+Generic (or meta-) programming is supported by both languages: it allows for describing logic
+which depends on some compile-time available information. The canonical example is a module,
+where the width of the input and output nets depend on some compile-time parameter.
+Listing~\ref{lst1:generic_verilog} shows a simple example.
+
+\begin{lstlisting}[
+  caption=Generic Verilog,
+  label=lst1:generic_verilog,
+]
+module register #(
+  parameter WIDTH = 64,
+) (
+  input logic clk,
+  input logic clk_en,
+  input logic [WIDTH-1:0] I,
+  output logic [WIDTH-1:0] O
+);
+  wire s, c;
+
+  always @(posedge clk) begin
+    if (clock_en == 1'b1) begin
+      O <= I;
+    end
+  end
+endmodule
+\end{lstlisting}
+
+There are more complex uses with the various 'generate' constructs, where the behavior and the
+synthesized logic of the module can depend on such generic parameters. However, one pretty
+quickly reaches the limits of these language features as well. For instance, while it's possible
+to describe the width of a bus as a generic parameter, it's not possible to describe the type of
+it. So while it's possible to create a generic adder of arbitrary width, it's not possible to
+extend that to vectors or complex numbers.
+
+While lacking these basic elements, both languages expand great effort supporting hardly ever
+used constructs. For instance, they support nets with multiple drivers (and custom resolution
+functions), which to our knowledge is almost never used in practice. Verilogs' {\tt tri} nets
+add support for capacitively loaded nets with dynamic storage. There are edge-cases for them
+for sure, but not in high-level digital logic design, which is our focus for this article.
+Tri-stated nets, in-out ports are also part of the repertoire of both langauges, but their
+use is rather minimal and relegated to chip-level I/O pads under almost all circumstances.
+
+To summarize, neither language has the facilities necessary to foster a rich environment of
+design re-use, the creation of reusable libraries. New features need constant revision of
+the core language and the tools which is a slow process even under the best of circumstances.
+
+Worse, since new features need constant updating of the core language and the tools, their
+adoption is slow. Tool vendors are slow in coming out with new synthesizers and the conservative
+design community is even slower in picking them up. Ecosystem players need to consider the lowest
+common denominator, which results in new features getting adopted at a painfully slow rate,
+sometimes taking a decade or longer.
+
+\section{Solutions?}
+
+In the following section we will introduce some ideas to overcome the shortcomings listed
+previously. We will start by providing Verilog-like code-examples to introduce some concepts
+but will soon start using Python-style examples later on, to talk about more involved
+scenarios, especially the interplay between the various features.
+
+\subsection{A false choice}
+
+We believe the dichotomy between structural and behavioral descriptions is a false one.
+A more useful paradigm is to treat the circuit description in the HDL as a netlist. Or, in
+other words, we argue there's no need for behavioral descriptions; only a need for a sane
+syntax for structural ones.
+
+The trick is to treat function calls as if they were module instantiations: all the inputs
+listed as function arguments, and all outputs as return values. For instance, instead of
+the {\tt and AND1(A1, A, B);} instantiation syntax above, one could write {\tt A1 = and(A, B);}.
+
+Logical operators can be thought of as in-fix function-calls, following any of the examples
+of programming languages that support this feature. In Python for instance, {\tt A1 = A \& B}
+would turn into a function (method) call {\tt A1 = A.\_\_and\_\_(B)} or {\tt A1 = B.\_\_rand\_\_(A)}
+depending on which names are defined.
+
+This single change immediately transforms structural description into a much more readable
+and maintainable format. It also removes a significant use-case for behavioral descriptions.
+
+Some module instances don't read well of course if written in a function-call format. A processor
+instance would look very strange in deed if expressed as a function call. To deal with this,
+we suggest that port binding should be decoupled from instance creation. Instance ports
+instead could be referenced on the right-hand-side of an expression in case of outputs, creating
+an output binding. Input instance ports can be referenced on the left-hand-side of an expression
+to create an input binding.
+
+Listing~\ref{lst1:mixed_inst_verilog} shows these new syntactic proposals in action. Here
+we assume that logic gates have been defined as having {\tt out} as their output port and
+{\tt in1} and {\tt in2} as their input ports.
+
+\begin{lstlisting}[
+  caption=Mixed instantiation syntax,
+  label=lst1:mixed_inst_verilog,
+]
+module fulladd (
+  input logic A,
+  input logic B,
+  input logic Cin,
+  output logic Cout,
+  output logic Sum
+);
+  logic X1, A1, A2, A3, O1;
+
+  // Traditional instantiation
+  xor XOR1(X1, A, B);
+  // Create a new instance, no binding
+  xor XOR2;
+  // Binding ports of existing instance
+  assign Sum = XOR2.out;
+  assign XOR2.in1 = X1;
+  assign XOR2.in2 = Cin;
+  // Instantiation through function call
+  assign A1 = and(A, B);
+  and AND3;
+  assign AND3.in1 = B;
+  assign AND3.in2 = Cin;
+  // Cascading instantiation
+  // with operator overloads
+  assign O1 = A1 | and(A, Cin));
+  // Bindig of output inside expression
+  assign Cout = or(O1, AND3.out);
+endmodule
+\end{lstlisting}
+
+\subsection{Sequential constructs}
+Verilog traditionally uses {\tt @always} blocks or their variants to describe sequential
+logic. In reality though designs almost exclusively rely on {\tt @always\_ff} blocks to
+create registers. Latches are discouraged by almost all design guidelines, some targets
+such as FPGAs don't even have support for them.
+
+The main question is this then: how to create registers without {\tt @always} blocks?
+Our suggestion is the creation of a new module, called 'reg'. This module would have
+an input and would output a registered version of the same signal. This module could then
+be instantiated using the same type of constructs as described for combinational logic
+as shown in Listing~\ref{lst1:reg_instantiation}.
+
+\begin{lstlisting}[
+  caption=Registers using instantiations,
+  label=lst1:reg_instantiation,
+]
+module registered_fulladd (
+  input logic clk,
+  input logic A,
+  input logic B,
+  input logic Cin,
+  output logic Cout,
+  output logic Sum
+);
+  logic c;
+
+  assign c = (A & B) | (A & Cin) |
+             (B & Cin);
+  assign Sum = reg(A ^ B ^ Cin);
+  assign Cout = reg(c)
+endmodule
+\end{lstlisting}
+
+There is at least one obvious problem with this construct though that needs to be addressed.
+How does our reg instance from Listing~\ref{lst1:reg_instantiation} get clocked?
+
+\subsubsection{Auto-ports}
+Our proposal is the introduction of a feature, called 'auto-ports'. These ports would automatically
+bind to a net in the instantiation context if they have the right name. For the sake of this
+example, we could declare our {\tt reg} module having a {\tt clk} port with the auto-bind
+marker on it (Listing~\ref{lst1:reg_definition}).
+
+\begin{lstlisting}[
+  caption={\tt reg} definition,
+  label=lst1:reg_definition,
+]
+module reg
+#(
+  parameter WIDTH = 1,
+) (
+  auto input logic clk,
+  input logic [WIDTH-1:0] in,
+  output logic [WIDTH-1:0] out
+);
+\end{lstlisting}
+
+\subsection{Conditional statements}
+The last large remaining use-case for {\tt @always} blocks is the use of conditional
+assignments in the form of {\tt if} and the variants of {\tt case} statements.
+
+The actual circuitry described by these constructs is almost always some type of
+multiplexer. These can already be described as continuous assignments, using the
+{\tt ?:} operator.
+
+Verilog offers a more convenient way of using conditional statements in continuous
+assignments: the {\tt always\_comb} block. We propose to elevate the syntax used
+in those blocks to the module level, as shown in Listing~\ref{lst1:conditionals}.
+
+\begin{lstlisting}[
+  caption=conditionals,
+  label=lst1:conditionals,
+]
+module collatz_step
+(
+  auto input logic clk,
+  input logic [63:0] in,
+  output logic [63:0] out
+);
+  if (in[0] == 0) begin
+    out <= reg(in >> 1)
+  end else begin
+    out <= reg(in << 1 + in + 1)
+  end
+endmodule
+\end{lstlisting}
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+THIS IS NOT WORKING. THERE REALLY ISN'T AN ARGUMENT WHY MOST OF THIS COULDN'T BE DONE IN VERILOG.
+VERIBLE MIGHT EVEN BE THE RIGHT VEHICLE TO CREATE A PRE-PROCESSOR THAT TURNS NEW-STYLE VERILOG
+INTO TRADITIONAL ONE. WHERE IT WOULD START BECOMING PAINFUL IS ALL THE META-PROGRAMMING STUFF.
+WHILE EVEN THAT COULD BE DONE IN VERILOG, I ASSUME, IT WOULD BE TOO MUCH SURGERY. THAT'S WHERE
+A PYTHON-BASED IMPLEMENTATION SHINES, BUT THAT'S A MUCH MORE DIFFICULT ARGUMENT TO MAKE.
+
+ANOTHER THING I'VE REALIZED IS THIS: NO ONE WILL INCORPORATE ANY OF THIS INTO THEIR ASIC WORKFLOW.
+THOSE LONG SPAGHETTI-CODE TCL SCRIPTS WILL NOT BE MODIFIED TO DO AN EXTRA PRE-PROCESSING STEP,
+VERIBLE OR PYTHON. THESE ARE NOT MAKEFILE PROJECTS AND EVEN IF THEY WERE, NO ONE WOULD CHANGE
+THEM.
+
+IN OTHER WORDS, A PROJECT LIKE THIS WILL **HAVE TO** START AT THE BOTTOM, AND CONVINCE FPGA
+USERS ON A SMALL SCALE FIRST. THEN, MAYBE, IT CAN MIGRATE UP THE FOOD-CHAIN, BUT IT'S HIGHLY
+QUESTIONABLE. REALLY THE ONLY REASON TO ADOPT SOMETHING LIKE THIS IS THE LIBRARY SUPPORT.
+
+THAT, OR IF YOU CAN'T STAND VERILOG.
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Other statements, such as {\tt case} could be handled the same way.
+
+Implementing all of these features within an existing toolset would not be
+terribly difficult, but can only be done by the maintainer of the toolset.
+Worse, these features would only be useful if most vendors implemented them.
+Prior to that, there wouldn't be much user appetite for using the features
+and without demand there would be no incentive for vendors to expend resources
+implementing these changes. A classic Catch-22.
+
+An alternative could be to create a Verilog pre-processor that takes
+a new-style Verilog source-code and outputs a toolset-compatible version of it,
+translating the new constructs into old ones. The problem here is that there are
+very few open-source Verilog parser implementations, and those are very far
+behind
+
+https://github.com/chipsalliance/verible - Probably the most promising. Comes from Google.
+http://iverilog.icarus.com/ - Verilog (and some SV) simulator
+https://www.veripool.org/verilator/ - Verilog (or SV) to C++ compiler.
+https://pypi.org/project/pyverilog/ - limited to no SV support, seems abandoned, single-dev driven
+
+
+% An example of a floating figure using the graphicx package.
+% Note that \label must occur AFTER (or within) \caption.
+% For figures, \caption should occur after the \includegraphics.
+% Note that IEEEtran v1.7 and later has special internal code that
+% is designed to preserve the operation of \label within \caption
+% even when the captionsoff option is in effect. However, because
+% of issues like this, it may be the safest practice to put all your
+% \label just after \caption rather than within \caption{}.
+%
+% Reminder: the "draftcls" or "draftclsnofoot", not "draft", class
+% option should be used if it is desired that the figures are to be
+% displayed while in draft mode.
+%
+%\begin{figure}[!t]
+%\centering
+%\includegraphics[width=2.5in]{myfigure}
+% where an .eps filename suffix will be assumed under latex,
+% and a .pdf suffix will be assumed for pdflatex; or what has been declared
+% via \DeclareGraphicsExtensions.
+%\caption{Simulation results for the network.}
+%\label{fig_sim}
+%\end{figure}
+
+% Note that the IEEE typically puts floats only at the top, even when this
+% results in a large percentage of a column being occupied by floats.
+
+
+% An example of a double column floating figure using two subfigures.
+% (The subfig.sty package must be loaded for this to work.)
+% The subfigure \label commands are set within each subfloat command,
+% and the \label for the overall figure must come after \caption.
+% \hfil is used as a separator to get equal spacing.
+% Watch out that the combined width of all the subfigures on a
+% line do not exceed the text width or a line break will occur.
+%
+%\begin{figure*}[!t]
+%\centering
+%\subfloat[Case I]{\includegraphics[width=2.5in]{box}%
+%\label{fig_first_case}}
+%\hfil
+%\subfloat[Case II]{\includegraphics[width=2.5in]{box}%
+%\label{fig_second_case}}
+%\caption{Simulation results for the network.}
+%\label{fig_sim}
+%\end{figure*}
+%
+% Note that often IEEE papers with subfigures do not employ subfigure
+% captions (using the optional argument to \subfloat[]), but instead will
+% reference/describe all of them (a), (b), etc., within the main caption.
+% Be aware that for subfig.sty to generate the (a), (b), etc., subfigure
+% labels, the optional argument to \subfloat must be present. If a
+% subcaption is not desired, just leave its contents blank,
+% e.g., \subfloat[].
+
+
+% An example of a floating table. Note that, for IEEE style tables, the
+% \caption command should come BEFORE the table and, given that table
+% captions serve much like titles, are usually capitalized except for words
+% such as a, an, and, as, at, but, by, for, in, nor, of, on, or, the, to
+% and up, which are usually not capitalized unless they are the first or
+% last word of the caption. Table text will default to \footnotesize as
+% the IEEE normally uses this smaller font for tables.
+% The \label must come after \caption as always.
+%
+%\begin{table}[!t]
+%% increase table row spacing, adjust to taste
+%\renewcommand{\arraystretch}{1.3}
+% if using array.sty, it might be a good idea to tweak the value of
+% \extrarowheight as needed to properly center the text within the cells
+%\caption{An Example of a Table}
+%\label{table_example}
+%\centering
+%% Some packages, such as MDW tools, offer better commands for making tables
+%% than the plain LaTeX2e tabular which is used here.
+%\begin{tabular}{|c||c|}
+%\hline
+%One & Two\\
+%\hline
+%Three & Four\\
+%\hline
+%\end{tabular}
+%\end{table}
+
+
+% Note that the IEEE does not put floats in the very first column
+% - or typically anywhere on the first page for that matter. Also,
+% in-text middle ("here") positioning is typically not used, but it
+% is allowed and encouraged for Computer Society conferences (but
+% not Computer Society journals). Most IEEE journals/conferences use
+% top floats exclusively.
+% Note that, LaTeX2e, unlike IEEE journals/conferences, places
+% footnotes above bottom floats. This can be corrected via the
+% \fnbelowfloat command of the stfloats package.
+
+
+
+
+\section{Conclusion}
+The conclusion goes here.
+
+
+
+
+% conference papers do not normally have an appendix
+
+
+
+% use section* for acknowledgment
+\ifCLASSOPTIONcompsoc
+  % The Computer Society usually uses the plural form
+  \section*{Acknowledgments}
+\else
+  % regular IEEE prefers the singular form
+  \section*{Acknowledgment}
+\fi
+
+
+The authors would like to thank...
+
+
+
+
+
+% trigger a \newpage just before the given reference
+% number - used to balance the columns on the last page
+% adjust value as needed - may need to be readjusted if
+% the document is modified later
+%\IEEEtriggeratref{8}
+% The "triggered" command can be changed if desired:
+%\IEEEtriggercmd{\enlargethispage{-5in}}
+
+% references section
+
+% can use a bibliography generated by BibTeX as a .bbl file
+% BibTeX documentation can be easily obtained at:
+% http://mirror.ctan.org/biblio/bibtex/contrib/doc/
+% The IEEEtran BibTeX style support page is at:
+% http://www.michaelshell.org/tex/ieeetran/bibtex/
+%\bibliographystyle{IEEEtran}
+% argument is your BibTeX string definitions and bibliography database(s)
+%\bibliography{IEEEabrv,../bib/paper}
+%
+% <OR> manually copy in the resultant .bbl file
+% set second argument of \begin to the number of references
+% (used to reserve space for the reference number labels box)
+\begin{thebibliography}{1}
+
+\bibitem{IEEEhowto:kopka}
+H.~Kopka and P.~W. Daly, \emph{A Guide to \LaTeX}, 3rd~ed.\hskip 1em plus
+  0.5em minus 0.4em\relax Harlow, England: Addison-Wesley, 1999.
+
+\end{thebibliography}
+
+
+
+
+% that's all folks
+\end{document}
+
+
