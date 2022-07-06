@@ -137,3 +137,8 @@ a.out
 **/work/*
 *.vcd
 transcript
+
+# Stuff from Quartus
+**/db/*
+**/incremental_db/*
+**/output_files/*
