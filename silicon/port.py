@@ -200,7 +200,6 @@ class Junction(JunctionBase):
 
         # If both ports have types, make sure they're compatible.
         if not source.is_typeless() and not self.is_typeless():
-            from .utils import adapt
             # Insert adaptor if needed
             old_junction = source
             # ... but first figure out into which context the adaptor should be inserted (if any).

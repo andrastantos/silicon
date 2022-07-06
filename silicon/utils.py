@@ -59,7 +59,7 @@ def convert_to_junction(thing: Any) -> Optional['Junction']:
     from .constant import ConstantModule, _const
     from .primitives import Concatenator
     import collections
-    
+
     if hasattr(thing, "get_underlying_junction"):
         return thing.get_underlying_junction()
     const_val = _const(thing)
@@ -185,14 +185,29 @@ def str_block(block: Optional[str], header: str, footer: str):
 
 
 def implicit_adapt(input: 'Junction', output_type: 'NetType') -> 'Junction':
+    """
+    Implicitly adapts input to output_type.
+
+    Implicit adaption happens when mismatched port-types are bound together.
+    """
     return adapt(input, output_type, implicit=True, force=False)
 
 
 def explicit_adapt(input: 'Junction', output_type: 'NetType') -> 'Junction':
+    """
+    Explicitly adapts input to output_type. If adaption would require force, it raises an exception.
+
+    NOTE: forcing an adaption means for instance to change a Number from a wider to a narrower range.
+    """
     return adapt(input, output_type, implicit=False, force=False)
 
 
 def cast(input: 'Junction', output_type: 'NetType') -> 'Junction':
+    """
+    Casts input to output_type. Forces adaption, on top of being explicit.
+
+    NOTE: forcing an adaption means for instance to change a Number from a wider to a narrower range.
+    """
     return adapt(input, output_type, implicit=False, force=True)
 
 def adapt(input: 'Junction', output_type: 'NetType', implicit: bool, force: bool) -> 'Junction':

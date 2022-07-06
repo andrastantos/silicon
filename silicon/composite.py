@@ -219,13 +219,12 @@ class Struct(Composite):
         ret_val += "}"
         return ret_val
 
-    class ToNumber(Module):
+    class ToNumber(GenericModule):
         input_port = Input()
         output_port = Output()
-        def body(self):
-            new_net_type = Unsigned(self.input_port.get_net_type().get_num_bits())
-            assert not self.output_port.is_specialized()
-            self.output_port.set_net_type(new_net_type)
+        def construct(self, input_type):
+            self.input_port.set_net_type(input_type)
+            self.output_port.set_net_type(Unsigned(input_type.get_num_bits()))
 
         def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
             assert len(self.get_outputs()) == 1
@@ -323,8 +322,8 @@ class Struct(Composite):
         if implicit:
             return None
         # We only support conversion to Numbers
-        raw_number = Struct.ToNumber(input)
-        if not force or raw_number.get_net_type() == output_type:
+        raw_number = Struct.ToNumber(input.get_net_type())(input)
+        if raw_number.get_net_type() == output_type:
             return raw_number
         return cast(raw_number, output_type)
 
