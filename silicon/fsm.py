@@ -6,12 +6,10 @@
 from .module import GenericModule, Module
 from .port import Input, Output, Wire, Junction
 from .auto_input import ClkPort, RstPort, RstValPort
-from .net_type import NetType
 from .primitives import SelectOne, Reg
-from .tracer import no_trace
 from .exceptions import SyntaxErrorException
-from .utils import is_junction, is_junction_member, is_junction_or_member, convert_to_junction
-from .number import Number, logic
+from .utils import is_junction_or_member
+from .number import logic
 from .constant import get_net_type_for_const
 from .back_end import str_to_id
 from collections import OrderedDict
