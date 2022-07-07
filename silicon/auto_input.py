@@ -1,4 +1,4 @@
-from .port import Junction, Input, JunctionRef
+from .port import Junction, Input, JunctionRef, junction_ref
 from typing import Optional, Union, Sequence, Any, Dict, Type, Callable
 from .net_type import NetType
 from .exceptions import SyntaxErrorException, SimulationException
@@ -51,21 +51,6 @@ class AutoInput(Input):
             for member_name, (member_junction, _) in self._member_junctions.items():
                 ret_val += member_junction.generate_interface(back_end, f"{port_name}{MEMBER_DELIMITER}{member_name}")
             return ret_val
-
-
-
-
-def junction_ref(junction: Optional[Junction]) -> Optional[JunctionRef]:
-    if junction is None:
-        return None
-    return JunctionRef(junction)
-
-sim_convert_lookup: Dict[Type, Callable] = {}
-
-def sim_const(value: Any, for_junction: 'Junction') -> Any:
-    if type(value) in sim_convert_lookup:
-        return sim_convert_lookup[type(value)](value, for_junction.get_net_type())
-    raise SimulationException(f"Don't know how to convert value {value} of type {type(value)} during simulation", for_junction)
 
 
 # Pre-defined port types for clk and rst as they are very commonly used
