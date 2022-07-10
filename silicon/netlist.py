@@ -547,20 +547,28 @@ class Netlist(object):
     def simulate(self, vcd_file_name: Union[Path,str], end_time: Optional[int] = None, timescale='1ns') -> int:
         from .simulator import Simulator
         with Simulator(self, str(vcd_file_name), timescale) as context:
+            def finalize_profile():
+                import pstats as pstats
+                import io as io
+
+                pr.disable()
+                s = io.StringIO()
+                sortby = 'cumulative'
+                ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+                #ps.print_stats()
+                ps.dump_stats("profile.out")
+                #print(s.getvalue())
+
             context.dump_signals()
             import cProfile as profile
-            import pstats as pstats
-            import io as io
             pr = profile.Profile()
             pr.enable()
-            ret_val = context.simulate(end_time)
-            pr.disable()
-            s = io.StringIO()
-            sortby = 'cumulative'
-            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-            #ps.print_stats()
-            ps.dump_stats("profile.out")
-            #print(s.getvalue())
+            try:
+                ret_val = context.simulate(end_time)
+            except:
+                finalize_profile()
+                raise
+            finalize_profile()
             return ret_val
 
     def lint(self):
