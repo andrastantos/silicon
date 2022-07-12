@@ -1,11 +1,11 @@
-from .number import Number, val_to_sim
+from .number import Number
 from enum import Enum as PyEnum
 from enum import EnumMeta
 #from enum import IntEnum as PyIntEnum
 from typing import Tuple, Union, Optional, Any, Sequence, Generator
 from .net_type import NetType
-from .utils import first, TSimEvent
-from .exceptions import SimulationException, SyntaxErrorException
+from .utils import first, TSimEvent, Context
+from .exceptions import SimulationException, SyntaxErrorException, AdaptTypeError
 from .netlist import Netlist
 from .module import Module, InlineBlock, InlineExpression
 from .port import Input, Output, Junction
@@ -21,104 +21,13 @@ class Enum(Number):
         self.base_type = base_type
         super().__init__(min_val = min(e.value for e in base_type), max_val = max(e.value for e in base_type))
 
-        from .constant import const_convert_lookup, sim_convert_lookup
+        from .constant import const_convert_lookup
         enum_type = type(first(base_type))
         const_convert_lookup[enum_type] = enum_to_const
-        sim_convert_lookup[enum_type] = Enum.val_to_sim
 
         #self.possible_values = set(e.value for e in base_type)
 
     vcd_type: str = 'string'
-
-    class EnumConverter(object):
-        def __init__(self, value):
-            self.value = value
-        def __int__(self):
-            return self.value.value
-        def __add__(self, other):
-            return int(self) + int(other)
-        def __sub__(self, other):
-            return int(self) - int(other)
-        def __mul__(self, other: Any) -> Any:
-            return int(self) * int(other)
-        def __floordiv__(self, other: Any) -> Any:
-            return int(self) // int(other)
-        def __mod__(self, other: Any) -> Any:
-            return int(self) % int(other)
-        def __divmod__(self, other: Any) -> Any:
-            return divmod(int(self), int(other))
-        def __pow__(self, other: Any, modulo = None) -> Any:
-            return pow(int(self), int(other), modulo)
-        def __lshift__(self, other: Any) -> Any:
-            return int(self) << int(other)
-        def __rshift__(self, other: Any) -> Any:
-            return int(self) >> int(other)
-        def __and__(self, other: Any) -> Any:
-            return int(self) & int(other)
-        def __xor__(self, other: Any) -> Any:
-            return int(self) ^ int(other)
-        def __or__(self, other: Any) -> Any:
-            return int(self) | int(other)
-        def __truediv__(self, other: Any) -> Any:
-            return int(self) / int(other)
-
-        def __radd__(self, other: Any) -> Any:
-            return int(other) + int(self)
-        def __rsub__(self, other: Any) -> Any:
-            return int(other) - int(self)
-        def __rmul__(self, other: Any) -> Any:
-            return int(other) * int(self)
-        def __rtruediv__(self, other: Any) -> Any:
-            return int(other) / int(self)
-        def __rfloordiv__(self, other: Any) -> Any:
-            return int(other) // int(self)
-        def __rmod__(self, other: Any) -> Any:
-            return int(other) % int(self)
-        def __rdivmod__(self, other: Any) -> Any:
-            return divmod(int(other), int(self))
-        def __rpow__(self, other: Any, modulo: Any = None) -> Any:
-            return pow(int(other), int(self), modulo)
-        def __rlshift__(self, other: Any) -> Any:
-            return int(other) << int(self)
-        def __rrshift__(self, other: Any) -> Any:
-            return int(other) >> int(self)
-        def __rand__(self, other: Any) -> Any:
-            return int(other) & int(self)
-        def __rxor__(self, other: Any) -> Any:
-            return int(other) ^ int(self)
-        def __ror__(self, other: Any) -> Any:
-            return int(other) | int(self)
-
-        def __neg__(self) -> Any:
-            return -int(self)
-        def __pos__(self) -> Any:
-            return +int(self)
-        def __abs__(self) -> Any:
-            return abs(int(self))
-        def __invert__(self) -> Any:
-            return ~int(self)
-
-        def __bool__(self) -> bool:
-            return bool(int(self))
-        def __lt__(self, other: Any) -> bool:
-            return int(self) < int(other)
-        def __le__(self, other: Any) -> bool:
-            return int(self) <= int(other)
-        def __eq__(self, other: Any) -> bool:
-            return int(self) == int(other)
-        def __ne__(self, other: Any) -> bool:
-            return int(self) != int(other)
-        def __gt__(self, other: Any) -> bool:
-            return int(self) > int(other)
-        def __ge__(self, other: Any) -> bool:
-            return int(self) >= int(other)
-
-        def as_number(self) -> Number.SimValue:
-            return Number.SimValue(self.value.value)
-
-    @staticmethod
-    def val_to_sim(val, target_net_type: NetType):
-        return Enum.EnumConverter(val)
 
     def __str__(self) -> str:
         return f"Enum({self.get_type_name()})"
@@ -148,10 +57,10 @@ class Enum(Number):
         assert back_end.language == "SystemVerilog"
         return value.name
 
-    def convert_to_vcd_type(self, value: Optional[Union['Enum', 'EnumConverter']]) -> Any:
+    def convert_to_vcd_type(self, value: Optional[Union['Enum', 'Enum.SimValue']]) -> Any:
         if value is None:
             return None
-        return value.value.name
+        return value.enum_value.name
 
     from .module import GenericModule
     class EnumAdaptor(GenericModule):
@@ -191,20 +100,45 @@ class Enum(Number):
             """
             return True
 
-    def adapt_from(self, input: 'Junction', implicit: bool, force: bool) -> 'Junction':
-        input_type = input.get_net_type()
-        if not isinstance(input_type, Enum):
-            if implicit:
+    def adapt_from(self, input: Any, implicit: bool, force: bool) -> Any:
+        enum_type = type(first(self.base_type))
+        context = Context.current()
+        if context == Context.simulation:
+            if input is None:
                 return None
-            if not isinstance(input_type, Number):
-                return None
-            return Enum.EnumAdaptor(input_type, self)(input)
-        # Not only we have to have both junctions being Enums, we have to make sure they're instances of the *same* Enum...
-        if self.base_type is not input_type.base_type:
-            if implicit:
-                return None
-            return Enum.EnumAdaptor(input_type, self)(input)
-        return input
+            if isinstance(input, Junction):
+                input = input.sim_value
+            elif isinstance(input, self.base_type):
+                input = Enum.SimValue(input)
+            elif isinstance(input, Enum.SimValue):
+                pass
+            elif isinstance(input, (int, Number.SimValue)):
+                if isinstance(input, Number.SimValue):
+                    if input.precision != 0:
+                        raise SimulationException(f"Can't convert Number {input} to enum type {self.base_type}. Fractional types are not supported")
+                    input = input.value
+                try:
+                    input = self.base_type(input)
+                except ValueError:
+                    raise SimulationException(f"Can't convert int value {input} to enum type {self.base_type}.")
+                input = Enum.SimValue(input)
+            else:
+                raise SimulationException(f"Don't support input type {type(input)}")
+            return input
+        elif context == Context.elaboration:
+            input_type = input.get_net_type()
+            if not isinstance(input_type, Enum):
+                if implicit:
+                    raise AdaptTypeError
+                if not isinstance(input_type, Number):
+                    raise AdaptTypeError
+                return Enum.EnumAdaptor(input_type, self)(input)
+            # Not only we have to have both junctions being Enums, we have to make sure they're instances of the *same* Enum...
+            if self.base_type is not input_type.base_type:
+                if implicit:
+                    raise AdaptTypeError
+                return Enum.EnumAdaptor(input_type, self)(input)
+            return input
 
     # For now, these we'll leave intact, but that means that enums are closer to Numbers we might want them to be....
     # We might also open up a bunch of cases where we silently should convert to Numbers, but we don't
@@ -218,13 +152,10 @@ class Enum(Number):
     def validate_sim_value(self, sim_value: Any, parent_junction: 'Junction') -> Any:
         if sim_value is None:
             return sim_value
-        if not isinstance(sim_value, Enum.EnumConverter):
-            raise SimulationException(f"Value {sim_value} of type {type(sim_value)} is not valid for an Enum type {self.get_type_name()}", parent_junction)
-        elif sim_value.value in self.base_type:
+        if isinstance(sim_value, Enum.SimValue):
             return sim_value
-        else:
-            raise SimulationException(f"Value {sim_value.value} can't be represented by Enum type {self.get_type_name()}", parent_junction)
-    
+        raise SimulationException(f"Value {sim_value} of type {type(sim_value)} is not valid for an Enum type {self.get_type_name()}", parent_junction)
+
     @classmethod
     def result_type(cls, net_types: Sequence[Optional['NetType']], operation: str) -> 'NetType':
         # If we're SELECT-ing from all Enum junctions of the same underlying PyEnum, go with that, otherwise revert to Number.
@@ -238,12 +169,14 @@ class Enum(Number):
     def __eq__(self, other):
         return self is other or type(self) is type(other)
 
-def enum_to_const(value: Enum) -> Tuple[NetType, Enum]:
+    class SimValue(Number.SimValue):
+        def __init__(self, value: Optional[Union[PyEnum,'Number.SimValue']]= None):
+            super().__init__(value.value)
+            self.enum_value = value
+
+def enum_to_const(value: Enum, type_hint: Optional[NetType]) -> Tuple[NetType, Enum]:
     return Enum(type(value)), value
 
 
-from .constant import const_convert_lookup, sim_convert_lookup
+from .constant import const_convert_lookup
 const_convert_lookup[PyEnum] = enum_to_const
-#sim_convert_lookup[Enum] = val_to_sim
-sim_convert_lookup[Enum.EnumConverter] = lambda enum_converter, target_net_type: enum_converter
-

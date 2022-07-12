@@ -3,15 +3,16 @@ from typing import Tuple, Union, Any, Dict, Set, Optional, Generator, Sequence
 from .net_type import NetType, KeyKind
 from .netlist import Netlist
 from .back_end import BackEnd
-from .exceptions import SyntaxErrorException
+from .exceptions import SimulationException, SyntaxErrorException
 from .module import Module, GenericModule, InlineExpression, InlineBlock, InlineStatement
 from .port import Input, Output, Port, Junction
 from .tracer import no_trace
-from .utils import TSimEvent, MEMBER_DELIMITER, adapt, cast
+from .utils import TSimEvent, MEMBER_DELIMITER, adapt, Context
 from collections import namedtuple, OrderedDict
 from copy import copy
 from .number import Unsigned, Number
 from .port import Wire
+from .exceptions import AdaptTypeError
 
 import types
 
@@ -320,26 +321,31 @@ class Struct(Composite):
             return input
         # We don't support implicit conversion
         if implicit:
-            return None
+            raise AdaptTypeError
         # We only support conversion to Numbers
         raw_number = Struct.ToNumber(input.get_net_type())(input)
-        if raw_number.get_net_type() == output_type:
+        if raw_number.get_net_type() is output_type:
             return raw_number
-        return cast(raw_number, output_type)
+        return adapt(raw_number, output_type, implicit, force)
 
-    def adapt_from(self, input: 'Junction', implicit: bool, force: bool) -> 'Junction':
-        input_type = input.get_net_type()
-        if input_type == self:
-            return input
-        # We don't support implicit conversion
-        if implicit:
-            return None
-        # We support anything that can convert to a number
-        input_as_num = adapt(input, Unsigned(length=input_type.get_num_bits()), implicit, force)
-        if input_as_num is None:
-            return None
-        return Struct.FromNumber(self)(input_as_num)
-
+    def adapt_from(self, input: Any, implicit: bool, force: bool) -> Any:
+        context = Context.current()
+        if context == Context.simulation:
+            raise SimulationException("Don't support simulation yet")
+        elif context == Context.elaboration:
+            input_type = input.get_net_type()
+            if input_type is self:
+                return input
+            # We don't support implicit conversion
+            if implicit:
+                raise AdaptTypeError
+            # We support anything that can convert to a number
+            input_as_num = adapt(input, Unsigned(length=input_type.get_num_bits()), implicit, force)
+            if input_as_num is None:
+                raise AdaptTypeError
+            return Struct.FromNumber(self)(input_as_num)
+        else:
+            assert False, f"Unkown context: {context}"
 class Interface(Composite):
     def __init__(self):
         super().__init__(support_reverse = True)
@@ -447,7 +453,7 @@ class Array(Composite):
             return True
 
     def get_slice(self, key: Any, junction: Junction) -> Any:
-        if junction.active_context() == "simulation":
+        if Context.current() == Context.simulation:
             return Array.Accessor.static_sim(junction, Number.Key(key))
         else:
             return Number.Accessor(slice=key, array=self)(junction)
@@ -457,7 +463,7 @@ class Array(Composite):
         # Otherwise, the auto-created converter object (such as Constant) will be evaluated in the wrong order
         # and during the evaluation of the Concatenator, the inlined expression forwarding logic will break.
         from .utils import convert_to_junction
-        real_junction = convert_to_junction(value)
+        real_junction = convert_to_junction(value, type_hint=None)
         junction.raw_input_map.append((key, real_junction))
     @classmethod
     def resolve_key_sequence_for_get(cls, keys: Sequence[Tuple[Any, KeyKind]], for_junction: Junction) -> Tuple[Optional[Sequence[Tuple[Any, KeyKind]]], Junction]:

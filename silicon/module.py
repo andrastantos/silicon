@@ -3,15 +3,15 @@
 from typing import Union, Set, Tuple, Dict, Any, Optional, List, Iterable, Generator, Sequence, Callable
 import typing
 from collections import OrderedDict
-from .port import Junction, Port, Output, Input, Wire, sim_const
+from .port import Junction, Port, Output, Input, Wire, JunctionBase
 from .net_type import NetType
-from .utils import convert_to_junction, BoolMarker, str_block, CountMarker, TSimEvent, ContextMarker, first
+from .utils import convert_to_junction, BoolMarker, str_block, CountMarker, TSimEvent, ContextMarker, first, Context
 from .stack import Stack
 from .tracer import Tracer, Trace, NoTrace, trace, no_trace
 from .netlist import Netlist
 from enum import Enum
 from .ordered_set import OrderedSet
-from .exceptions import SyntaxErrorException
+from .exceptions import SimulationException, SyntaxErrorException
 from threading import RLock
 from itertools import chain, zip_longest
 from .utils import is_port, is_input_port, is_output_port, is_wire, is_junction_member, is_module, fill_arg_names, is_junction_or_member, is_junction, is_iterable, MEMBER_DELIMITER, first
@@ -120,6 +120,8 @@ class Module(object):
                 return super().__new__(cls)
 
     def __init__(self, *args, **kwargs):
+        if Context.current() != Context.elaboration:
+            raise SyntaxErrorException(f"Can't instantiate module outside of elaboration context")
         self.custom_parameters = OrderedDict()
         self._impl = Module.Impl(self, *args, **kwargs)
         self._impl._init_phase2(*args, **kwargs)
@@ -144,10 +146,12 @@ class Module(object):
 
 
     def __call__(self, *args, **kwargs) -> Union[Port, Tuple[Port]]:
+        if Context.current() != Context.elaboration:
+            raise SyntaxErrorException(f"Can't bind module using call-syntax outside of elaboration context")
         def do_call() -> Union[Port, Tuple[Port]]:
             my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
             for idx, arg in enumerate(args):
-                arg_junction = convert_to_junction(arg) if arg is not None else None
+                arg_junction = convert_to_junction(arg, type_hint=None) if arg is not None else None
                 if idx >= len(my_positional_inputs) and not self._impl._in_create_port:
                     input_cnt = len(my_positional_inputs)
                     self._impl._create_positional_port(idx, arg_junction.get_net_type() if arg_junction is not None else None)
@@ -157,7 +161,7 @@ class Module(object):
                 if arg_junction is not None:
                     my_positional_inputs[idx].bind(arg_junction)
             for arg_name, arg_value in kwargs.items():
-                arg_junction = convert_to_junction(arg_value) if arg_value is not None else None
+                arg_junction = convert_to_junction(arg_value, type_hint=None) if arg_value is not None else None
                 if not has_port(self, arg_name) and not self._impl._in_create_port:
                     self._impl._create_named_port(arg_name, arg_junction.get_net_type() if arg_junction is not None else None)
                 if arg_junction is not None:
@@ -184,11 +188,11 @@ class Module(object):
     def __getattr__(self, name) -> Any:
         # This gets called in the following situation:
         #    my_module.dynamic_port <<= 42
-        # where dynamic_port is someting that normally would get created by create_named_port.
+        # where dynamic_port is something that normally would get created by create_named_port.
         # TODO: what to do during simulation??
         if self._impl._no_port_create_in_get_attr:
             raise AttributeError
-        if self._impl.active_context() != "elaboration":
+        if Context.current() != Context.elaboration:
             raise AttributeError
         port = self._impl._create_named_port(name)
         if port is None:
@@ -447,6 +451,7 @@ class Module(object):
             all that happens with them is that they're passed through to the 'construct' call, we can leave it as-is.
             """
             import inspect
+            Context.register(self._context_change)
             self._no_junction_bind = BoolMarker()
             with self._no_junction_bind:
                 import os
@@ -494,7 +499,6 @@ class Module(object):
                 self.setattr__impl = self.__setattr__normal
                 self._inside = BoolMarker()
                 self._in_generate = BoolMarker()
-                self._in_elaborate = ContextMarker(self, "elaboration")
                 self._in_create_port = BoolMarker()
                 self._in_construct = BoolMarker()
                 self._in_set_attr_no_bind = BoolMarker()
@@ -520,7 +524,6 @@ class Module(object):
                     parent._impl.register_sub_module(self._true_module)
                     self.netlist = parent._impl.netlist
                     self.parent = parent
-                    self.set_context(self.parent._impl.active_context())
                 else:
                     self.netlist = Netlist(self._true_module)
                     self.parent = None
@@ -562,6 +565,9 @@ class Module(object):
                         instance_port._net_type = port_object._net_type
                         instance_port.set_parent_module(self._true_module)
                         setattr(self._true_module, port_name, instance_port)
+                        # Since we didn't actually create a new Port object - we've copied it, it's __init__ didn't get called.
+                        # As such, the new port didn't get registered for context changes. Let's fix that
+                        Context.register(instance_port._context_change)
                         #print("Creating instance port with name: {} and type {}".format(port_name, port_object))
                     #print("module {} is created".format(type(self)))
                     # Store construct arguments locally so we can compare them later for is_equivalent
@@ -581,16 +587,9 @@ class Module(object):
                 del self._parent_local_junctions
             #show_callers_locals()
 
-        def set_context(self, context: str) -> None:
-            # Must be called late enough in "__init__" so that the various attributes are already set.
-            for sub_module in self._sub_modules:
-                sub_module._impl.set_context(context)
-            for junction in self.get_junctions().values():
-                junction.set_context(context)
-            for wire in self._local_wires:
-                wire.set_context(context)
-            self._context = context
-            if context == "simulation":
+        def _context_change(self, context: Context) -> None:
+            # Called by Context every time there's a change in context
+            if context == Context.simulation:
                 self.setattr__impl = self.__setattr__sim
             else:
                 self.setattr__impl = self.__setattr__normal
@@ -780,10 +779,10 @@ class Module(object):
                         assert value.get_parent_module() is self._true_module or value.get_parent_module() is None
                         value.set_parent_module(self._true_module)
                     return self.__set_no_bind_attr__(name, value, super_setter)
-                context = self.active_context()
+                context = Context.current()
                 if context is None:
                     return self.__set_no_bind_attr__(name, value, super_setter)
-                elif context == "elaboration":
+                elif context == Context.elaboration:
                     if is_junction(value):
                         if value.get_parent_module() is None:
                             # If the attribute doesn't exist and we do a direct-assign to a free-standing port, assume that this is a port-creation request
@@ -808,12 +807,13 @@ class Module(object):
                     if is_junction(getattr(self._true_module, name)):
                         try:
                         #if True:
-                            junction_value = convert_to_junction(value)
+                            junction_value = convert_to_junction(value, type_hint=None)
                             if junction_value is None:
                                 # We couldn't create a port out of the value:
-                                raise SyntaxErrorException(f"couldn't bind junction to value '{value}'.")
+                                raise SyntaxErrorException(f"couldn't convert '{value}' to Junction.")
                         except Exception as ex:
                             raise SyntaxErrorException(f"couldn't bind junction to value '{value}' with exception '{ex}'")
+                        assert isinstance(junction_value, JunctionBase)
                         junction_inst = getattr(self._true_module, name)
                         if junction_value is junction_inst:
                             # This happens with self.port <<= something constructors: we do the <<= operator, which returns the RHS, then assign it to the old property.
@@ -902,7 +902,7 @@ class Module(object):
 
             assert len(self._local_wires) == 0
 
-            with self._in_elaborate:
+            with ContextMarker(Context.elaboration):
                 self._body(trace) # Will create all the sub-modules
 
             for wire in tuple(self._local_wires):
@@ -1313,9 +1313,10 @@ class DecoratorModule(GenericModule):
         for return_value, (name, output_port) in zip(return_values, self._impl.get_outputs().items()):
             # We need to do a little slight of hands here: the original output port needs to be replaced with the one returned by the function.
             # TODO: That's not true, I don't think. We can simply hook up the real outputs as sources to the previously created output
-            return_port = convert_to_junction(return_value)
+            return_port = convert_to_junction(return_value, type_hint=None)
             if return_port is None:
                 raise SyntaxErrorException(f"Modularized function must return output ports or at least things that can be turned into output ports")
+            assert isinstance(return_port, JunctionBase)
             assert output_port.source is None
             output_port <<= return_port
             #for sink in output_port.sinks:
@@ -1357,7 +1358,7 @@ class DecoratorModule(GenericModule):
         for name, arg in bound_args.items():
             if arg in ports_needing_name:
                 setattr(self, name, arg)
-                arg.bind(convert_to_junction(ports_needing_name[arg]))
+                arg.bind(convert_to_junction(ports_needing_name[arg], type_hint=None))
                 del ports_needing_name[arg]
         # Work through the remaining inputs and simply name them consecutively
         for idx, port, arg_junction in enumerate(ports_needing_name.items()):
@@ -1366,7 +1367,7 @@ class DecoratorModule(GenericModule):
                 if hasattr(self, port_name):
                     raise SyntaxErrorException("Can't add port {port_name} to modularized function: the attribute already exists")
             setattr(self, port_name, port)
-            port.bind(convert_to_junction(arg_junction))
+            port.bind(convert_to_junction(arg_junction, type_hint=None))
 
         ret_val = tuple(self._impl.get_outputs().values())
         if len(ret_val) == 1:

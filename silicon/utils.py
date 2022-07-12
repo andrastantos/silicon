@@ -1,11 +1,63 @@
 from typing import Union, Sequence, Any, Optional, Iterable, Dict, List, Callable, IO, Sequence, Tuple, Generator, Set, Iterator
-
 from .tracer import no_trace
-from .exceptions import SyntaxErrorException
+from .exceptions import SyntaxErrorException, AdaptTypeError
 from collections import deque
 from threading import RLock
-
 TSimEvent = Generator[Union[int, Sequence['Port']], int, int]
+
+# Only purpose to provide an easy way to check if something is a SimValue in convert_to_junction
+class SimValue(object):
+    pass
+class Context(object):
+    stack = []
+    listeners = set()
+
+    @staticmethod
+    def register(callback: Callable):
+        Context.listeners.add(callback)
+        callback(Context.current())
+    @staticmethod
+    def unregister(callback: Callable):
+        Context.listeners.remove(callback)
+
+    @staticmethod
+    def push(context: Any):
+        notify = context != Context.current()
+        Context.stack.append(context)
+        if notify:
+            for callback in Context.listeners:
+                callback(context)
+
+    @staticmethod
+    def pop() -> Any:
+        ret_val = Context.stack.pop()
+        new_context = Context.current()
+        if ret_val != new_context:
+            for callback in Context.listeners:
+                callback(new_context)
+        return ret_val
+
+    @staticmethod
+    def current() -> Any:
+        if len(Context.stack) == 0:
+            return None
+        return Context.stack[-1]
+
+    elaboration = 1
+    simulation = 2
+    generation = 3
+
+class ContextMarker(object):
+    def __init__(self, context: Any):
+        self.context = context
+    def __enter__(self):
+        Context.push(self.context)
+        return self
+    def __exit__(self, type, value, traceback):
+        old_context = Context.pop()
+        assert old_context == self.context
+
+
 
 def is_iterable(thing: Any) -> bool:
     try:
@@ -52,7 +104,7 @@ def is_net_type(thing: Any) -> bool:
     return isinstance(thing, NetType)
 
 
-def convert_to_junction(thing: Any) -> Optional['Junction']:
+def convert_to_junction(thing: Any, type_hint: Optional['NetType']=None) -> Optional['Junction']:
     """
     Convert the input 'thing' into a port, if possible. Returns None if such conversion is not possible
     """
@@ -60,21 +112,52 @@ def convert_to_junction(thing: Any) -> Optional['Junction']:
     from .primitives import Concatenator
     import collections
 
-    if hasattr(thing, "get_underlying_junction"):
-        return thing.get_underlying_junction()
-    const_val = _const(thing)
-    if const_val is not None:
-        return ConstantModule(const_val)()
-    elif isinstance(thing, collections.abc.Mapping):
-        assert False, "FIXME: this is where direct struct assignment would go"
-    elif isinstance(thing, str):
-        raise SyntaxErrorException(f"Can't convert string '{thing}' into a constant")
-    elif is_iterable(thing):
-        return Concatenator(*thing)
-    elif hasattr(thing, "__bool__") or hasattr(thing, "__len__"):
-        # Use bool-conversion to get to the value
-        return convert_to_junction(bool(thing))
+    context = Context.current()
+    if context == Context.elaboration:
+        if hasattr(thing, "get_underlying_junction"):
+            return thing.get_underlying_junction()
+    elif context == Context.simulation:
+        if thing is None:
+            return None
+        if hasattr(thing, "sim_value"):
+            return thing.sim_value
+        if isinstance(thing, SimValue):
+            return thing
     else:
+        assert False, f"Unknown context: '{context}'"
+
+    const_val = _const(thing, type_hint)
+
+    if const_val is not None:
+        if context == Context.elaboration:
+            return ConstantModule(const_val)()
+        elif context == Context.simulation:
+            from .number import Number
+            from .enum import Enum
+
+            if isinstance(const_val.net_type, Enum):
+                return Enum.SimValue(const_val.value)
+            if isinstance(const_val.net_type, Number):
+                return Number.SimValue(const_val.value, precision=const_val.net_type.precision)
+            assert False, f"FIXME: unknown constant type '{const_val.net_type}' encountered"
+
+    # _const failed to find us what we were looking for.
+    # There can be two reasons for it: either it's a string that didn't convert, or some other, unknown type.
+    # We will check for the first, then try a few implicit conversions to get to our goal.
+    if isinstance(thing, str):
+        raise SyntaxErrorException(f"Can't convert '{thing}' into a constant")
+    if hasattr(thing, "__bool__"):
+        # Use bool-conversion to get to the value
+        # NOTE: pretty much anything converts to a bool, so simply trying and catching the TypeError is not an option here
+        return convert_to_junction(bool(thing), type_hint)
+    try:
+        return convert_to_junction(int(thing), type_hint)
+    except TypeError:
+        pass
+    try:
+        # NOTE: pretty much anything converts to a str, so this must be the last resort
+        return convert_to_junction(str(thing), type_hint)
+    except TypeError:
         return None
 
 FQN_DELIMITER = "."
@@ -110,16 +193,6 @@ class CountMarker(object):
         return (self.value, other)
     def __int__(self) -> int:
         return self.value
-
-class ContextMarker(object):
-    def __init__(self, target_module: 'Module', context: str):
-        self.target_module = target_module
-        self.context = context
-    def __enter__(self):
-        self.target_module.set_context(self.context)
-        return self
-    def __exit__(self, type, value, traceback):
-        self.target_module.set_context(None)
 
 def assign_levels(objects: Iterable[Any], object: Any, object_to_level: Dict[Any, int], level_to_objects: Dict[int, List[Any]], get_dependencies: Callable) -> int:
     def assign_level(object, level):
@@ -184,7 +257,7 @@ def str_block(block: Optional[str], header: str, footer: str):
         return ""
 
 
-def implicit_adapt(input: 'Junction', output_type: 'NetType') -> 'Junction':
+def implicit_adapt(input: Any, output_type: 'NetType') -> 'Junction':
     """
     Implicitly adapts input to output_type.
 
@@ -193,7 +266,7 @@ def implicit_adapt(input: 'Junction', output_type: 'NetType') -> 'Junction':
     return adapt(input, output_type, implicit=True, force=False)
 
 
-def explicit_adapt(input: 'Junction', output_type: 'NetType') -> 'Junction':
+def explicit_adapt(input: Any, output_type: 'NetType') -> 'Junction':
     """
     Explicitly adapts input to output_type. If adaption would require force, it raises an exception.
 
@@ -202,7 +275,7 @@ def explicit_adapt(input: 'Junction', output_type: 'NetType') -> 'Junction':
     return adapt(input, output_type, implicit=False, force=False)
 
 
-def cast(input: 'Junction', output_type: 'NetType') -> 'Junction':
+def cast(input: Any, output_type: 'NetType') -> 'Junction':
     """
     Casts input to output_type. Forces adaption, on top of being explicit.
 
@@ -210,24 +283,58 @@ def cast(input: 'Junction', output_type: 'NetType') -> 'Junction':
     """
     return adapt(input, output_type, implicit=False, force=True)
 
-def adapt(input: 'Junction', output_type: 'NetType', implicit: bool, force: bool) -> 'Junction':
+def adapt(input: Any, output_type: 'NetType', implicit: bool, force: bool) -> 'Junction':
     """
     Creates an adaptor instance if needed to convert input to output_type.
     Returns the generated output port. If such adaptation is not possible, raises an exception
+
+    If the type of the input is not know, a delayed adaptor is created.
     """
-    if output_type == input.get_net_type():
-        return input
     try:
-        ret_val = output_type.adapt_from(input, implicit, force)
-        if ret_val is None:
-            raise Exception # Force the other path to execute in case this one isn't supported
-        return ret_val
-    except:
+        if output_type == input.get_net_type():
+            return input
+    except AttributeError:
         pass
-    ret_val = input.get_net_type().adapt_to(output_type, input, implicit, force)
-    if ret_val is None:
-        raise SyntaxErrorException(f"Can't generate adaptor from {input.get_net_type()} to {output_type} for port {input}")
-    return ret_val
+
+    try:
+        if input.is_typeless():
+            from .module import GenericModule, InlineExpression
+            from .port import Input, Output
+
+            class DelayedAdaptor(GenericModule):
+                """
+                Allows for adaption of types that are unknown at the time of the call for adopt
+                """
+                input_port = Input()
+                output_port = Output()
+
+                def construct(self, output_type, implicit: bool, force: bool):
+                    self.implicit = implicit
+                    self.force = force
+                    self.output_port.set_net_type(output_type)
+                def body(self):
+                    adapted = adapt(self.input_port, self.output_port.get_net_type(), self.implicit, self.force)
+                    self.adaptor = adapted.get_parent_module()
+                    self.output_port <<= adapted
+                def get_inline_block(self, back_end: 'BackEnd', target_namespace: 'Module') -> Generator['InlineBlock', None, None]:
+                    # Delegate inlining (if possible) to the adapter
+                    yield from self.adaptor.get_inline_block(back_end, target_namespace)
+                def is_combinational(self) -> bool:
+                    return True
+            return DelayedAdaptor(output_type, implicit, force)(input)
+    except AttributeError:
+        pass
+
+    input = convert_to_junction(input, output_type)
+    try:
+        return output_type.adapt_from(input, implicit, force)
+    except AdaptTypeError:
+        try:
+            return input.get_net_type().adapt_to(output_type, input, implicit, force)
+        except AdaptTypeError:
+            raise SyntaxErrorException(f"Can't generate adaptor from {input.get_net_type()} to {output_type} for port {input}")
+        except AttributeError:
+            raise SyntaxErrorException(f"Can't generate adaptor from {input} to {output_type}")
 
 def product(__iterable: Iterable[int]):
     from functools import reduce

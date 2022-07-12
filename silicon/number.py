@@ -1,10 +1,10 @@
 from typing import Optional, Any, Tuple, Generator, Union, Dict, Set, Sequence, Union
-from .exceptions import FixmeException, SyntaxErrorException, SimulationException
+from .exceptions import FixmeException, SyntaxErrorException, SimulationException, AdaptTypeError
 from .net_type import NetType, KeyKind
 from .module import GenericModule, Module, InlineBlock, InlineExpression, has_port
-from .port import Input, Output, Junction, Port
+from .port import Input, JunctionBase, Output, Junction, Port
 from .tracer import no_trace
-from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set
+from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, SimValue
 from collections import OrderedDict
 import re
 try:
@@ -50,7 +50,7 @@ class Number(NetType):
     # The associated VCD type (one of VAR_TYPES inside vcd.writer.py)
     vcd_type: str = 'wire'
 
-    class SimValue(object):
+    class SimValue(SimValue):
         # Used to extract the exact floating point exponent and mantissa from a float.
         # Pre-compiled only once to speed things up a little.
         __float_parser = re.compile("(-?)0x([^p]*)p(.*)")
@@ -765,7 +765,7 @@ class Number(NetType):
         return self.length
 
     def get_slice(self, key: Any, junction: Junction) -> Any:
-        if junction.active_context() == "simulation":
+        if Context.current() == Context.simulation:
             return Number.Accessor.static_sim(junction.sim_value, Number.Key(key), junction.get_net_type().precision)
         else:
             return Number.Accessor(slice=key, number=self)(junction)
@@ -775,7 +775,7 @@ class Number(NetType):
         # Otherwise, the auto-created converter object (such as Constant) will be evaluated in the wrong order
         # and during the evaluation of the Concatenator, the inlined expression forwarding logic will break.
         from .utils import convert_to_junction
-        real_junction = convert_to_junction(value)
+        real_junction = convert_to_junction(value, type_hint=None)
         junction.raw_input_map.append((key, real_junction))
     @classmethod
     def resolve_key_sequence_for_get(cls, keys: Sequence[Tuple[Any, KeyKind]], for_junction: Junction) -> Tuple[Optional[Sequence[Tuple[Any, KeyKind]]], Junction]:
@@ -963,24 +963,47 @@ class Number(NetType):
             """
             return True
 
-    def adapt_from(self, input: Junction, implicit: bool, force: bool) -> Junction:
-        input_type = input.get_net_type()
-        if not isinstance(input_type, Number):
-            return None
-        if input_type.is_abstract():
-            return None
-        if self.is_abstract():
-            return None
-        if self.min_val > input_type.min_val or self.max_val < input_type.max_val:
-            if not force:
+    def adapt_from(self, input: Any, implicit: bool, force: bool) -> Any:
+        context = Context.current()
+
+        if context == Context.simulation:
+            if input is None:
                 return None
+            if isinstance(input, Junction):
+                input = input.sim_value
+            elif isinstance(input, int):
+                input = Number.SimValue(input)
+            elif isinstance(input, Number.SimValue):
+                pass
             else:
-                return Number.SizeAdaptor(input_type = input_type, output_type = self)(input)
-        if self.length >= input_type.length and self.signed == input_type.signed and self.precision == input_type.precision:
+                raise SimulationException(f"Don't support input type f{type(input)}")
+
+            int_input = int(input)
+            if self.min_val > int_input or self.max_val < int_input:
+                if not force:
+                    raise AdaptTypeError
+                else:
+                    assert False, "FIXME: we should chop of top bits here!"
+                    return adjust_precision_sim(input.value, input.precision, self.precision)
             return input
-        output = Number.SizeAdaptor(input_type = input_type, output_type = self)(input)
-        #output.get_parent_module()._impl._elaborate(hier_level=0, trace=False)
-        return output
+        elif context == Context.elaboration:
+            input_type = input.get_net_type()
+            if not isinstance(input_type, Number):
+                raise AdaptTypeError
+            if input_type.is_abstract():
+                raise AdaptTypeError
+            if self.is_abstract():
+                raise AdaptTypeError
+            if self.min_val > input_type.min_val or self.max_val < input_type.max_val:
+                if not force:
+                    raise AdaptTypeError
+                else:
+                    return Number.SizeAdaptor(input_type = input_type, output_type = self)(input)
+            if self.length >= input_type.length and self.signed == input_type.signed and self.precision == input_type.precision:
+                return input
+            output = Number.SizeAdaptor(input_type = input_type, output_type = self)(input)
+            #output.get_parent_module()._impl._elaborate(hier_level=0, trace=False)
+            return output
 
     """
     ============================================================================================
@@ -1335,11 +1358,8 @@ class Number(NetType):
             return super().result_type(net_types, operation) # Will raise an exception.
 
 
-def int_to_const(value: int) -> Tuple[NetType, int]:
+def int_to_const(value: int, type_hint: Optional[NetType]) -> Tuple[NetType, int]:
     return Number(min_val=value, max_val=value), value
-
-def val_to_sim(value: int, target_net_type: NetType) -> 'Number.SimValue':
-    return Number.SimValue(value)
 
 def _str_to_int(value: str) -> Tuple[int, int, bool]:
     """
@@ -1393,38 +1413,32 @@ def _str_to_int(value: str) -> Tuple[int, int, bool]:
             raise SyntaxErrorException(f"String '{value}' isn't a valid Constant. It's value field '{value_field}' doesn't fit in the declared size")
     return (int_value, size, negative)
 
-def str_to_const(value: str) -> Tuple[NetType, int]:
+def str_to_const(value: str, type_hint: Optional[NetType]) -> Tuple[NetType, int]:
     int_val, size, negative = _str_to_int(value)
     net_type = Number(length=size, signed=negative)
     assert int_val >= net_type.min_val and int_val <= net_type.max_val
     return net_type, int_val
 
-def str_to_sim(value: str, target_net_type: NetType) -> int:
-    return Number.SimValue(_str_to_int(value)[0])
-
-def float_to_sim(value: float, target_net_type: NetType) -> int:
-    # We are converting a float to the (nearest) representanble fixed-point value
-    if not isinstance(target_net_type, Number):
+def float_to_const(value: float, type_hint: Optional[NetType]) -> int:
+    # We are converting a float to the (nearest) representable fixed-point value
+    if not isinstance(type_hint, Number):
         raise SimulationException(f"Can only assign a floating point value to a Number", self)
-    value_as_int = round(value * (2 ** target_net_type.precision))
-    return Number.SimValue(value_as_int, target_net_type.precision)
+    value_as_int = round(value * (2 ** type_hint.precision))
+    #return type_hint, Number.SimValue(value_as_int, type_hint.precision)
+    return type_hint, value_as_int
 
-def bool_to_const(value: bool) -> Tuple[NetType, int]:
+def bool_to_const(value: bool, type_hint: Optional[NetType]) -> Tuple[NetType, int]:
     if value:
         return Unsigned(1), 1
     else:
         return Unsigned(1), 0
 
-from .constant import const_convert_lookup, sim_convert_lookup
+from .constant import const_convert_lookup
 
 const_convert_lookup[int] = int_to_const
 const_convert_lookup[str] = str_to_const
 const_convert_lookup[bool] = bool_to_const
-sim_convert_lookup[int] = val_to_sim
-sim_convert_lookup[str] = str_to_sim
-sim_convert_lookup[bool] = val_to_sim
-sim_convert_lookup[float] = float_to_sim
-sim_convert_lookup[Number.SimValue] = lambda sim_val, target_net_type: sim_val
+const_convert_lookup[float] = float_to_const
 
 def Signed(length: int=None):
     return Number(length=length, signed=True)

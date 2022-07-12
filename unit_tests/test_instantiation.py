@@ -27,7 +27,7 @@ class Test(Module):
     __test__ = False
 
     def body(self):
-        self.out_h <<= Parity(self.in_a),
+        self.out_h <<= Parity(self.in_a)
 
 def test_test():
     test.rtl_generation(Test, "test_instantiation")

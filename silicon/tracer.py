@@ -56,10 +56,10 @@ class Tracer(object):
         elif event == 'return':
             try:
                 context = Tracer.context.pop()
+                if not context.trace:
+                    return chain()
             except:
                 pass
-            if not context.trace:
-                return chain()
             if not func_name in Tracer.force_list:
                 if func_name.startswith("__"): # Skip all dunder functions
                     return chain()
@@ -162,16 +162,30 @@ class Tracer(object):
 
     def __init__(self):
         pass
+
     def __enter__(self):
-        assert Tracer.old_tracer is None
-        assert not Tracer.tracer_active, "Only a single tracer can be active at a time. Please don't call '_body' recursively!"
-        Tracer.tracer_active = True
-        Tracer.old_tracer = sys.getprofile()
-        assert Tracer.enable.is_empty()
-        Tracer.enable.push(False) # Start tracer in the disabled state (except for the first-level call)
-        Tracer.context.push(Tracer.ContextInfo("__enter__", False)) # The first trace event we'll see is the return from the __enter__ call, so let's pre-populate the context stack
-        Tracer.initial_entry = True
-        sys.setprofile(Tracer.trace_event_handler)
+        try:
+            assert Tracer.old_tracer is None
+            assert not Tracer.tracer_active, "Only a single tracer can be active at a time. Please don't call '_body' recursively!"
+            assert Tracer.enable.is_empty()
+            Tracer.tracer_active = True
+            Tracer.enable.push(False) # Start tracer in the disabled state (except for the first-level call)
+            Tracer.context.push(Tracer.ContextInfo("__enter__", False)) # The first trace event we'll see is the return from the __enter__ call, so let's pre-populate the context stack
+            Tracer.initial_entry = True
+            Tracer.old_tracer = sys.getprofile()
+            sys.setprofile(Tracer.trace_event_handler)
+        except:
+            if Tracer.tracer_active:
+                sys.setprofile(Tracer.old_tracer)
+                while not Tracer.context.is_empty():
+                    Tracer.context.pop()
+                while not Tracer.enable.is_empty():
+                    Tracer.enable.pop()
+                Tracer.old_tracer = None
+                Tracer.tracer_active = False
+            print("Tracer::__enter__ - throw", file=sys.stderr)
+            raise
+
     def __exit__(self, type, value, traceback):
         sys.setprofile(Tracer.old_tracer)
         if type is None:

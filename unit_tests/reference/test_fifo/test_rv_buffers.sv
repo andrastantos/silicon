@@ -49,11 +49,9 @@ module Fifo (
 	logic [7:0] input_data_data;
 	logic push_will_wrap;
 	logic push;
-	logic [3:0] u12_output_port;
 	logic [3:0] next_push_addr;
 	logic pop_will_wrap;
 	logic pop;
-	logic [3:0] u20_output_port;
 	logic [3:0] next_pop_addr;
 	logic next_looped;
 	logic next_empty_or_full;
@@ -70,10 +68,10 @@ module Fifo (
 	assign output_port_valid =  ~ empty;
 	assign push_will_wrap = push_addr == 4'h9;
 	assign push =  ~ full & input_port_valid;
-	assign next_push_addr = push ? u12_output_port : push_addr;
+	assign next_push_addr = push ? push_will_wrap ? 1'h0 : push_addr + 1'h1 : push_addr;
 	assign pop_will_wrap = pop_addr == 4'h9;
 	assign pop =  ~ empty & output_port_ready;
-	assign next_pop_addr = pop ? u20_output_port : pop_addr;
+	assign next_pop_addr = pop ? pop_will_wrap ? 1'h0 : pop_addr + 1'h1 : pop_addr;
 	assign next_looped = push != 1'h1 & pop != 1'h1 ? looped : 1'b0 | push == 1'h1 & pop != 1'h1 ? push_will_wrap ? 1'h1 : looped : 1'b0 | push != 1'h1 & pop == 1'h1 ? pop_will_wrap ? 1'h0 : looped : 1'b0 | push == 1'h1 & pop == 1'h1 ? push_will_wrap != 1'h1 & pop_will_wrap != 1'h1 ? looped : 1'b0 | push_will_wrap == 1'h1 & pop_will_wrap != 1'h1 ? 1'h1 : 1'b0 | push_will_wrap != 1'h1 & pop_will_wrap == 1'h1 ? 1'h0 : 1'b0 | push_will_wrap == 1'h1 & pop_will_wrap == 1'h1 ? looped : 1'b0  : 1'b0 ;
 	assign next_empty_or_full = next_push_addr == next_pop_addr;
 	assign next_empty = next_empty_or_full ?  ~ next_looped : 1'h0;
@@ -83,16 +81,6 @@ module Fifo (
 	always_ff @(posedge clock_port) empty <= reset_port ? 1'h0 : next_empty;
 	always_ff @(posedge clock_port) full <= reset_port ? 1'h0 : next_full;
 	always_ff @(posedge clock_port) looped <= reset_port ? 1'h0 : next_looped;
-
-	ExplicitAdaptor u12 (
-		.input_port(push_will_wrap ? 1'h0 : push_addr + 1'h1),
-		.output_port(u12_output_port)
-	);
-
-	ExplicitAdaptor u20 (
-		.input_port(pop_will_wrap ? 1'h0 : pop_addr + 1'h1),
-		.output_port(u20_output_port)
-	);
 
 	Memory buffer_1 (
 		.port1_addr(push_addr),
@@ -140,19 +128,6 @@ module Memory (
 	assign real_mem_port2_data_out = mem[port2_addr_reg];
 
 	assign {port2_data_out_data} = real_mem_port2_data_out;
-endmodule
-
-
-////////////////////////////////////////////////////////////////////////////////
-// ExplicitAdaptor
-////////////////////////////////////////////////////////////////////////////////
-module ExplicitAdaptor (
-	input logic [3:0] input_port,
-	output logic [3:0] output_port
-);
-
-	assign output_port = input_port;
-
 endmodule
 
 

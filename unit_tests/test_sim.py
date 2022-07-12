@@ -151,8 +151,11 @@ def test_sim_concat():
             self.out2 = Wire()
             self.out3 = Wire()
 
-            self.out1 = [self.uin1, self.uin2]
-            self.out2 = [self.sin1, self.uin1, self.uin2]
+            # This type of concatenation is not supported at the moment
+            #self.out1 = [self.uin1, self.uin2]
+            #self.out2 = [self.sin1, self.uin1, self.uin2]
+            self.out1 = concat(self.uin1, self.uin2)
+            self.out2 = concat(self.sin1, self.uin1, self.uin2)
             self.out3 = concat(self.uin1, self.uin2, self.uin3)
 
         def simulate(self) -> TSimEvent:
@@ -171,10 +174,10 @@ def test_sim_concat():
     test.simulation(top, inspect.currentframe().f_code.co_name)
 
 if __name__ == "__main__":
-    test_sim_gates()
+    #test_sim_gates()
     test_sim_counter()
-    test_sim_select()
-    test_sim_concat()
+    #test_sim_select()
+    #test_sim_concat()
 
 """
 An idea from PyRTL: use <<= as the 'bind' operator. Could re-use the same for simulation assignment, though that's ugly. (not that the current hack isn't either)

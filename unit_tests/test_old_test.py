@@ -307,7 +307,7 @@ def test_old_number():
             # There's a strange artifact in the generation of this code. It outputs:
             #   assign out_d = {{7{1'bX}}, {in_a[4], in_b[0], u1_out}};
             # This is probably not a big deal, but maybe at some point we should optimize away the extra {} braces to improve readability.
-            self.out_d[3:0] = (c0, b0, self.in_a[4])
+            self.out_d[3:0] = concat(c0, b0, self.in_a[4])
             self.out_d[10:4] = 0
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)

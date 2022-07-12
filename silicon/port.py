@@ -4,7 +4,7 @@ from .net_type import NetType, KeyKind
 from .tracer import no_trace, NoTrace
 from .ordered_set import OrderedSet
 from .exceptions import SyntaxErrorException, SimulationException
-from .utils import convert_to_junction, is_iterable, is_junction, is_input_port, is_output_port, is_wire, get_caller_local_junctions, is_junction_member, BoolMarker, is_module, implicit_adapt, MEMBER_DELIMITER
+from .utils import convert_to_junction, is_iterable, is_junction, is_input_port, is_output_port, is_wire, get_caller_local_junctions, is_junction_member, BoolMarker, is_module, implicit_adapt, MEMBER_DELIMITER, Context, ContextMarker
 from .port import KeyKind
 from collections import OrderedDict
 from enum import Enum
@@ -31,7 +31,15 @@ class EdgeType(Enum):
 
 class Junction(JunctionBase):
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False):
+        # !!!!! SUPER IMPORTANT !!!!!
+        # In most cases, Ports of a Module are set on the cls level, not inside __init__() (or construct()).
+        # There is a generic 'deepcopy' call in _init_phase2 that creates the instance-level copies for all the ports.
+        # This means that __init__ for those ports is not getting called, the instance-level port is not a brand new
+        # object, it's a copy of an already live one. This means, that none of this code gets executed for instance-level
+        # ports. Right now, the most important thing here is that 'Context.register' doesn't get executed, but every time
+        # we put stuff in here, that needs to be checked against the copy functionality in '_init_phase2' of 'Module.
         super().__init__()
+        Context.register(self._context_change)
         assert parent_module is None or is_module(parent_module)
         from .module import Module
         self.source: Optional['Port'] = None
@@ -59,10 +67,6 @@ class Junction(JunctionBase):
             if not isinstance(net_type, NetType):
                 raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType. (Did you forget to construct an instance?)")
             self.set_net_type(net_type)
-        if self._parent_module is not None:
-            self.set_context(self._parent_module._impl.active_context())
-        else:
-            self.set_context(None)
 
     def __str__(self) -> str:
         ret_val = self.get_diagnostic_name()
@@ -100,7 +104,6 @@ class Junction(JunctionBase):
         assert self._parent_module is None or self._parent_module is parent_module
         assert self._parent_junction is None or self._parent_junction._parent_module is parent_module
         self._parent_module = parent_module
-        self.set_context(self._parent_module._impl.active_context())
         # Recurse into members
         for member_junction, _ in self.get_member_junctions().values():
             member_junction.set_parent_module(parent_module)
@@ -118,7 +121,7 @@ class Junction(JunctionBase):
             self.raw_input_map = [] # Prevent re-creation of Concatenator
             # If the concatenator was created outside the normal body context (during type determination)
             # We'll have to make sure it's properly registered
-            if self.active_context() is None:
+            if Context.current() is None:
                 assert False, "I DONT THINK THIS SHOULD HAPPEN!!!!!"
                 self.concatenator.freeze_interface()
                 self.concatenator._body()
@@ -222,9 +225,10 @@ class Junction(JunctionBase):
             assert is_module(scope)
             from .module import Module
             with Module._parent_modules.push(scope):
-                source = implicit_adapt(source, self.get_net_type())
+                with ContextMarker(Context.elaboration):
+                    source = implicit_adapt(source, self.get_net_type())
                 # If an adaptor was created, we'll have to make sure it's properly registered.
-                if self.active_context() is None:
+                if Context.current() != Context.elaboration:
                     if source is not old_junction:
                         adaptor = source.get_parent_module()
                         adaptor._impl.freeze_interface()
@@ -292,7 +296,7 @@ class Junction(JunctionBase):
 
 
     def __getitem__(self, key: Any) -> Any:
-        if self.active_context() == "simulation":
+        if Context.current() == Context.simulation:
             return self.get_net_type().get_slice(key, self)
         else:
             from .member_access import MemberGetter
@@ -456,56 +460,56 @@ class Junction(JunctionBase):
         return getattr(type(obj), name)(obj, *kargs, **kwargs)
 
     def _binary_op(self, other: Any, gate: 'Module', name: str) -> Any:
-        context = self.active_context()
-        if context == "simulation":
+        context = Context.current()
+        if context == Context.simulation:
             my_val = self.sim_value
             return Port._safe_call_by_name(my_val, name, other)
-        elif context == "elaboration":
+        elif context == Context.elaboration:
             return gate(self, other)
         else:
             sup = super()
             return getattr(sup, name)(other)
 
     def _rbinary_op(self, other: Any, gate: 'Module', name: str) -> Any:
-        context = self.active_context()
-        if context == "simulation":
+        context = Context.current()
+        if context == Context.simulation:
             my_val = self.sim_value
             return Port._safe_call_by_name(my_val, name, other)
-        elif context == "elaboration":
+        elif context == Context.elaboration:
             return gate(other, self)
         else:
             sup = super()
             return getattr(sup, name)(other)
 
     def _unary_op(self, gate: 'Module', name: str) -> Any:
-        context = self.active_context()
-        if context == "simulation":
+        context = Context.current()
+        if context == Context.simulation:
             my_val = self.sim_value
             return Port._safe_call_by_name(my_val, name)
-        elif context == "elaboration":
+        elif context == Context.elaboration:
             return gate(self)
         else:
             sup = super()
             return getattr(sup, name)()
 
     def _ninput_op(self, other: Any, gate: 'Module', name: str) -> Any:
-        context = self.active_context()
-        if context == "simulation":
+        context = Context.current()
+        if context == Context.simulation:
             my_val = self.sim_value
             if my_val is None: return None
             return Port._safe_call_by_name(my_val, name, other)
-        elif context == "elaboration":
+        elif context == Context.elaboration:
             return gate(self, other)
         else:
             sup = super()
             return getattr(sup, name)(other)
 
     def _rninput_op(self, other, gate: 'Module', name: str) -> Any:
-        context = self.active_context()
-        if context == "simulation":
+        context = Context.current()
+        if context == Context.simulation:
             my_val = self.sim_value
             return Port._safe_call_by_name(my_val, name, other)
-        elif context == "elaboration":
+        elif context == Context.elaboration:
             return gate(other, self)
         else:
             sup = super()
@@ -608,10 +612,10 @@ class Junction(JunctionBase):
 
     def __ilshift__elab(self, other: Any) -> 'Junction':
         try:
-            junction_value = convert_to_junction(other)
+            junction_value = convert_to_junction(other, type_hint=None)
             if junction_value is None:
                 # We couldn't create a port out of the value:
-                raise SyntaxErrorException(f"Couldn't bind port to value '{other}'.")
+                raise SyntaxErrorException(f"Couldn't convert '{other}' to Junction.")
         except Exception as ex:
             raise SyntaxErrorException(f"Couldn't bind port to value '{other}' with exception '{ex}'")
         # assignment-style binding is only allowed for outputs (on the inside) and inputs (on the outside)
@@ -675,7 +679,8 @@ class Junction(JunctionBase):
         if hasattr(value, "sim_value"):
             new_sim_value = value.sim_value
         else:
-            new_sim_value = sim_const(value, self)
+            from .utils import adapt
+            new_sim_value = adapt(value, self.get_net_type(), implicit=False, force=False)
 
         if self._xnet.source is not self and self._xnet.source is not None:
             is_transition = self in self._xnet.transitions
@@ -699,8 +704,8 @@ class Junction(JunctionBase):
 
     def __invert__(self) -> Any:
         from .gates import not_gate as gate
-        context = self.active_context()
-        if context == "simulation":
+        context = Context.current()
+        if context == Context.simulation:
             my_val = self.sim_value
             try:
                 return my_val.invert(self.get_num_bits())
@@ -750,18 +755,15 @@ class Junction(JunctionBase):
     def __hash__(self):
         return id(self)
 
-    def set_context(self, context: str) -> None:
-        self._context = context
+    def _context_change(self, context: Context) -> None:
         if context is None:
             self.__ilshift__impl = self.__ilshift__none
-        elif context == "simulation":
+        elif context == Context.simulation:
             self.__ilshift__impl = self.__ilshift__sim
-        elif context == "elaboration":
+        elif context == Context.elaboration:
             self.__ilshift__impl = self.__ilshift__elab
         else:
             assert False
-        for member_junction, _ in self._member_junctions.values():
-            member_junction.set_context(context)
 
     def active_context(self) -> str:
         return self._context
@@ -1057,11 +1059,3 @@ def junction_ref(junction: Optional[Junction]) -> Optional[JunctionRef]:
     if junction is None:
         return None
     return JunctionRef(junction)
-
-sim_convert_lookup: Dict[Type, Callable] = {}
-
-def sim_const(value: Any, for_junction: 'Junction') -> Any:
-    if type(value) in sim_convert_lookup:
-        return sim_convert_lookup[type(value)](value, for_junction.get_net_type())
-    raise SimulationException(f"Don't know how to convert value {value} of type {type(value)} during simulation", for_junction)
-

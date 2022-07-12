@@ -1,5 +1,5 @@
 from silicon import SystemVerilog, File, Module, Junction, NetType, Number, Simulator, Module, elaborate, BoolMarker
-from silicon.utils import is_iterable, CountMarker, BoolMarker
+from silicon.utils import is_iterable, CountMarker, BoolMarker, Context, ContextMarker
 from typing import IO, Callable, Sequence, Union, Optional, Any
 from collections import OrderedDict
 from silicon.ordered_set import OrderedSet
@@ -66,16 +66,14 @@ class test:
             return ret_val
 
     @staticmethod
-    def rtl_generation(top_class: Union[Callable, Module], test_name: str = None, allow_new_attributes: bool = False, *, add_unnamed_scopes: bool = False):
+    def rtl_generation(top_class: Callable, test_name: str = None, allow_new_attributes: bool = False, *, add_unnamed_scopes: bool = False):
         if test_name is None:
             test_name = top_class.__name__.lower()
         import os
         test.clear()
         test.reference_dir = Path("reference") / test_name
         test.output_dir = Path("output") / test_name
-        if isinstance(top_class, Module):
-            top = top_class
-        else:
+        with ContextMarker(Context.elaboration):
             top = top_class()
         netlist = elaborate(top, add_unnamed_scopes=add_unnamed_scopes)
         logged_system_verilog = SystemVerilog(stream_class = test.DiffedFile)
@@ -112,7 +110,8 @@ class test:
         test.clear()
         test.reference_dir = Path("reference") / Path(test_name)
         test.output_dir = Path("output") / Path(test_name)
-        top = top_class()
+        with ContextMarker(Context.elaboration):
+            top = top_class()
         netlist = elaborate(top, add_unnamed_scopes=add_unnamed_scopes)
         test.output_dir.mkdir(parents=True, exist_ok=True)
         vcd_filename = test.output_dir / Path(f"{test_name}.vcd")

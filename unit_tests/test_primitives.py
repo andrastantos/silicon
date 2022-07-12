@@ -6,6 +6,7 @@ sys.path.append(str(Path(__file__).parent / ".."))
 from typing import *
 
 from silicon import *
+import silicon
 from test_utils import *
 
 import inspect
@@ -203,6 +204,15 @@ def test_unassigned_net_repro():
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 
+def test_const_cast():
+    class top(Module):
+        #fetch = Input(Unsigned(32))
+        push_data = Output(Unsigned(32))
+
+        def body(self):
+            self.push_data = cast(3, Unsigned(32))
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 
 if __name__ == "__main__":
     #test_select()
@@ -214,4 +224,5 @@ if __name__ == "__main__":
     #test_reg4()
     #test_reg_with_adaptor()
     #test_partial_assign()
-    test_unassigned_net_repro()
+    #test_unassigned_net_repro()
+    test_const_cast()

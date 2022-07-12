@@ -4,7 +4,7 @@ from vcd import VCDWriter
 from .netlist import Netlist, XNet
 from .ordered_set import OrderedSet
 from collections import OrderedDict
-from .utils import is_iterable, first, is_junction_member, is_output_port
+from .utils import is_iterable, first, is_junction_member, is_output_port, Context
 from .exceptions import SimulationException
 
 """
@@ -329,7 +329,13 @@ class Simulator(object):
             self.vcd_stream = self.vcd_file
         self.context = Simulator.SimulatorContext(self, self.vcd_stream, self.timescale)
         self.top_level._impl.netlist.simulator_context = self.context
-        self.top_level._impl.set_context("simulation")
+        Context.push(Context.simulation)
+        # We put the top module back to the Module.Context stack as well. That way, anyone knows what the top level is and can query it.
+        # This is particularly important to get to the active context (simulation that is) in cases where we have no idea, where in the
+        # hierarchy we sit.
+        self.module_context = Module.Context(self.top_level._impl)
+        self.module_context.__enter__()
+
         self.current_event = self._get_event(0)
         self.context._setup()
         return self.context
@@ -338,7 +344,10 @@ class Simulator(object):
         self.context._done()
         self.context = None
         self.top_level._impl.netlist.simulator_context = None
-        self.top_level._impl.set_context(None)
+        self.module_context.__exit__(exception_type, exception_value, traceback)
+        self.module_context = None
+        old_context = Context.pop()
+        assert old_context == Context.simulation
         self.current_event = None
 
     #TODO: test if we can safely enter and exit a simulator multiple times

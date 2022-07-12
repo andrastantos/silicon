@@ -444,6 +444,16 @@ def test_fractional2():
 
     test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
+def test_fractional_const():
+    class Top(Module):
+        in1 = Input(Number(length=8, signed=False, precision=3))
+        outp = Output(Number(length=10, signed=False, precision=4))
+
+        def body(self):
+            self.outp <<= self.in1 + Number(length=8, signed=False, precision=3)(1.1)
+
+    test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+
 def test_fractional1_sim():
     class Top(Module):
         in1 = Input(Number(length=8, signed=False, precision=3))
@@ -743,6 +753,7 @@ if __name__ == "__main__":
     #test_fractional1()
     #test_fractional2()
     test_fractional1_sim()
+    #test_fractional_const()
     #test_float_convert()
     pass
 

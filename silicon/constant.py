@@ -2,7 +2,7 @@ from typing import Tuple, Union, Any, Dict, Set, Optional, Callable, Type, Gener
 
 from .net_type import NetType
 from .module import Module, GenericModule, InlineBlock, InlineExpression
-from .port import Input, Output, sim_convert_lookup
+from .port import Input, Output
 from .utils import TSimEvent
 from .exceptions import SyntaxErrorException
 from inspect import getmro
@@ -59,25 +59,22 @@ def get_net_type_for_const(value: Any) -> Optional[NetType]:
     for base in getmro(type(value)):
         if base in const_convert_lookup:
             # Returns a tuple with index 0 being the net type
-            return const_convert_lookup[base](value)[0]
-        
+            return const_convert_lookup[base](value, None)[0]
+
     return None
 
 
-def _const(value: Any) -> Optional[Constant]:
+def _const(value: Any, type_hint: Optional[NetType] = None) -> Optional[Constant]:
     if isinstance(value, Constant):
         return value
     for base in getmro(type(value)):
         if base in const_convert_lookup:
-            return Constant(*const_convert_lookup[base](value))
-        
-    return None
+            return Constant(*const_convert_lookup[base](value, type_hint))
+
+    raise SyntaxErrorException(f"Don't know how to create Constant from value {value}")
 
 def const(value: Any) -> Constant:
-    ret_val = _const(value)
-    if ret_val is None:
-        raise SyntaxErrorException(f"Don't know how to create Constant from value {value}")
-    return ret_val
+    return _const(value, type_hint=None)
 
 class NoneType(NetType):
     @staticmethod
@@ -87,8 +84,4 @@ class NoneType(NetType):
 #def None_to_const(value: None) -> Tuple[None, None]:
 #    return None, None
 
-def None_to_sim(value: None, target_net_type: NetType) -> None:
-    return None
-
 #const_convert_lookup[type(None)] = None_to_const
-sim_convert_lookup[type(None)] = None_to_sim

@@ -49,7 +49,6 @@ module Pacer (
 
 	logic wait_done;
 	logic transfer;
-	logic [1:0] u10_output_port;
 	logic [1:0] next_wait_cnt;
 	logic [1:0] wait_cnt;
 
@@ -57,28 +56,10 @@ module Pacer (
 	assign input_port_ready = wait_done & output_port_ready;
 	assign output_port_valid = wait_done & input_port_valid;
 	assign transfer = input_port_valid & output_port_ready & wait_done;
-	assign next_wait_cnt = transfer ? 1'h0 : u10_output_port;
+	assign next_wait_cnt = transfer ? 1'h0 : wait_done ? 2'h2 : wait_cnt + 1'h1;
 	always_ff @(posedge clock_port) wait_cnt <= reset_port ? 2'h0 : next_wait_cnt;
 
-	ExplicitAdaptor u10 (
-		.input_port(wait_done ? 2'h2 : wait_cnt + 1'h1),
-		.output_port(u10_output_port)
-	);
-
 	assign output_port_data = input_port_data;
-endmodule
-
-
-////////////////////////////////////////////////////////////////////////////////
-// ExplicitAdaptor
-////////////////////////////////////////////////////////////////////////////////
-module ExplicitAdaptor (
-	input logic [1:0] input_port,
-	output logic [1:0] output_port
-);
-
-	assign output_port = input_port;
-
 endmodule
 
 

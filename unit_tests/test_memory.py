@@ -85,7 +85,7 @@ def _test_single_port_ram(mode: str, registered_input: bool, registered_output: 
 
 
     if mode == "rtl":
-        test.rtl_generation(Top(), inspect.currentframe().f_back.f_code.co_name)
+        test.rtl_generation(Top, inspect.currentframe().f_back.f_code.co_name)
     else:
         test.simulation(Top, "_test_single_port_ram")
 
@@ -129,7 +129,7 @@ def test_single_port_async_rom(mode: str = "rtl"):
             mem.addr <<= self.addr
 
     if mode == "rtl":
-        test.rtl_generation(Top(), inspect.currentframe().f_code.co_name)
+        test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
 def test_single_port_rom(mode: str = "rtl"):
 
@@ -153,7 +153,7 @@ def test_single_port_rom(mode: str = "rtl"):
             mem.addr <<= self.addr
 
     if mode == "rtl":
-        test.rtl_generation(Top(), inspect.currentframe().f_code.co_name)
+        test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
 def test_single_port_rom2(mode: str = "rtl"):
 
@@ -183,7 +183,7 @@ def test_single_port_rom2(mode: str = "rtl"):
             mem.addr <<= self.addr
 
     if mode == "rtl":
-        test.rtl_generation(Top(), inspect.currentframe().f_code.co_name)
+        test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
 def test_single_port_rom3(mode: str = "rtl"):
 
@@ -213,7 +213,7 @@ def test_single_port_rom3(mode: str = "rtl"):
             mem.addr <<= self.addr
 
     if mode == "rtl":
-        test.rtl_generation(Top(), inspect.currentframe().f_code.co_name)
+        test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
 def test_single_port_rom4(mode: str = "rtl"):
 
@@ -243,7 +243,7 @@ def test_single_port_rom4(mode: str = "rtl"):
             mem.addr <<= self.addr
 
     if mode == "rtl":
-        test.rtl_generation(Top(), inspect.currentframe().f_code.co_name)
+        test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
 READ_WRITE = 3
 READ = 1
@@ -293,7 +293,7 @@ def _test_simple_dual_port_ram(mode: str, registered_input_a: bool, registered_o
             mem.port2_addr <<= self.addr_b
 
     if mode == "rtl":
-        test.rtl_generation(Top(), inspect.currentframe().f_back.f_code.co_name)
+        test.rtl_generation(Top, inspect.currentframe().f_back.f_code.co_name)
 
 def test_simple_dual_port_ram_ffff(mode: str = "rtl"):
     with ExpectError(SyntaxErrorException):
@@ -512,7 +512,7 @@ def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered
 
 
     if mode == "rtl":
-        test.rtl_generation(Top(), inspect.currentframe().f_code.co_name)
+        test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
     else:
         test.simulation(Top, "_test_single_port_ram")
 
@@ -525,18 +525,18 @@ def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered
 if __name__ == "__main__":
     #test_single_port_ram_ff("rtl")
     #test_single_port_ram_ft("rtl")
-    #test_single_port_ram_tf("rtl")
+    test_single_port_ram_tf("rtl")
     #test_single_port_ram_tt("rtl")
     #test_single_port_rom("rtl")
     #test_single_port_rom2("rtl")
     #test_single_port_rom3("rtl")
     #test_single_port_rom4("rtl")
-    test_simple_dual_port_ram_ffff("rtl")
+    #test_simple_dual_port_ram_ffff("rtl")
     #test_simple_dual_port_ram_tftt("rtl")
     #test_simple_dual_port_ram_tttf("rtl")
     #test_simple_dual_port_ram_tttt("rtl")
     #test_single_port_async_rom("rtl")
     #test_simple_dual_port_ram_rw("rtl")
-    test_simple_dual_port_ram_sim()
+    #test_simple_dual_port_ram_sim()
     #test_single_port_ram_tt("sim")
     #test_struct_ram("rtl")

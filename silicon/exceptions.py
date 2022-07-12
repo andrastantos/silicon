@@ -1,4 +1,5 @@
 # Maybe what we want is this: https://docs.python.org/3/library/warnings.html?
+from typing import Optional
 
 class SyntaxErrorException(Exception):
     def __init__(self, message, context = None):
@@ -22,7 +23,7 @@ class FixmeException(SyntaxErrorException):
         super().__init__(f"FIXME: {message}", context)
 
 class SimulationException(Exception):
-    def __init__(self, message, context):
+    def __init__(self, message, context: Optional['Module'] = None):
         loc = None
         try:
             loc = context.get_diagnostic_name(add_location=True)
@@ -33,4 +34,7 @@ class SimulationException(Exception):
         super().__init__(f"{loc}\n{message}")
 
 class IVerilogException(Exception):
+    pass
+
+class AdaptTypeError(Exception):
     pass
