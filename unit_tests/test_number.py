@@ -481,13 +481,13 @@ def test_sim_value_fract():
         for a in args[1:]: diag_line += f", {a}"
         diag_line += f") = {result} ?= {expected_value}"
         print(diag_line)
-        if isinstance(expected_value, Number.SimValue):
+        if isinstance(expected_value, Number.NetValue):
             assert(result.value == expected_value.value)
             assert(result.precision == expected_value.precision)
         else:
             assert(result == expected_value)
     def n(value, precision = 0):
-        ret_val = Number.SimValue(value, precision)
+        ret_val = Number.NetValue(value, precision)
         return ret_val
 
     test_result(n(4,2), "__add__", n(1, 2), n(3,2))
@@ -580,13 +580,13 @@ def test_sim_value_fract():
 
 def test_sim_value_int():
     def test_result(result, expected_value, expected_precision = 0):
-        if isinstance(expected_value, Number.SimValue):
+        if isinstance(expected_value, Number.NetValue):
             expected_precision = expected_value.precision
             expected_value = expected_value.value
         assert(result.value == expected_value)
         assert(result.precision == expected_precision)
     def n(value, precision = 0):
-        return Number.SimValue(value, precision)
+        return Number.NetValue(value, precision)
 
     test_result(n(1)+n(2), n(3))
     test_result(n(1)+2, n(3))
@@ -663,71 +663,71 @@ def test_sim_value_int():
     assert (n(2) >= n(2)) == True
 
 
-    test_result(Number.SimValue.lt(n(3), n(2)), n(False))
-    test_result(Number.SimValue.lt(3, n(2)), n(False))
-    test_result(Number.SimValue.lt(n(3), 2), n(False))
-    test_result(Number.SimValue.lt(n(2), n(3)), n(True))
-    test_result(Number.SimValue.lt(2, n(3)), n(True))
-    test_result(Number.SimValue.lt(n(2), 3), n(True))
-    test_result(Number.SimValue.le(n(3), n(2)), n(False))
-    test_result(Number.SimValue.le(3, n(2)), n(False))
-    test_result(Number.SimValue.le(n(3), 2), n(False))
-    test_result(Number.SimValue.le(n(2), n(3)), n(True))
-    test_result(Number.SimValue.le(2, n(3)), n(True))
-    test_result(Number.SimValue.le(n(2), 3), n(True))
-    test_result(Number.SimValue.eq(n(3), n(2)), n(False))
-    test_result(Number.SimValue.eq(3, n(2)), n(False))
-    test_result(Number.SimValue.eq(n(2), 3), n(False))
-    test_result(Number.SimValue.ne(n(3), n(2)), n(True))
-    test_result(Number.SimValue.ne(3, n(2)), n(True))
-    test_result(Number.SimValue.ne(n(2), 3), n(True))
-    test_result(Number.SimValue.gt(n(3), n(2)), n(True))
-    test_result(Number.SimValue.gt(3, n(2)), n(True))
-    test_result(Number.SimValue.gt(n(3), 2), n(True))
-    test_result(Number.SimValue.gt(n(2), n(3)), n(False))
-    test_result(Number.SimValue.gt(2, n(3)), n(False))
-    test_result(Number.SimValue.gt(n(2), 3), n(False))
-    test_result(Number.SimValue.ge(n(3), n(2)), n(True))
-    test_result(Number.SimValue.ge(3, n(2)), n(True))
-    test_result(Number.SimValue.ge(n(3), 2), n(True))
-    test_result(Number.SimValue.ge(n(2), n(3)), n(False))
-    test_result(Number.SimValue.ge(2, n(3)), n(False))
-    test_result(Number.SimValue.ge(n(2), 3), n(False))
-    test_result(Number.SimValue.lt(n(2), n(2)), n(False))
-    test_result(Number.SimValue.le(n(2), n(2)), n(True))
-    test_result(Number.SimValue.eq(n(2), n(2)), n(True))
-    test_result(Number.SimValue.ne(n(2), n(2)), n(False))
-    test_result(Number.SimValue.gt(n(2), n(2)), n(False))
-    test_result(Number.SimValue.ge(n(2), n(2)), n(True))
+    test_result(Number.NetValue.lt(n(3), n(2)), n(False))
+    test_result(Number.NetValue.lt(3, n(2)), n(False))
+    test_result(Number.NetValue.lt(n(3), 2), n(False))
+    test_result(Number.NetValue.lt(n(2), n(3)), n(True))
+    test_result(Number.NetValue.lt(2, n(3)), n(True))
+    test_result(Number.NetValue.lt(n(2), 3), n(True))
+    test_result(Number.NetValue.le(n(3), n(2)), n(False))
+    test_result(Number.NetValue.le(3, n(2)), n(False))
+    test_result(Number.NetValue.le(n(3), 2), n(False))
+    test_result(Number.NetValue.le(n(2), n(3)), n(True))
+    test_result(Number.NetValue.le(2, n(3)), n(True))
+    test_result(Number.NetValue.le(n(2), 3), n(True))
+    test_result(Number.NetValue.eq(n(3), n(2)), n(False))
+    test_result(Number.NetValue.eq(3, n(2)), n(False))
+    test_result(Number.NetValue.eq(n(2), 3), n(False))
+    test_result(Number.NetValue.ne(n(3), n(2)), n(True))
+    test_result(Number.NetValue.ne(3, n(2)), n(True))
+    test_result(Number.NetValue.ne(n(2), 3), n(True))
+    test_result(Number.NetValue.gt(n(3), n(2)), n(True))
+    test_result(Number.NetValue.gt(3, n(2)), n(True))
+    test_result(Number.NetValue.gt(n(3), 2), n(True))
+    test_result(Number.NetValue.gt(n(2), n(3)), n(False))
+    test_result(Number.NetValue.gt(2, n(3)), n(False))
+    test_result(Number.NetValue.gt(n(2), 3), n(False))
+    test_result(Number.NetValue.ge(n(3), n(2)), n(True))
+    test_result(Number.NetValue.ge(3, n(2)), n(True))
+    test_result(Number.NetValue.ge(n(3), 2), n(True))
+    test_result(Number.NetValue.ge(n(2), n(3)), n(False))
+    test_result(Number.NetValue.ge(2, n(3)), n(False))
+    test_result(Number.NetValue.ge(n(2), 3), n(False))
+    test_result(Number.NetValue.lt(n(2), n(2)), n(False))
+    test_result(Number.NetValue.le(n(2), n(2)), n(True))
+    test_result(Number.NetValue.eq(n(2), n(2)), n(True))
+    test_result(Number.NetValue.ne(n(2), n(2)), n(False))
+    test_result(Number.NetValue.gt(n(2), n(2)), n(False))
+    test_result(Number.NetValue.ge(n(2), n(2)), n(True))
 
 def test_float_convert():
-    p, v = Number.SimValue._precision_and_value(1.0)
+    p, v = Number.NetValue._precision_and_value(1.0)
     assert p == 0 and v == 1
-    p, v = Number.SimValue._precision_and_value(0.5)
+    p, v = Number.NetValue._precision_and_value(0.5)
     assert p == 1 and v == 1
-    p, v = Number.SimValue._precision_and_value(0.125)
+    p, v = Number.NetValue._precision_and_value(0.125)
     assert p == 3 and v == 1
-    p, v = Number.SimValue._precision_and_value(0.625)
+    p, v = Number.NetValue._precision_and_value(0.625)
     assert p == 3 and v == 5
-    p, v = Number.SimValue._precision_and_value(4.0)
+    p, v = Number.NetValue._precision_and_value(4.0)
     assert p == 0 and v == 4
-    p, v = Number.SimValue._precision_and_value(4.5)
+    p, v = Number.NetValue._precision_and_value(4.5)
     assert p == 1 and v == 9
-    p, v = Number.SimValue._precision_and_value(-1.0)
+    p, v = Number.NetValue._precision_and_value(-1.0)
     assert p == 0 and v == -1
-    p, v = Number.SimValue._precision_and_value(-0.5)
+    p, v = Number.NetValue._precision_and_value(-0.5)
     assert p == 1 and v == -1
-    p, v = Number.SimValue._precision_and_value(-0.125)
+    p, v = Number.NetValue._precision_and_value(-0.125)
     assert p == 3 and v == -1
-    p, v = Number.SimValue._precision_and_value(-0.625)
+    p, v = Number.NetValue._precision_and_value(-0.625)
     assert p == 3 and v == -5
-    p, v = Number.SimValue._precision_and_value(-4.0)
+    p, v = Number.NetValue._precision_and_value(-4.0)
     assert p == 0 and v == -4
-    p, v = Number.SimValue._precision_and_value(-4.5)
+    p, v = Number.NetValue._precision_and_value(-4.5)
     assert p == 1 and v == -9
-    p, v = Number.SimValue._precision_and_value(0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001)
+    p, v = Number.NetValue._precision_and_value(0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001)
     assert p == 1089, v == 202402253307
-    p, v = Number.SimValue._precision_and_value(0.1)
+    p, v = Number.NetValue._precision_and_value(0.1)
     assert p == 55
 
 if __name__ == "__main__":

@@ -121,12 +121,12 @@ class and_gate(NInputGate):
         next_input = _sim_value(next_input)
         if next_input is None:
             if partial_output == 0:
-                return Number.SimValue(0)
+                return Number.NetValue(0)
             else:
                 return None
         if partial_output is None:
             if next_input == 0:
-                return Number.SimValue(0)
+                return Number.NetValue(0)
             else:
                 return None
         return next_input & partial_output
@@ -251,7 +251,7 @@ class not_gate(UnaryGate):
         input_val = _sim_value(input)
         if input_val is None:
             return None
-        return Number.SimValue(input_val).invert(self.output_port.get_num_bits())
+        return Number.NetValue(input_val).invert(self.output_port.get_num_bits())
     def generate_op(self, back_end: 'BackEnd') -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
         return "~", back_end.get_operator_precedence("~", back_end.UNARY)
@@ -419,7 +419,7 @@ class lt_gate(ComparisonGate):
         input_1 = _sim_value(input_1)
         if input_0 is None or input_1 is None:
             return None
-        return Number.SimValue.lt(input_0, input_1)
+        return Number.NetValue.lt(input_0, input_1)
     def generate_op(self, back_end: 'BackEnd') -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
         return "<", back_end.get_operator_precedence("<", back_end.BINARY)
@@ -432,7 +432,7 @@ class le_gate(ComparisonGate):
         input_1 = _sim_value(input_1)
         if input_0 is None or input_1 is None:
             return None
-        return Number.SimValue.le(input_0, input_1)
+        return Number.NetValue.le(input_0, input_1)
     def generate_op(self, back_end: 'BackEnd') -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
         return "<=", back_end.get_operator_precedence("<=", back_end.BINARY)
@@ -445,7 +445,7 @@ class eq_gate(ComparisonGate):
         input_1 = _sim_value(input_1)
         if input_0 is None or input_1 is None:
             return None
-        return Number.SimValue.eq(input_0, input_1)
+        return Number.NetValue.eq(input_0, input_1)
     def generate_op(self, back_end: 'BackEnd') -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
         return "==", back_end.get_operator_precedence("==", back_end.BINARY)
@@ -458,7 +458,7 @@ class ne_gate(ComparisonGate):
         input_1 = _sim_value(input_1)
         if input_0 is None or input_1 is None:
             return None
-        return Number.SimValue.ne(input_0, input_1)
+        return Number.NetValue.ne(input_0, input_1)
     def generate_op(self, back_end: 'BackEnd') -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
         return "!=", back_end.get_operator_precedence("!=", back_end.BINARY)
@@ -471,7 +471,7 @@ class gt_gate(ComparisonGate):
         input_1 = _sim_value(input_1)
         if input_0 is None or input_1 is None:
             return None
-        return Number.SimValue.gt(input_0, input_1)
+        return Number.NetValue.gt(input_0, input_1)
     def generate_op(self, back_end: 'BackEnd') -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
         return ">", back_end.get_operator_precedence(">", back_end.BINARY)
@@ -484,7 +484,7 @@ class ge_gate(ComparisonGate):
         input_1 = _sim_value(input_1)
         if input_0 is None or input_1 is None:
             return None
-        return Number.SimValue.ge(input_0, input_1)
+        return Number.NetValue.ge(input_0, input_1)
     def generate_op(self, back_end: 'BackEnd') -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
         return ">=", back_end.get_operator_precedence(">=", back_end.BINARY)

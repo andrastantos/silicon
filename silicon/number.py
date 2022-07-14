@@ -4,7 +4,7 @@ from .net_type import NetType, KeyKind
 from .module import GenericModule, Module, InlineBlock, InlineExpression, has_port
 from .port import Input, JunctionBase, Output, Junction, Port
 from .tracer import no_trace
-from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, SimValue
+from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, NetValue
 from collections import OrderedDict
 import re
 try:
@@ -16,7 +16,7 @@ except:
         return a
 
 def __init__mantissa_bits():
-    unit_matches = Number.SimValue.__float_parser.match((1.0).hex())
+    unit_matches = Number.NetValue.__float_parser.match((1.0).hex())
     unit_mantissa = int(unit_matches.group(2).replace(".", ""), 16)
     return unit_mantissa.bit_length()
 
@@ -50,22 +50,22 @@ class Number(NetType):
     # The associated VCD type (one of VAR_TYPES inside vcd.writer.py)
     vcd_type: str = 'wire'
 
-    class SimValue(SimValue):
+    class NetValue(NetValue):
         # Used to extract the exact floating point exponent and mantissa from a float.
         # Pre-compiled only once to speed things up a little.
         __float_parser = re.compile("(-?)0x([^p]*)p(.*)")
         # Let's figure out the number of bits in the mantissa and cache it in the class
         # NOTE: This is ugly as hell, but I had to inline everything to make Python happy. What's really going on here is this:
         #           def __init_mantissa_bits():
-        #               unit_matches = Number.SimValue.__float_parser.match((1.0).hex())
+        #               unit_matches = Number.NetValue.__float_parser.match((1.0).hex())
         #               unit_mantissa = int(unit_matches.group(2).replace(".", ""), 16)
         #               return unit_mantissa.bit_length()
         #           __float_mantissa_bits = __init_mantissa_bits()
         __float_mantissa_bits = int(re.compile("(-?)0x([^p]*)p(.*)").match((1.0).hex()).group(2).replace(".", ""), 16).bit_length()
 
 
-        def __init__(self, value: Optional[Union[int,'Number.SimValue']]= None, precision: int = 0):
-            if isinstance(value, Number.SimValue):
+        def __init__(self, value: Optional[Union[int,'Number.NetValue']]= None, precision: int = 0):
+            if isinstance(value, Number.NetValue):
                 self.value = value.value
                 self.precision = value.precision
             else:
@@ -73,7 +73,7 @@ class Number(NetType):
                 self.value = int(value)
 
         @staticmethod
-        def _precision_and_value(thing: Union[int, float, 'Number.SimValue', 'Junction']) -> Tuple[int]:
+        def _precision_and_value(thing: Union[int, float, 'Number.NetValue', 'Junction']) -> Tuple[int]:
             if isinstance(thing, int):
                 return 0, thing
             if isinstance(thing, float):
@@ -81,7 +81,7 @@ class Number(NetType):
                     return 0, 0
 
                 # Now, pick apart the actual number
-                matches = Number.SimValue.__float_parser.match(thing.hex())
+                matches = Number.NetValue.__float_parser.match(thing.hex())
                 if matches is None:
                     raise ValueError(f"Somehow '{thing}' is not a float I can parse")
                 is_positive = matches.group(1) == ''
@@ -93,7 +93,7 @@ class Number(NetType):
                 rightmost_bit_idx = first_bit_set(mantissa)
                 leftmost_bit_idx = mantissa.bit_length() - 1
 
-                precision = (Number.SimValue.__float_mantissa_bits - rightmost_bit_idx - 1) - exponent + (Number.SimValue.__float_mantissa_bits - leftmost_bit_idx - 1)
+                precision = (Number.NetValue.__float_mantissa_bits - rightmost_bit_idx - 1) - exponent + (Number.NetValue.__float_mantissa_bits - leftmost_bit_idx - 1)
                 mantissa >>= rightmost_bit_idx
                 if precision < 0:
                     mantissa <<= -precision
@@ -117,35 +117,35 @@ class Number(NetType):
                 return value << (out_precision - precision)
 
         def _coerce_precisions(self, other) -> Tuple[int, int, int]:
-            other_precision, other_value = Number.SimValue._precision_and_value(other)
+            other_precision, other_value = Number.NetValue._precision_and_value(other)
             if other_precision is None or other_value is None:
                 return None, None, None
             my_precision = self.precision
             result_precision = max(my_precision, other_precision)
-            other_value = Number.SimValue._value_in_precision(other_value, other_precision, result_precision)
-            my_value = Number.SimValue._value_in_precision(self.value, my_precision, result_precision)
+            other_value = Number.NetValue._value_in_precision(other_value, other_precision, result_precision)
+            my_value = Number.NetValue._value_in_precision(self.value, my_precision, result_precision)
             return my_value, other_value, result_precision
 
         def __add__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value + other_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value + other_value, result_precision)
 
         def __sub__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value - other_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value - other_value, result_precision)
 
         def __mul__(self, other: Any) -> Any:
-            other_precision, other_value = Number.SimValue._precision_and_value(other)
+            other_precision, other_value = Number.NetValue._precision_and_value(other)
             my_precision = self.precision
             result_precision = my_precision + other_precision
             my_value = self.value
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value * other_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value * other_value, result_precision)
 
         #def __truediv__(self, other: Any) -> Any:
         #def __floordiv__(self, other: Any) -> Any:
@@ -154,69 +154,69 @@ class Number(NetType):
         #def __pow__(self, other: Any, modulo = None) -> Any:
 
         def __lshift__(self, other: Any) -> Any:
-            other_precision, other_value = Number.SimValue._precision_and_value(other)
+            other_precision, other_value = Number.NetValue._precision_and_value(other)
             if other_precision != 0:
                 raise SimulationException(f"Can only shift by integer amount. {other} is potentially fractional.")
             my_precision = self.precision
             my_value = self.value
             if my_value is None or other_value is None:
-                return Number.SimValue(None, 0)
+                return Number.NetValue(None, 0)
             if other_value < 0:
                 raise SimulationException(f"Can not shift by negative amount. {other} has a negative value of {other_value}")
             result_precision = my_precision
-            return Number.SimValue(my_value << other_value, result_precision)
+            return Number.NetValue(my_value << other_value, result_precision)
 
         def __rshift__(self, other: Any) -> Any:
-            other_precision, other_value = Number.SimValue._precision_and_value(other)
+            other_precision, other_value = Number.NetValue._precision_and_value(other)
             if other_precision != 0:
                 raise SimulationException(f"Can only shift by integer amount. {other} is potentially fractional.")
             my_precision = self.precision
             my_value = self.value
             if my_value is None or other_value is None:
-                return Number.SimValue(None, 0)
+                return Number.NetValue(None, 0)
             if other_value < 0:
                 raise SimulationException(f"Can not shift by negative amount. {other} has a negative value of {other_value}")
             result_precision = my_precision
-            return Number.SimValue(my_value >> other_value, result_precision)
+            return Number.NetValue(my_value >> other_value, result_precision)
 
         def __and__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value & other_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value & other_value, result_precision)
 
         def __xor__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value ^ other_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value ^ other_value, result_precision)
 
         def __or__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value | other_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value | other_value, result_precision)
 
         def __radd__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(other_value + my_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(other_value + my_value, result_precision)
 
         def __rsub__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(other_value - my_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(other_value - my_value, result_precision)
 
         def __rmul__(self, other: Any) -> Any:
-            other_precision, other_value = Number.SimValue._precision_and_value(other)
+            other_precision, other_value = Number.NetValue._precision_and_value(other)
             my_precision = self.precision
             result_precision = my_precision + other_precision
             my_value = self.value
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(other_value * my_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(other_value * my_value, result_precision)
 
         #def __rtruediv__(self, other: Any) -> Any:
         #def __rfloordiv__(self, other: Any) -> Any:
@@ -225,75 +225,75 @@ class Number(NetType):
         #def __rpow__(self, other: Any) -> Any:
 
         def __rlshift__(self, other: Any) -> Any:
-            other_precision, other_value = Number.SimValue._precision_and_value(other)
+            other_precision, other_value = Number.NetValue._precision_and_value(other)
             my_precision = self.precision
             if my_precision != 0:
                 raise SimulationException(f"Can only shift by integer amount. {self} is potentially fractional.")
             my_value = self.value
             if my_value is None or other_value is None:
-                return Number.SimValue(None, 0)
+                return Number.NetValue(None, 0)
             if my_value < 0:
                 raise SimulationException(f"Can not shift by negative amount. {self} has a negative value of {my_value}")
             result_precision = other_precision
-            return Number.SimValue(other_value << my_value, result_precision)
+            return Number.NetValue(other_value << my_value, result_precision)
 
         def __rrshift__(self, other: Any) -> Any:
-            other_precision, other_value = Number.SimValue._precision_and_value(other)
+            other_precision, other_value = Number.NetValue._precision_and_value(other)
             my_precision = self.precision
             if my_precision != 0:
                 raise SimulationException(f"Can only shift by integer amount. {self} is potentially fractional.")
             my_value = self.value
             if my_value is None or other_value is None:
-                return Number.SimValue(None, 0)
+                return Number.NetValue(None, 0)
             if my_value < 0:
                 raise SimulationException(f"Can not shift by negative amount. {self} has a negative value of {my_value}")
             result_precision = other_precision
-            return Number.SimValue(other_value >> my_value, result_precision)
+            return Number.NetValue(other_value >> my_value, result_precision)
 
         def __rand__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(other_value & my_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(other_value & my_value, result_precision)
 
         def __rxor__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(other_value ^ my_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(other_value ^ my_value, result_precision)
 
         def __ror__(self, other: Any) -> Any:
             my_value, other_value, result_precision = self._coerce_precisions(other)
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(other_value | my_value, result_precision)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(other_value | my_value, result_precision)
 
         def __neg__(self) -> Any:
             if self.value is None:
-                return Number.SimValue(None, self.precision)
-            return Number.SimValue(-self.value, self.precision)
+                return Number.NetValue(None, self.precision)
+            return Number.NetValue(-self.value, self.precision)
 
         def __pos__(self) -> Any:
             return self.value
 
         def __abs__(self) -> Any:
             if self.value is None:
-                return Number.SimValue(None, self.precision)
-            return Number.SimValue(abs(self.value), self.precision)
+                return Number.NetValue(None, self.precision)
+            return Number.NetValue(abs(self.value), self.precision)
 
         def __invert__(self) -> Any:
-            raise SyntaxErrorException(f"It's not really possible to invert a Number.SimValue without knowing it's length. Use the 'invert' method instead of the ~ operator if you really need this functionality.")
+            raise SyntaxErrorException(f"It's not really possible to invert a Number.NetValue without knowing it's length. Use the 'invert' method instead of the ~ operator if you really need this functionality.")
             #if self.value is None:
-            #    return Number.SimValue(None, self.precision)
-            #return Number.SimValue(~self.value, self.precision)
+            #    return Number.NetValue(None, self.precision)
+            #return Number.NetValue(~self.value, self.precision)
 
         def invert(self, length: int) -> Any:
             if self.value is None:
-                return Number.SimValue(None, self.precision)
+                return Number.NetValue(None, self.precision)
             # Pythons binary negation operator is pretty lame: it apparently computes -x-1,
             # which is not quite the same when doing fixed-width binary numbers
             all_ones = (1 << length) - 1
-            return Number.SimValue(self.value ^ all_ones, self.precision)
+            return Number.NetValue(self.value ^ all_ones, self.precision)
 
 
         #def __complex__(self) -> Any:
@@ -362,78 +362,78 @@ class Number(NetType):
 
         @staticmethod
         def lt(self, other: Any) -> Any:
-            if isinstance(self, Number.SimValue):
+            if isinstance(self, Number.NetValue):
                 my_value, other_value, result_precision = self._coerce_precisions(other)
-            elif isinstance(other, Number.SimValue):
+            elif isinstance(other, Number.NetValue):
                 other_value, my_value, result_precision = other._coerce_precisions(self)
             else:
-                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.NetValue")
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value < other_value, 0)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value < other_value, 0)
 
         @staticmethod
         def le(self, other: Any) -> Any:
-            if isinstance(self, Number.SimValue):
+            if isinstance(self, Number.NetValue):
                 my_value, other_value, result_precision = self._coerce_precisions(other)
-            elif isinstance(other, Number.SimValue):
+            elif isinstance(other, Number.NetValue):
                 other_value, my_value, result_precision = other._coerce_precisions(self)
             else:
-                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.NetValue")
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value <= other_value, 0)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value <= other_value, 0)
 
         @staticmethod
         def eq(self, other: Any) -> Any:
-            if isinstance(self, Number.SimValue):
+            if isinstance(self, Number.NetValue):
                 my_value, other_value, result_precision = self._coerce_precisions(other)
-            elif isinstance(other, Number.SimValue):
+            elif isinstance(other, Number.NetValue):
                 other_value, my_value, result_precision = other._coerce_precisions(self)
             else:
-                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.NetValue")
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value == other_value, 0)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value == other_value, 0)
 
         @staticmethod
         def ne(self, other: Any) -> Any:
-            if isinstance(self, Number.SimValue):
+            if isinstance(self, Number.NetValue):
                 my_value, other_value, result_precision = self._coerce_precisions(other)
-            elif isinstance(other, Number.SimValue):
+            elif isinstance(other, Number.NetValue):
                 other_value, my_value, result_precision = other._coerce_precisions(self)
             else:
-                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.NetValue")
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value != other_value, 0)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value != other_value, 0)
 
         @staticmethod
         def gt(self, other: Any) -> Any:
-            if isinstance(self, Number.SimValue):
+            if isinstance(self, Number.NetValue):
                 my_value, other_value, result_precision = self._coerce_precisions(other)
-            elif isinstance(other, Number.SimValue):
+            elif isinstance(other, Number.NetValue):
                 other_value, my_value, result_precision = other._coerce_precisions(self)
             else:
-                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.NetValue")
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value > other_value, 0)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value > other_value, 0)
 
         @staticmethod
         def ge(self, other: Any) -> Any:
-            if isinstance(self, Number.SimValue):
+            if isinstance(self, Number.NetValue):
                 my_value, other_value, result_precision = self._coerce_precisions(other)
-            elif isinstance(other, Number.SimValue):
+            elif isinstance(other, Number.NetValue):
                 other_value, my_value, result_precision = other._coerce_precisions(self)
             else:
-                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.SimValue")
+                raise SyntaxErrorException(f"Cant compare values if neither are an instance of Number.NetValue")
             if my_value is None or other_value is None:
-                return Number.SimValue(None, result_precision)
-            return Number.SimValue(my_value >= other_value, 0)
+                return Number.NetValue(None, result_precision)
+            return Number.NetValue(my_value >= other_value, 0)
 
 
-        def as_number(self) -> 'Number.SimValue':
+        def as_number(self) -> 'Number.NetValue':
             return self
 
 
@@ -898,7 +898,7 @@ class Number(NetType):
         """
         if value is None:
             return 'X'
-        if isinstance(value, Number.SimValue):
+        if isinstance(value, Number.NetValue):
             return value.value
         assert False
         return value
@@ -972,8 +972,8 @@ class Number(NetType):
             if isinstance(input, Junction):
                 input = input.sim_value
             elif isinstance(input, int):
-                input = Number.SimValue(input)
-            elif isinstance(input, Number.SimValue):
+                input = Number.NetValue(input)
+            elif isinstance(input, Number.NetValue):
                 pass
             else:
                 raise SimulationException(f"Don't support input type f{type(input)}")
@@ -1424,7 +1424,7 @@ def float_to_const(value: float, type_hint: Optional[NetType]) -> int:
     if not isinstance(type_hint, Number):
         raise SimulationException(f"Can only assign a floating point value to a Number", self)
     value_as_int = round(value * (2 ** type_hint.precision))
-    #return type_hint, Number.SimValue(value_as_int, type_hint.precision)
+    #return type_hint, Number.NetValue(value_as_int, type_hint.precision)
     return type_hint, value_as_int
 
 def bool_to_const(value: bool, type_hint: Optional[NetType]) -> Tuple[NetType, int]:

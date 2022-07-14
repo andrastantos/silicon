@@ -5,8 +5,8 @@ from collections import deque
 from threading import RLock
 TSimEvent = Generator[Union[int, Sequence['Port']], int, int]
 
-# Only purpose to provide an easy way to check if something is a SimValue in convert_to_junction
-class SimValue(object):
+# Only purpose to provide an easy way to check if something is a NetValue in convert_to_junction
+class NetValue(object):
     pass
 class Context(object):
     stack = []
@@ -121,7 +121,7 @@ def convert_to_junction(thing: Any, type_hint: Optional['NetType']=None) -> Opti
             return None
         if hasattr(thing, "sim_value"):
             return thing.sim_value
-        if isinstance(thing, SimValue):
+        if isinstance(thing, NetValue):
             return thing
     else:
         assert False, f"Unknown context: '{context}'"
@@ -136,9 +136,9 @@ def convert_to_junction(thing: Any, type_hint: Optional['NetType']=None) -> Opti
             from .enum import Enum
 
             if isinstance(const_val.net_type, Enum):
-                return Enum.SimValue(const_val.value)
+                return Enum.NetValue(const_val.value)
             if isinstance(const_val.net_type, Number):
-                return Number.SimValue(const_val.value, precision=const_val.net_type.precision)
+                return Number.NetValue(const_val.value, precision=const_val.net_type.precision)
             assert False, f"FIXME: unknown constant type '{const_val.net_type}' encountered"
 
     # _const failed to find us what we were looking for.

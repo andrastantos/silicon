@@ -57,7 +57,7 @@ class Enum(Number):
         assert back_end.language == "SystemVerilog"
         return value.name
 
-    def convert_to_vcd_type(self, value: Optional[Union['Enum', 'Enum.SimValue']]) -> Any:
+    def convert_to_vcd_type(self, value: Optional[Union['Enum', 'Enum.NetValue']]) -> Any:
         if value is None:
             return None
         return value.enum_value.name
@@ -109,11 +109,11 @@ class Enum(Number):
             if isinstance(input, Junction):
                 input = input.sim_value
             elif isinstance(input, self.base_type):
-                input = Enum.SimValue(input)
-            elif isinstance(input, Enum.SimValue):
+                input = Enum.NetValue(input)
+            elif isinstance(input, Enum.NetValue):
                 pass
-            elif isinstance(input, (int, Number.SimValue)):
-                if isinstance(input, Number.SimValue):
+            elif isinstance(input, (int, Number.NetValue)):
+                if isinstance(input, Number.NetValue):
                     if input.precision != 0:
                         raise SimulationException(f"Can't convert Number {input} to enum type {self.base_type}. Fractional types are not supported")
                     input = input.value
@@ -121,7 +121,7 @@ class Enum(Number):
                     input = self.base_type(input)
                 except ValueError:
                     raise SimulationException(f"Can't convert int value {input} to enum type {self.base_type}.")
-                input = Enum.SimValue(input)
+                input = Enum.NetValue(input)
             else:
                 raise SimulationException(f"Don't support input type {type(input)}")
             return input
@@ -152,7 +152,7 @@ class Enum(Number):
     def validate_sim_value(self, sim_value: Any, parent_junction: 'Junction') -> Any:
         if sim_value is None:
             return sim_value
-        if isinstance(sim_value, Enum.SimValue):
+        if isinstance(sim_value, Enum.NetValue):
             return sim_value
         raise SimulationException(f"Value {sim_value} of type {type(sim_value)} is not valid for an Enum type {self.get_type_name()}", parent_junction)
 
@@ -169,8 +169,8 @@ class Enum(Number):
     def __eq__(self, other):
         return self is other or type(self) is type(other)
 
-    class SimValue(Number.SimValue):
-        def __init__(self, value: Optional[Union[PyEnum,'Number.SimValue']]= None):
+    class NetValue(Number.NetValue):
+        def __init__(self, value: Optional[Union[PyEnum,'Number.NetValue']]= None):
             super().__init__(value.value)
             self.enum_value = value
 
