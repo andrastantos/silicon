@@ -297,7 +297,7 @@ def adapt(input: Any, output_type: 'NetType', implicit: bool, force: bool) -> 'J
         pass
 
     try:
-        if input.is_typeless():
+        if not input.is_specialized():
             from .module import GenericModule, InlineExpression
             from .port import Input, Output
 
@@ -359,7 +359,7 @@ def common_superclass(*args, **kwargs) -> object:
     return candidates[0]
 
 def get_common_net_type(junctions: Sequence['Junction'], partial_results: bool = False) -> Optional[object]:
-    net_types = tuple(junction.get_net_type() for junction in junctions if not junction.is_typeless() or not partial_results)
+    net_types = tuple(junction.get_net_type() for junction in junctions if junction.is_specialized() or not partial_results)
     # If any of the types
     if (any(net_type is None for net_type in net_types) or len(net_types) == 0) and not partial_results:
         return None

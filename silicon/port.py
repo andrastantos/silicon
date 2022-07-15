@@ -70,7 +70,7 @@ class Junction(JunctionBase):
 
     def __str__(self) -> str:
         ret_val = self.get_diagnostic_name()
-        if self.is_typeless():
+        if not self.is_specialized():
             return ret_val
         ret_val += ": " + str(self.get_net_type())
         if not hasattr(self, "_xnet") or self._xnet is None:
@@ -171,24 +171,10 @@ class Junction(JunctionBase):
 
     def get_net_type(self) -> Optional[NetType]:
         return self._net_type
-    def is_typeless(self) -> bool:
-        if "_net_type" not in self.__dict__:
-            return True
-        return self._net_type is None
     def is_specialized(self) -> bool:
-        """
-        Returns True if the port has a non-abstract type.
-        """
-        if self.is_typeless():
+        if "_net_type" not in self.__dict__:
             return False
-        return not self.get_net_type().is_abstract()
-    def is_abstract(self) -> bool:
-        """
-        Returns True if the port has an abstract type, or no type at all
-        """
-        if self.is_typeless():
-            return True
-        return self.get_net_type().is_abstract()
+        return self._net_type is not None
 
     def set_source(self, source: 'Junction') -> None:
         old_source = f"{id(self.source):x}" if self.source is not None else "--NONE--"
@@ -202,7 +188,7 @@ class Junction(JunctionBase):
             self.source = None
 
         # If both ports have types, make sure they're compatible.
-        if not source.is_typeless() and not self.is_typeless():
+        if source.is_specialized() and self.is_specialized():
             # Insert adaptor if needed
             old_junction = source
             # ... but first figure out into which context the adaptor should be inserted (if any).
@@ -238,14 +224,14 @@ class Junction(JunctionBase):
                     naming_wire = Wire(source.get_net_type(), source.get_parent_module()._impl.parent)
                     naming_wire.local_name = old_junction.interface_name # This creates duplicates of course, but that will be resolved later on
                     naming_wire.bind(source)
-        # At this point source is compatible with us. The actual binding however will have to be port-wise for compoud types and recursively
+        # At this point source is compatible with us. The actual binding however will have to be done port-wise for composite types and recursively
         if self.is_composite():
-            if source.is_typeless():
+            if not source.is_specialized():
                 # It's possible that the source doesn't quite yet have a type (for example the result of a Select on a Struct).
                 # In that case, we back-propagate the sinks' type to the source.
                 sinks = source.get_all_sinks()
                 for sink in sinks:
-                    if not sink.is_typeless() and self.get_net_type() != sink.get_net_type():
+                    if sink.is_specialized() and self.get_net_type() != sink.get_net_type():
                         raise SyntaxErrorException(f"A sink of junction {source} ({sink}) is of the wrong type. All sinks should have type {source.get_net_type()}.")
                 source.set_net_type(self.get_net_type())
             for member_name, (member_junction, reversed) in self.get_member_junctions().items():
@@ -278,17 +264,13 @@ class Junction(JunctionBase):
             return ret_val
 
     def __iter__(self) -> Any:
-        if self.is_typeless():
-            raise SyntaxErrorException(f"Can't iterate through the elements of a typeless port {self}")
-        if self.is_abstract():
-            raise SyntaxErrorException(f"Can't iterate through the elements of an abstract port {self}")
+        if not self.is_specialized():
+            raise SyntaxErrorException(f"Can only iterate through the elements of a specialized port.")
         return self.get_net_type().get_iterator(self)
 
     def __len__(self) -> int:
-        if self.is_typeless():
-            raise SyntaxErrorException(f"Can't determine the length of a typeless port {self}")
-        if self.is_abstract():
-            raise SyntaxErrorException(f"Can't determine the length of an abstract port {self}")
+        if not self.is_specialized():
+            raise SyntaxErrorException(f"Can only determine the length of a specialized port.")
         net_type = self.get_net_type()
         if not hasattr(net_type, "get_length"):
             raise SyntaxErrorException(f"Net {self} of type {net_type} doesn't support 'len'")
@@ -317,7 +299,7 @@ class Junction(JunctionBase):
     def __getattr__(self, name: str) -> Any:
         if "_member_junctions" in dir(self) and name in self._member_junctions:
             return self._member_junctions[name][0]
-        if not self.is_typeless() and hasattr(self.get_net_type(), "get_junction_member"):
+        if self.is_specialized() and hasattr(self.get_net_type(), "get_junction_member"):
             return self.get_net_type().get_junction_member(self, name)
         raise AttributeError
 
@@ -326,7 +308,7 @@ class Junction(JunctionBase):
             if value is self._member_junctions[name][0]:
                 return
             self._member_junctions[name][0] <<= value
-        if not self.is_typeless() and hasattr(self.get_net_type(), "set_junction_member"):
+        if self.is_specialized() and hasattr(self.get_net_type(), "set_junction_member"):
             if self.get_net_type().set_junction_member(self, name, value):
                 return
         super().__setattr__(name, value)
@@ -782,7 +764,7 @@ class Junction(JunctionBase):
         raise NotImplementedError
 
     def create_member_junction(self, name: str, net_type: 'NetType', reversed: bool) -> None:
-        assert not self.is_typeless(), "Can't add members to a typeless port. In fact, create_member_junction should only be called from the junctions type."
+        assert self.is_specialized(), "Can only add members to a specialized port. In fact, create_member_junction should only be called from the junctions type."
         junction_type = self.get_member_junction_kind(reversed)
         member = junction_type(net_type, self.get_parent_module())
         if self.interface_name is not None:
@@ -829,7 +811,7 @@ class Junction(JunctionBase):
         return self.get_net_type().get_lhs_name(self, back_end, target_namespace, allow_implicit)
 
     def get_rhs_expression(self, back_end: 'BackEnd', target_namespace: 'Module', default_type: Optional[NetType] = None, outer_precedence: Optional[int] = None, allow_expression: bool = True) -> Tuple[str, int]:
-        if self.is_typeless():
+        if not self.is_specialized():
             assert default_type is not None
             return default_type.get_unconnected_value(back_end), 0
         else:

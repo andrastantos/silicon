@@ -362,8 +362,6 @@ class Array(Composite):
 
         self.size = size
         self.member_type = member_type
-        if member_type.is_abstract():
-            raise SyntaxErrorException(f"Array doesn't support abstract members")
         for idx in range(self.size):
             super().add_member(f"element_{idx}", member_type)
 

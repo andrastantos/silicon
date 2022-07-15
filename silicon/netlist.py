@@ -77,7 +77,7 @@ class XNet(object):
         if name is None:
             # We end up here with an unconnected input in the instantiation scope, if that input feeds other sub-module inputs within the instance.
             port = self.source
-            if port.is_typeless():
+            if not port.is_specialized():
                 return back_end.get_unconnected_value(), 0
             return port.get_net_type().get_unconnected_value(back_end), 0
         else:
@@ -224,7 +224,7 @@ class Netlist(object):
         # Note: we register only the junctions' type and its NetType, not the junction object itself.
         # NetType is needed for types that need generation (enums, structs, interfaces etc.)
         # The type of the port is needed to be able to 'reverse' port directions for things, such as interfaces
-        if not junction.is_typeless():
+        if junction.is_specialized():
             self._register_net_type(junction.get_net_type()) # This is the actual data type carried over the port, such as Logic or a Vector of something...
         if is_port(junction):
             self.ports.add(type(junction)) # This would be 'Input' or 'Output' for most cases

@@ -29,7 +29,7 @@ class MemberGetter(object):
         # underlying net_type. However for things, like interfaces and structs, each
         # member-access can change the port type and might need the generation of
         # accessors (it appears that structs and interfaces require you to do
-        # member-level assignment anyway, so generating accessors for all but 
+        # member-level assignment anyway, so generating accessors for all but
         # bottom-most members is probably the right abstraction.)
         # NOTE: This system will break down if there ever was a construct that
         #       has members of different types, yet only allow assignment as a whole
@@ -54,7 +54,7 @@ class MemberGetter(object):
         def construct(self, keys: Sequence[Tuple[Any, KeyKind]]) -> None:
             self._keys = keys
 
-        
+
         def body(self) -> None:
             if not self.input_port.is_specialized():
                 raise SyntaxErrorException(f"Input port type is not specified for slice {self}")
@@ -115,8 +115,8 @@ class MemberGetter(object):
         return self._slice_port
 
     def __ilshift__(self, other: Any) -> 'Junction':
-        if self._parent_junction.is_typeless():
-            raise SyntaxErrorException("Can't set slice on a typeless port")
+        if not self._parent_junction.is_specialized():
+            raise SyntaxErrorException("Can only bind to a slice of a specialized port (one with a type).")
         net_type = self._parent_junction.get_net_type()
         if not hasattr(net_type, "set_member_access"):
             raise TypeError()
@@ -141,139 +141,139 @@ class MemberGetter(object):
     def allow_bind(self) -> bool:
         """
         Determines if port binding to this port is allowed.
-        Defaults to True, but for scoped ports, get set to 
+        Defaults to True, but for scoped ports, get set to
         False to disallow shananingans, like this:
             with my_port as x:
                 x <<= 3
         """
         return self.get_underlying_junction().allow_bind()
 
-    
+
     def __add__(self, other: Any) -> Any:
         return self.get_underlying_junction().__add__(other)
-    
+
     def __sub__(self, other: Any) -> Any:
         return self.get_underlying_junction().__sub__(other)
-    
+
     def __mul__(self, other: Any) -> Any:
         return self.get_underlying_junction().__mul__(other)
-    
+
     def __floordiv__(self, other: Any) -> Any:
         return self.get_underlying_junction().__floordiv__(other)
-    
+
     def __mod__(self, other: Any) -> Any:
         return self.get_underlying_junction().__mod__(other)
-    
+
     def __divmod__(self, other: Any) -> Any:
         return self.get_underlying_junction().__divmod__(other)
-    
+
     def __pow__(self, other: Any, modulo = None) -> Any:
         return self.get_underlying_junction().__pow__(other)
-    
+
     def __lshift__(self, other: Any) -> Any:
         return self.get_underlying_junction().__lshift__(other)
-    
+
     def __rshift__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rshift__(other)
-    
+
     def __and__(self, other: Any) -> Any:
         return self.get_underlying_junction().__and__(other)
-    
+
     def __xor__(self, other: Any) -> Any:
         return self.get_underlying_junction().__xor__(other)
-    
+
     def __or__(self, other: Any) -> Any:
         return self.get_underlying_junction().__or__(other)
-    
+
     def __truediv__(self, other: Any) -> Any:
         return self.get_underlying_junction().__truediv__(other)
 
-    
+
     def __radd__(self, other: Any) -> Any:
         return self.get_underlying_junction().__radd__(other)
-    
+
     def __rsub__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rsub__(other)
-    
+
     def __rmul__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rmul__(other)
-    
+
     def __rtruediv__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rtruediv__(other)
-    
+
     def __rfloordiv__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rfloordiv__(other)
-    
+
     def __rmod__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rmod__(other)
-    
+
     def __rdivmod__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rdivmod__(other)
-    
+
     def __rpow__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rpow__(other)
-    
+
     def __rlshift__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rlshift__(other)
-    
+
     def __rrshift__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rrshift__(other)
-    
+
     def __rand__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rand__(other)
-    
+
     def __rxor__(self, other: Any) -> Any:
         return self.get_underlying_junction().__rxor__(other)
-    
+
     def __ror__(self, other: Any) -> Any:
         return self.get_underlying_junction().__ror__(other)
 
-    
+
     def __neg__(self) -> Any:
         return self.get_underlying_junction().__neg__()
-    
+
     def __pos__(self) -> Any:
         return self.get_underlying_junction().__pos__()
-    
+
     def __abs__(self) -> Any:
         return self.get_underlying_junction().__abs__()
-    
+
     def __invert__(self) -> Any:
         return self.get_underlying_junction().__invert__()
 
-    
+
     def __bool__(self) -> bool:
         return self.get_underlying_junction().__bool__()
-    
+
     def __lt__(self, other: Any) -> bool:
         return self.get_underlying_junction().__lt__(other)
-    
+
     def __le__(self, other: Any) -> bool:
         return self.get_underlying_junction().__le__(other)
-    
+
     def __eq__(self, other: Any) -> bool:
         return self.get_underlying_junction().__eq__(other)
-    
+
     def __ne__(self, other: Any) -> bool:
         return self.get_underlying_junction().__ne__(other)
-    
+
     def __gt__(self, other: Any) -> bool:
         return self.get_underlying_junction().__gt__(other)
-    
+
     def __ge__(self, other: Any) -> bool:
         return self.get_underlying_junction().__ge__(other)
 
-    
+
     def __getitem__(self, key: Any) -> Any:
         # We get here in the following context:
         # out = in1[4:0][1]
         # self represents in1[4:0]. We would have to create a new MemberGetter with the new key that represnts the sub-slice.
         # NOTE: this can be recursive as in in1[100:0][50:0][25:0][3:0][2]
         return MemberGetter(self._parent_junction, self._keys + [(key, KeyKind.Index)])
-    
+
     def __getattr__(self, name:str) -> Any:
         return MemberGetter(self._parent_junction, self._keys + [(name, KeyKind.Member)])
-    
+
     def __setitem__(self, key: Any, value: Any) -> None:
         # We get here in the following context:
         # out[4:0][1] = 3
@@ -308,27 +308,27 @@ class MemberGetter(object):
         #    entries or a list of expressions. NOT DONE
         # 6. For structs to be useful, we would need some sort of 'default assignment'. This could be lexical, that is 'last assignment wins'
         #    or another operator, such as **= or something. Maybe the lexical is better, but that involves making sure that multiple assignments
-        #    to the same key are allowed (which is hard for Numbers and Vectors), and so probably assignment order will have to be maintained in 
+        #    to the same key are allowed (which is hard for Numbers and Vectors), and so probably assignment order will have to be maintained in
         #    whatever set_slice uses to store the keys. That way, later one, when the Concatenator is created (that is, when the full set of
         #    assignments are known) they can be reconciled. That is going to be one *fun* algorithm to write and debug though...
         #    NOTE: set_slice already stores things in a list, so it's order-preserving already. NOT DONE
         keys = self._keys + [(key, KeyKind.Index)]
         if value._parent_junction is self._parent_junction and value._keys == keys:
-            return 
-        if self._parent_junction.is_typeless():
-            raise SyntaxErrorException("Can't set slice on a typeless port")
+            return
+        if not self._parent_junction.is_specialized():
+            raise SyntaxErrorException("Can only set an item of a specialized port (one with a type).")
         net_type = self._parent_junction.get_net_type()
         if not hasattr(net_type, "set_member_access"):
             raise TypeError()
         net_type.set_member_access(keys, value, self._parent_junction)
-    
+
     def __setattr__(self, name: str, value: Any) -> None:
         # We have to be tricky here! This thing gets invoked every time an attribute gets set, whether it exists or not.
         if name in dir(self) or name == "_initialized" or "_initialized" not in dir(self):
             super().__setattr__(name, value)
         else:
-            if self._parent_junction.is_typeless():
-                raise SyntaxErrorException("Can't set slice on a typeless port")
+            if not self._parent_junction.is_specialized():
+                raise SyntaxErrorException("Can only assign to a slice of a specialized port (one with a type).")
             net_type = self._parent_junction.get_net_type()
             if not hasattr(net_type, "resolve_key_sequence"):
                 raise TypeError()
@@ -340,12 +340,12 @@ class MemberGetter(object):
             final_type.set_slice(final_key, value, final_junction)
 
 
-    
+
     def __delitem__(self, key: Any) -> None:
         # I'm not sure what this even means in this context
         raise TypeError()
 
-    
+
     def __enter__(self) -> 'JunctionBase':
         assert not self._in_with_block
         self._in_with_block = True
@@ -354,7 +354,7 @@ class MemberGetter(object):
         self._allow_auto_bind = True
         return self._scoped_port
 
-    
+
     def __exit__(self, exception_type, exception_value, traceback):
         assert self._in_with_block
         self._in_with_block = False

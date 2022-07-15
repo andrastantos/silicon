@@ -65,10 +65,6 @@ class Enum(Number):
     from .module import GenericModule
     class EnumAdaptor(GenericModule):
         def construct(self, input_type: 'Number', output_type: 'Enum') -> None:
-            if input_type.is_abstract():
-                raise SyntaxErrorException("Cannot adapt to numbers from abstract types")
-            if output_type.is_abstract():
-                raise SyntaxErrorException("Cannot adapt to abstract number types")
             if not isinstance(input_type, Number):
                 raise SyntaxErrorException("Can only adapt the size of numbers")
             if not isinstance(output_type, Enum):

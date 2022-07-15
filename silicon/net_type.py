@@ -39,11 +39,6 @@ class NetType(object):
         An example would be 'input logic [7:0]' for a byte-wider input.
         """
         raise NotImplementedError
-    def is_abstract(self) -> bool:
-        """
-        Returns True if the type is abstract, that is it can't be the type of an actual net.
-        """
-        return False
     def get_type_name(self) -> Optional[str]:
         """
         Returns a unique name for the type. This name is used to identify the type, in other words, if two type object instances return the same string from get_type_name, they are considered to be the same type.

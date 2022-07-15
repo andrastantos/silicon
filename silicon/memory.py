@@ -205,10 +205,9 @@ class _Memory(GenericModule):
                 if data_conf_bits is not None and data_conf_bits < data_in_bits:
                     raise SyntaxErrorException(f"Memory was specified as {data_conf_bits} wide in config, yet data input port is {data_in_bits} wide")
             if data_out_port is not None:
-                if not data_out_port.is_abstract():
-                    data_out_bits = data_out_port.get_net_type().get_num_bits()
-                    if data_conf_bits is not None and data_conf_bits < data_out_bits:
-                        raise SyntaxErrorException(f"Memory was specified as {data_conf_bits} wide in config, yet data output port is {data_out_bits} wide")
+                data_out_bits = data_out_port.get_net_type().get_num_bits()
+                if data_conf_bits is not None and data_conf_bits < data_out_bits:
+                    raise SyntaxErrorException(f"Memory was specified as {data_conf_bits} wide in config, yet data output port is {data_out_bits} wide")
 
             if data_conf_bits is not None:
                 data_bits = data_conf_bits

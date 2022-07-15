@@ -39,7 +39,7 @@ class AutoInput(Input):
         return not self.has_driver() and self._optional
 
     def generate_interface(self, back_end: 'BackEnd', port_name: str) -> Sequence[str]:
-        if self.is_typeless():
+        if not self.is_specialized():
             assert self.is_deleted()
             return []
 

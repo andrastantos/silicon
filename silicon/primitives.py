@@ -47,7 +47,7 @@ class Select(Module):
 
     def generate_output_type(self) -> Optional['Number']:
         value_ports = list(self.value_ports.values())
-        if not self.default_port.is_typeless():
+        if self.default_port.is_specialized():
             value_ports.append(self.default_port)
         all_inputs_specialized = all(tuple(input.is_specialized() for input in self.get_inputs().values()))
         common_net_type = get_common_net_type(value_ports, not all_inputs_specialized)
@@ -240,7 +240,7 @@ class _SelectOneHot(Module):
 
     def generate_output_type(self) -> Optional['Number']:
         value_ports = list(self.value_ports.values())
-        if not self.default_port.is_typeless():
+        if self.default_port.is_specialized():
             value_ports.append(self.default_port)
         all_inputs_specialized = all(tuple(input.is_specialized() for input in self.get_inputs().values()))
         if self.has_default:
@@ -340,7 +340,7 @@ class SelectOne(_SelectOneHot):
             selector_expression, _ = selector.get_rhs_expression(back_end, target_namespace, None, op_precedence)
             value_expression, _ = value.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += f"{selector_expression} ? {value_expression} : {zero} | "
-        if not self.default_port.is_typeless():
+        if self.default_port.is_specialized():
             default_expression, _ = self.default_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += default_expression
         else:
@@ -545,12 +545,12 @@ class Reg(Module):
             input_members = self.input_port.get_all_member_junctions(add_self=False)
             output_members = self.output_port.get_all_member_junctions(add_self=False)
 
-            if not self.reset_value_port.is_typeless():
+            if self.reset_value_port.is_specialized():
                 if self.input_port.get_net_type() != self.reset_value_port.get_net_type():
                     raise SyntaxErrorException(f"Can only register composite types if the input and reset_value_port types are the same.")
                 reset_value_members = self.reset_value_port.get_all_member_junctions(add_self=False)
             else:
-                assert not self.reset_value_port.has_driver(), f"Strange: didn't expect a typeless input to have a driver..."
+                assert not self.reset_value_port.has_driver(), f"Strange: didn't expect a non-specialized input to have a driver..."
                 # will cause the logic inside generate_inline_statement to go down the proper path to generate default reset values
                 reset_value_members = (self.reset_value_port, ) * len(output_members)
 

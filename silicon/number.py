@@ -607,7 +607,6 @@ class Number(NetType):
 
     def generate_type_ref(self, back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
-        assert not self.is_abstract(), "Can't generate RTL for abstract Numbers"
         if self.signed:
             if self.length > 1:
                 return f"logic signed [{self.length - 1}:0]"
@@ -707,7 +706,7 @@ class Number(NetType):
             max_val = None
             precision = None
             for sink in sinks:
-                if not sink.is_abstract() and isinstance(sink.get_net_type(), Number):
+                if isinstance(sink.get_net_type(), Number):
                     min_val = max_none(min_val, sink.get_net_type().min_val)
                     max_val = min_none(max_val, sink.get_net_type().max_val)
                     precision = min_none(precision, sink.get_net_type().precision)
@@ -810,14 +809,7 @@ class Number(NetType):
             assert sub_key[1] is KeyKind.Index, "Number doesn't support member access, only slices"
             key = _slice_of_slice(key, sub_key[0])
         return None, key
-    def is_abstract(self) -> bool:
-        return self.length is None and self.min_val is None and self.max_val is None
-
     def _calc_metrics(self):
-        if self.is_abstract():
-            if self.signed is None:
-                raise SyntaxErrorException("Abstract Number types must have signage specified")
-            return
         if self.precision is None:
             self.precision = 0
         if self.length is None:
@@ -919,10 +911,6 @@ class Number(NetType):
     from .module import GenericModule
     class SizeAdaptor(GenericModule):
         def construct(self, input_type: 'Number', output_type: 'Number') -> None:
-            if input_type.is_abstract():
-                raise SyntaxErrorException("Cannot adapt to numbers from abstract types")
-            if output_type.is_abstract():
-                raise SyntaxErrorException("Cannot adapt to abstract number types")
             if not isinstance(input_type, Number):
                 raise SyntaxErrorException("Can only adapt the size of numbers")
             if not isinstance(output_type, Number):
@@ -989,10 +977,6 @@ class Number(NetType):
         elif context == Context.elaboration:
             input_type = input.get_net_type()
             if not isinstance(input_type, Number):
-                raise AdaptTypeError
-            if input_type.is_abstract():
-                raise AdaptTypeError
-            if self.is_abstract():
                 raise AdaptTypeError
             if self.min_val > input_type.min_val or self.max_val < input_type.max_val:
                 if not force:
@@ -1101,8 +1085,6 @@ class Number(NetType):
         for junction in input_map.values():
             if not isinstance(junction.get_net_type(), Number):
                 raise SyntaxErrorException("Can only determine concatenated type if all constituents are Numbers")
-            if junction.get_net_type().is_abstract():
-                raise SyntaxErrorException("Can't determine concatenated type if any of the constituents is an abstract Number")
         # Simple assignment: return the input, but converted into an integer
         if len(input_map) == 1 and first(input_map.keys()).is_sequential:
             input_type = first(input_map.values()).get_net_type()
@@ -1135,8 +1117,6 @@ class Number(NetType):
 
         # No source: return a X-assignment
         assert back_end.language == "SystemVerilog"
-        if self.is_abstract():
-            raise SyntaxErrorException("Can't generate source expression for abstract Numbers")
         if len(input_map) == 0:
             return f"{self.length}'bX", 0
 
@@ -1221,8 +1201,6 @@ class Number(NetType):
         for net_type in net_types:
             if not isinstance(net_type, Number) and net_type is not None:
                 raise SyntaxErrorException("Can only determine union type if all constituents are Numbers")
-            if net_type is not None and net_type.is_abstract():
-                raise SyntaxErrorException("Can't determine union type if any of the constituents is an abstract Number")
         if operation == "SELECT":
             max_val = None
             min_val = None

@@ -245,8 +245,8 @@ class Simulator(object):
                             # get connected through the hierarchy, but are left unconnected on the top level.
                             # If we encounter such an instance, we're simply leaving it out of the dump
                             # (since we don't know what type to export it as).
-                            #assert not port.is_typeless() or len(xnet.sinks) == 0
-                            if not port.is_typeless():
+                            #assert port.is_specialized() or len(xnet.sinks) == 0
+                            if port.is_specialized():
                                 scopes = name.split(FQN_DELIMITER)
                                 scope = FQN_DELIMITER.join(scopes[:-1])
                                 name = scopes[-1]
