@@ -89,9 +89,10 @@ class Fifo(GenericModule):
     reset_port = RstPort()
 
     def construct(self, depth:int):
-        if not isinstance(depth, int):
+        try:
+            self.depth = int(depth)
+        except TypeError:
             raise SyntaxErrorException("Fifo depth must be an integer")
-        self.depth = depth
 
     def body(self):
         if self.depth == 0:
@@ -150,7 +151,7 @@ class Fifo(GenericModule):
 
             push_addr <<= Reg(next_push_addr)
             pop_addr <<= Reg(next_pop_addr)
-            empty <<= Reg(next_empty)
+            empty <<= Reg(next_empty, reset_value_port = 1)
             full <<= Reg(next_full)
             looped <<= Reg(next_looped)
 
@@ -164,7 +165,15 @@ class Fifo(GenericModule):
             buffer.port1_data_in <<= input_data
             buffer.port1_addr <<= push_addr
             buffer.port1_write_en <<= push
-            output_data <<= buffer.port2_data_out
+            # Since RAM has read-old-value semantics for the case where read and write address matches,
+            # we need a bypass pass to get rid of the extra cycle of latency.
+            # TODO: Can we do better? We could probably change the logic to take the extra cycle into account.
+            #       This way output_data is not registered.
+            output_data <<= Select(
+                push_addr == next_pop_addr,
+                buffer.port2_data_out,
+                Reg(input_data)
+            )
             buffer.port2_addr <<= next_pop_addr
             self.output_port.set_data_members(output_data)
 
@@ -182,9 +191,10 @@ class DelayLine(GenericModule):
     reset_port = RstPort()
 
     def construct(self, depth:int):
-        if not isinstance(depth, int):
-            raise SyntaxErrorException("Fifo depth must be an integer")
-        self.depth = depth
+        try:
+            self.depth = int(depth)
+        except TypeError:
+            raise SyntaxErrorException("DelayLine depth must be an integer")
 
     def body(self):
         intermediate = self.input_port
@@ -200,9 +210,10 @@ class Pacer(GenericModule):
     reset_port = RstPort()
 
     def construct(self, wait_states:int):
-        if not isinstance(wait_states, int):
+        try:
+            self.wait_states = int(wait_states)
+        except TypeError:
             raise SyntaxErrorException("Number of wait states must be an integer")
-        self.wait_states = wait_states
 
     def body(self):
         wait_cnt_type = Number(min_val=0, max_val=self.wait_states-1)
