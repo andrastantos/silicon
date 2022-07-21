@@ -100,9 +100,16 @@ def is_module(thing: Any) -> bool:
     return isinstance(thing, Module)
 
 def is_net_type(thing: Any) -> bool:
-    from .net_type import NetType
-    return isinstance(thing, NetType)
+    from .net_type import NetType, NetTypeMeta
+    if not isinstance(thing, NetTypeMeta):
+        return False
+    try:
+        return issubclass(thing, NetType)
+    except TypeError:
+        return False
 
+def is_net_value(thing: Any) -> bool:
+    return isinstance(thing, NetValue)
 
 def convert_to_junction(thing: Any, type_hint: Optional['NetType']=None) -> Optional['Junction']:
     """
@@ -121,7 +128,7 @@ def convert_to_junction(thing: Any, type_hint: Optional['NetType']=None) -> Opti
             return None
         if hasattr(thing, "sim_value"):
             return thing.sim_value
-        if isinstance(thing, NetValue):
+        if is_net_value(thing):
             return thing
     else:
         assert False, f"Unknown context: '{context}'"
@@ -132,14 +139,7 @@ def convert_to_junction(thing: Any, type_hint: Optional['NetType']=None) -> Opti
         if context == Context.elaboration:
             return ConstantModule(const_val)()
         elif context == Context.simulation:
-            from .number import Number
-            from .enum import Enum
-
-            if isinstance(const_val.net_type, Enum):
-                return Enum.NetValue(const_val.value)
-            if isinstance(const_val.net_type, Number):
-                return Number.NetValue(const_val.value, precision=const_val.net_type.precision)
-            assert False, f"FIXME: unknown constant type '{const_val.net_type}' encountered"
+            return const_val.net_type.sim_constant_to_net_value(const_val)
 
     # _const failed to find us what we were looking for.
     # There can be two reasons for it: either it's a string that didn't convert, or some other, unknown type.
@@ -291,7 +291,7 @@ def adapt(input: Any, output_type: 'NetType', implicit: bool, force: bool) -> 'J
     If the type of the input is not know, a delayed adaptor is created.
     """
     try:
-        if output_type == input.get_net_type():
+        if output_type is input.get_net_type():
             return input
     except AttributeError:
         pass
@@ -342,15 +342,15 @@ def product(__iterable: Iterable[int]):
 
 def common_superclass(*args, **kwargs) -> object:
     """
-    Returns the most specialized common superclass of all supplied argiments
+    Returns the most specialized common superclass of all supplied arguments
     """
     all_args = list(args) + list(kwargs.values())
     assert len(all_args) > 0
 
     from inspect import getmro
-    candidates = list(getmro(type(all_args[0])))
+    candidates = list(getmro(all_args[0]))
     for arg in all_args[1:]:
-        bases = set(getmro(type(arg)))
+        bases = set(getmro(arg))
         candidates = [candidate for candidate in candidates if candidate in bases]
         if len(candidates) == 1:
             assert candidates[0] is object
@@ -366,11 +366,12 @@ def get_common_net_type(junctions: Sequence['Junction'], partial_results: bool =
     if len(net_types) == 0:
         return None
     superclass = common_superclass(*net_types)
-    from .net_type import NetType
+    from .net_type import NetType, NetTypeMeta
     from inspect import getmro
-    if superclass in (object, NetType) or NetType not in getmro(superclass):
-        junction_list_as_str = " ".join(str(junction) for junction in junctions)
-        raise SyntaxErrorException(f"Ports {junction_list_as_str} don't have a common superclass.")
+    with NetTypeMeta.eq_is_is:
+        if superclass in (object, NetType) or NetType not in getmro(superclass):
+            junction_list_as_str = " ".join(str(junction) for junction in junctions)
+            raise SyntaxErrorException(f"Ports {junction_list_as_str} don't have a common superclass.")
     return superclass
 
 def get_caller_local_junctions(frame_cnt: int = 1) -> Dict[str, 'Junction']:

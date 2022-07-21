@@ -17,11 +17,11 @@ class Pixel(Struct):
 
 def test_select_struct():
     class top(Module):
-        out_port = Output(Pixel())
-        in1 = Input(Pixel())
-        in2 = Input(Pixel())
-        in3 = Input(Pixel())
-        in4 = Input(Pixel())
+        out_port = Output(Pixel)
+        in1 = Input(Pixel)
+        in2 = Input(Pixel)
+        in3 = Input(Pixel)
+        in4 = Input(Pixel)
         sel_in = Input(Unsigned(2))
 
         def body(self):
@@ -31,11 +31,11 @@ def test_select_struct():
 
 def test_select_one_struct():
     class top(Module):
-        out_port = Output(Pixel())
-        in1 = Input(Pixel())
-        in2 = Input(Pixel())
-        in3 = Input(Pixel())
-        in4 = Input(Pixel())
+        out_port = Output(Pixel)
+        in1 = Input(Pixel)
+        in2 = Input(Pixel)
+        in3 = Input(Pixel)
+        in4 = Input(Pixel)
         sel_in = Input(Unsigned(4))
 
         def body(self):
@@ -45,11 +45,11 @@ def test_select_one_struct():
 
 def test_select_first_struct(mode: str = "rtl"):
     class top(Module):
-        out_port = Output(Pixel())
-        in1 = Input(Pixel())
-        in2 = Input(Pixel())
-        in3 = Input(Pixel())
-        in4 = Input(Pixel())
+        out_port = Output(Pixel)
+        in1 = Input(Pixel)
+        in2 = Input(Pixel)
+        in3 = Input(Pixel)
+        in4 = Input(Pixel)
         sel_in = Input(Unsigned(4))
 
         def body(self):
@@ -79,13 +79,13 @@ def test_select_first_struct(mode: str = "rtl"):
 
 def test_reg_struct():
     class top(Module):
-        sout1 = Output(Pixel())
-        uout1 = Output(Pixel())
-        uout2 = Output(Pixel())
-        uout3 = Output(Pixel())
-        uout4 = Output(Pixel())
-        uin1 = Input(Pixel())
-        uin2 = Input(Pixel())
+        sout1 = Output(Pixel)
+        uout1 = Output(Pixel)
+        uout2 = Output(Pixel)
+        uout3 = Output(Pixel)
+        uout4 = Output(Pixel)
+        uin1 = Input(Pixel)
+        uin2 = Input(Pixel)
         clk1 = Input(logic)
         clk2 = Input(logic)
 
@@ -107,14 +107,14 @@ def test_reg_struct():
 
 def test_struct_of_struct():
     class ValidPixel(Struct):
-        pixel = Pixel()
+        pixel = Pixel
         valid = logic
 
     class AlphaBender(Module):
-        in1 = Input(ValidPixel())
-        in2 = Input(ValidPixel())
+        in1 = Input(ValidPixel)
+        in2 = Input(ValidPixel)
         alpha = Input(Unsigned(8))
-        outp = Output(ValidPixel())
+        outp = Output(ValidPixel)
         error = Output(logic)
 
         def body(self):
@@ -131,20 +131,26 @@ def test_struct_of_struct():
 
     test.rtl_generation(AlphaBender, inspect.currentframe().f_code.co_name)
 
+
+
+class GPixel(NetTypeFactory, net_type = Struct):
+    @classmethod
+    def construct(cls, net_type: Optional[Struct], length: int) -> Optional[Tuple[str, int]]:
+        if net_type is not None:
+            net_type.length = length # We'll need this later in AlphaBlender
+            net_type.add_member("r", Unsigned(length))
+            net_type.add_member("g", Unsigned(length))
+            net_type.add_member("b", Unsigned(length))
+        return (f"Pixel_{length}", length)
+
+
 def test_generic_struct():
-    class Pixel(Struct):
-        def __init__(self, length: int):
-            super().__init__()
-            self.length = length # We'll need this later in AlphaBlender
-            self.add_member("r", Unsigned(length))
-            self.add_member("g", Unsigned(length))
-            self.add_member("b", Unsigned(length))
 
     class AlphaBender(Module):
-        in1 = Input(Pixel(8))
-        in2 = Input(Pixel(8))
+        in1 = Input(GPixel(8))
+        in2 = Input(GPixel(8))
         alpha = Input(Unsigned(8))
-        outp = Output(Pixel(8))
+        outp = Output(GPixel(8))
 
         def body(self):
             pixel_width = 8
@@ -163,6 +169,9 @@ def test_struct_with_method():
     pixel_width = 12
 
     class Pixel(Struct):
+        r = Unsigned(pixel_width)
+        g = Unsigned(pixel_width)
+        b = Unsigned(pixel_width)
 
         class Behaviors(Struct.Behaviors):
             def blend(self, other, alpha):
@@ -170,27 +179,19 @@ def test_struct_with_method():
                 def blend_mono(in1, in2):
                     pix1 = in1 * alpha
                     pix2 = in2 * (255-alpha)
-                    top = self.get_net_type().length + 8 - 1
+                    top = self.r.get_net_type().length + 8 - 1
                     return (pix1 + pix2 + 127)[top:8]
-                result = Wire(Pixel(self.get_net_type().length))
+                result = Wire(Pixel)
                 result.r = blend_mono(self.r, other.r)
                 result.g = blend_mono(self.g, other.g)
                 result.b = blend_mono(self.b, other.b)
                 return result
 
-        def __init__(self, length: int):
-            super().__init__()
-            self.length = length
-            self.add_member("r", Unsigned(length))
-            self.add_member("g", Unsigned(length))
-            self.add_member("b", Unsigned(length))
-
-
     class AlphaBender(Module):
-        in1 = Input(Pixel(pixel_width))
-        in2 = Input(Pixel(pixel_width))
+        in1 = Input(Pixel)
+        in2 = Input(Pixel)
         alpha = Input(Unsigned(8))
-        outp = Output(Pixel(pixel_width))
+        outp = Output(Pixel)
 
         def body(self):
             self.outp = self.in1.blend(self.in2, self.alpha)
@@ -201,16 +202,8 @@ def test_struct_with_method():
 def test_struct_to_number(mode: str = "rtl"):
     pixel_width = 8
 
-    class Pixel(Struct):
-        def __init__(self, length: int):
-            super().__init__()
-            self.length = length
-            self.add_member("r", Unsigned(length))
-            self.add_member("g", Unsigned(length))
-            self.add_member("b", Unsigned(length))
-
     class Top(Module):
-        in1 = Input(Pixel(pixel_width))
+        in1 = Input(GPixel(pixel_width))
         outp = Output()
 
         def body(self):
@@ -240,17 +233,9 @@ def test_struct_to_number(mode: str = "rtl"):
 def test_number_to_struct(mode: str = "rtl"):
     pixel_width = 8
 
-    class Pixel(Struct):
-        def __init__(self, length: int):
-            super().__init__()
-            self.length = length
-            self.add_member("r", Unsigned(length))
-            self.add_member("g", Unsigned(length))
-            self.add_member("b", Unsigned(length))
-
     class Top(Module):
         in1 = Input(Unsigned(pixel_width * 3))
-        outp = Output(Pixel(pixel_width))
+        outp = Output(GPixel(pixel_width))
 
         def body(self):
             self.outp <<= explicit_adapt(self.in1, self.outp.get_net_type())
@@ -281,23 +266,15 @@ def test_number_to_struct_sim():
 def test_multi_assign(mode: str = "rtl"):
     pixel_width = 8
 
-    class Pixel(Struct):
-        def __init__(self, length: int):
-            super().__init__()
-            self.length = length
-            self.add_member("r", Unsigned(length))
-            self.add_member("g", Unsigned(length))
-            self.add_member("b", Unsigned(length))
-
     class Top(Module):
-        outp = Output(Pixel(pixel_width))
-        outp2 = Output(Pixel(pixel_width))
-        outp3 = Output(Pixel(pixel_width))
+        outp = Output(GPixel(pixel_width))
+        outp2 = Output(GPixel(pixel_width))
+        outp3 = Output(GPixel(pixel_width))
 
         def body(self):
-            self.outp <<= Pixel(pixel_width)(0,1,2)
-            self.outp2 <<= Pixel(pixel_width)(0x10,0x11,b=0x12)
-            #self.outp3 <<= Pixel(pixel_width)(0x20,b=0x22)
+            self.outp <<= GPixel(pixel_width)(0,1,2)
+            self.outp2 <<= GPixel(pixel_width)(0x10,0x11,b=0x12)
+            #self.outp3 <<= GPixel(pixel_width)(0x20,b=0x22)
 
         def simulate(self):
             yield 10
@@ -313,24 +290,16 @@ def test_multi_assign(mode: str = "rtl"):
 def test_struct_sub_module(mode: str = "rtl"):
     pixel_width = 8
 
-    class Pixel(Struct):
-        def __init__(self, length: int):
-            super().__init__()
-            self.length = length
-            self.add_member("r", Unsigned(length))
-            self.add_member("g", Unsigned(length))
-            self.add_member("b", Unsigned(length))
-
     class Sub(Module):
-        in1 = Input(Pixel(pixel_width))
-        in2 = Input(Pixel(pixel_width))
-        outp = Output(Pixel(pixel_width))
+        in1 = Input(GPixel(pixel_width))
+        in2 = Input(GPixel(pixel_width))
+        outp = Output(GPixel(pixel_width))
 
         def body(self):
             self.outp = Select(1, self.in1, self.in2)
 
     class Top(Module):
-        in1 = Input(Pixel(pixel_width))
+        in1 = Input(GPixel(pixel_width))
         outp = Output()
 
         def body(self):
@@ -349,12 +318,12 @@ class Data(Interface):
 
 def test_interface_wire(mode: str = "rtl"):
     class top(Module):
-        in2 = Input(Data())
-        out2 = Output(Data())
+        in2 = Input(Data)
+        out2 = Output(Data)
 
         def body(self):
-            x1 = Wire(Data())
-            #x2 = Wire(Data())
+            x1 = Wire(Data)
+            #x2 = Wire(Data)
 
             x1 <<= self.in2
             #x2 <<= x1
@@ -365,12 +334,12 @@ def test_interface_wire(mode: str = "rtl"):
 
 def test_interface_wire2(mode: str = "rtl"):
     class top(Module):
-        in2 = Input(Data())
-        out2 = Output(Data())
+        in2 = Input(Data)
+        out2 = Output(Data)
 
         def body(self):
-            x1 = Wire(Data())
-            x2 = Wire(Data())
+            x1 = Wire(Data)
+            x2 = Wire(Data)
 
             x1 <<= self.in2
             x2 <<= x1
@@ -380,13 +349,13 @@ def test_interface_wire2(mode: str = "rtl"):
 
 def test_interface_wire3(mode: str = "rtl"):
     class top(Module):
-        in2 = Input(Data())
-        out2 = Output(Data())
+        in2 = Input(Data)
+        out2 = Output(Data)
 
         def body(self):
             x0 = self.in2
-            x1 = Wire(Data())
-            x2 = Wire(Data())
+            x1 = Wire(Data)
+            x2 = Wire(Data)
             x3 = self.out2
 
             x1 <<= self.in2
@@ -402,7 +371,7 @@ if __name__ == "__main__":
     #test_select_one_struct()
     #test_select_first_struct("rtl")
     #test_select_first_struct("sim")
-    test_reg_struct()
+    #test_reg_struct()
     #test_struct_of_struct()
     #test_generic_struct()
     #test_struct_with_method()
@@ -411,7 +380,7 @@ if __name__ == "__main__":
     #test_struct_sub_module("rtl")
     #test_number_to_struct("rtl")
     #test_number_to_struct("sim")
-    #test_interface_wire("rtl")
+    test_interface_wire("rtl")
     #test_interface_wire2("rtl")
     #test_interface_wire3("rtl")
     #test_number_to_struct_sim()

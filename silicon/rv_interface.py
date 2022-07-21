@@ -1,4 +1,4 @@
-from .composite import Interface, Reverse, Struct
+from .composite import Interface, Reverse, Struct, is_reverse
 from .number import logic
 from typing import Union, Callable, Optional
 from .net_type import NetType
@@ -35,23 +35,23 @@ class ReadyValid(Interface):
                 my_wire = getattr(self, name)
                 my_wire <<= junction
 
-
-    def __init__(self):
-        super().__init__()
-        self._data_member_type = None
-
-    def get_data_member_type(self) -> Struct:
-        if self._data_member_type is None:
-            self._data_member_type = Struct()
-            for name, (member, _) in self.members.items():
+    @classmethod
+    def get_data_member_type(cls) -> Struct:
+        try:
+            return cls._data_member_type
+        except AttributeError:
+            cls._data_member_type = type(f"{cls.__name__}.DataMemberStruct", (Struct,), {})
+            for name, (member, _) in cls.members.items():
                 if name not in ("ready", "valid"):
-                    self._data_member_type.add_member(name, member)
-        return self._data_member_type
+                    cls._data_member_type.add_member(name, member)
+            return cls._data_member_type
 
-    def add_member(self, name: str, member: Union[NetType, Reverse]) -> None:
-        self._data_member_type = None
-        if isinstance(member, Reverse) and name != "ready":
-            raise SyntaxErrorException(f"ReadyValid interface {type(self)} doesn't support reverse members")
+    @classmethod
+    def add_member(cls, name: str, member: Union[NetType, Reverse]) -> None:
+        if hasattr(cls, "_data_member_type"):
+            raise SyntaxErrorException(f"ReadyValid interface {cls.__name__} doesn't support member addition after data member type is created")
+        if is_reverse(member) and name != "ready":
+            raise SyntaxErrorException(f"ReadyValid interface {cls.__name__} doesn't support reverse members")
         super().add_member(name, member)
 
 
@@ -82,7 +82,7 @@ class RvSimSource(GenericModule):
                 except TypeError:
                     # We get here if next_val.get_net_type is not callable
                     next_val_net_type = None
-                if next_val_net_type == self.data_members.get_net_type():
+                if next_val_net_type is self.data_members.get_net_type():
                     self.data_members <<= next_val
                 else:
                     self.data_members <<= (next_val, )

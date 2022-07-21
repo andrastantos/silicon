@@ -4,7 +4,7 @@ from typing import Union, Set, Tuple, Dict, Any, Optional, List, Iterable, Gener
 import typing
 from collections import OrderedDict
 from .port import Junction, Port, Output, Input, Wire, JunctionBase
-from .net_type import NetType
+from .net_type import NetType, NetTypeMeta
 from .utils import convert_to_junction, BoolMarker, str_block, CountMarker, TSimEvent, ContextMarker, first, Context
 from .stack import Stack
 from .tracer import Tracer, Trace, NoTrace, trace, no_trace
@@ -103,6 +103,7 @@ class Module(object):
             self.context = context
 
     def __new__(cls, *args, **kwargs):
+        NetTypeMeta.assert_on_eq = True
         with cls._in_new_lock:
             if not cls._in_new:
                 # For a non-generic module, all parameters are passed on to the __call__ function.
@@ -1075,7 +1076,7 @@ class Module(object):
                     return False
                 if not my_junction.is_specialized():
                     return True
-                return my_junction.get_net_type() == other_junction.get_net_type()
+                return my_junction.get_net_type() is other_junction.get_net_type()
 
             ports_are_ok = all(
                 are_junctions_equivalent(my_port_name, my_port, other_port_name, other_port)
@@ -1109,9 +1110,10 @@ class Module(object):
 
             if len(self._construct_kwargs) != len(other._impl._construct_kwargs):
                 return False
-            all_construct_kwargs_are_ok = all(
-                my_arg_name in other._impl._construct_kwargs and my_arg == other._impl._construct_kwargs[my_arg_name] for my_arg_name, my_arg in self._construct_kwargs.items()
-            )
+            with NetTypeMeta.eq_is_is:
+                all_construct_kwargs_are_ok = all(
+                    my_arg_name in other._impl._construct_kwargs and my_arg == other._impl._construct_kwargs[my_arg_name] for my_arg_name, my_arg in self._construct_kwargs.items()
+                )
             if not all_construct_kwargs_are_ok:
                 return False
 

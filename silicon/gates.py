@@ -34,7 +34,7 @@ class Gate(Module):
 
     def construct(self):
         self.max_input_cnt = None
-    def generate_output_type(self) -> Optional['Number']:
+    def generate_output_type(self) -> Optional['NumberMeta']:
         from .number import Number
         common_net_type = get_common_net_type(self.get_inputs().values())
         if common_net_type is None:
@@ -302,7 +302,7 @@ class bool_gate(UnaryGate):
         if input is None:
             return None
         return bool(input)
-    def generate_output_type(self) -> Optional['Number']:
+    def generate_output_type(self) -> Optional['NumberMeta']:
         return None
     def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
@@ -410,7 +410,7 @@ class ComparisonGate(BinaryGate):
         super().construct()
         from .number import logic
         self.output_port.set_net_type(logic)
-    def generate_output_type(self) -> Optional['Number']:
+    def generate_output_type(self) -> Optional['NumberMeta']:
         return None
 
 class lt_gate(ComparisonGate):

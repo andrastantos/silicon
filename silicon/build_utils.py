@@ -1,7 +1,7 @@
 from .exceptions import IVerilogException
 from .back_end import SystemVerilog, File
 from .module import Module, elaborate
-from .utils import BoolMarker
+from .utils import BoolMarker, is_module
 from typing import Callable, Union, IO
 import os
 
@@ -21,7 +21,7 @@ class Build:
     @staticmethod
     def generate_rtl(top_class: Union[Callable, Module], *, add_unnamed_scopes: bool = False):
         Build.clear()
-        if isinstance(top_class, Module):
+        if is_module(top_class):
             top = top_class
         else:
             top = top_class()

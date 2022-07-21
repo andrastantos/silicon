@@ -6,6 +6,7 @@ from .ordered_set import OrderedSet
 from collections import OrderedDict
 from .utils import is_iterable, first, is_junction_member, is_output_port, Context
 from .exceptions import SimulationException
+from pathlib import Path
 
 """
 A discrete time simulator for Silicon
@@ -291,8 +292,8 @@ class Simulator(object):
         def simulate(self, end_time: Optional[int] = None) -> int:
             while len(self.simulator.timeline) > 0 and (end_time is None or self.simulator.now < end_time):
                 self.tick()
-            if self.vcd_writer is not None:
-                self.vcd_writer.flush()
+                if self.vcd_writer is not None:
+                    self.vcd_writer.flush()
             return self.now
 
         def _done(self):
@@ -323,8 +324,8 @@ class Simulator(object):
     def __enter__(self):
         assert self.context is None
         assert self.top_level._impl.netlist.simulator_context is None, "Can't start multiple simulations on a single netlist"
-        if isinstance(self.vcd_file, str):
-            self.vcd_stream = open(self.vcd_file, "w")
+        if isinstance(self.vcd_file, (str, Path)):
+            self.vcd_stream = open(str(self.vcd_file), "w")
         else:
             self.vcd_stream = self.vcd_file
         self.context = Simulator.SimulatorContext(self, self.vcd_stream, self.timescale)

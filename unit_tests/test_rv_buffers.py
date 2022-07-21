@@ -21,7 +21,7 @@ class RvData(ReadyValid):
 
 class Generator(RvSimSource):
     def construct(self, max_wait_state: int = 5):
-        super().construct(RvData(), None, max_wait_state)
+        super().construct(RvData, None, max_wait_state)
         self.cnt = -1
     def generator(self, is_reset):
         if is_reset:
@@ -35,10 +35,8 @@ class Checker(RvSimSink):
     def construct(self, max_wait_state: int = 5):
         super().construct(None, max_wait_state)
         self.cnt = 0
-        self.last_val = Wire(Unsigned(8))
     def checker(self, value):
-        self.last_val <<= value
-        assert(value == self.cnt)
+        assert(value.data == self.cnt)
         self.cnt += 1
         if self.cnt == 256:
             self.cnt = 0
@@ -50,7 +48,7 @@ def test_gen_chk(mode: str = "rtl"):
         rst = RstPort()
 
         def body(self):
-            self.data = Wire(RvData())
+            self.data = Wire(RvData)
             self.checker = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
@@ -85,8 +83,8 @@ def test_gen_chk(mode: str = "rtl"):
 
 def test_forward_buf(mode: str = "rtl"):
     class top(Module):
-        in1 = Input(RvData())
-        out1 = Output(RvData())
+        in1 = Input(RvData)
+        out1 = Output(RvData)
         clk = ClkPort()
         rst = RstPort()
 
@@ -99,7 +97,7 @@ def test_forward_buf(mode: str = "rtl"):
         clk = ClkPort()
         rst = RstPort()
         def body(self):
-            self.data = Wire(RvData())
+            self.data = Wire(RvData)
             self.checker = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
@@ -136,8 +134,8 @@ def test_forward_buf(mode: str = "rtl"):
 
 def test_reverse_buf(mode: str = "rtl"):
     class top(Module):
-        in1 = Input(RvData())
-        out1 = Output(RvData())
+        in1 = Input(RvData)
+        out1 = Output(RvData)
         clk = ClkPort()
         rst = RstPort()
 
@@ -148,7 +146,7 @@ def test_reverse_buf(mode: str = "rtl"):
         clk = ClkPort()
         rst = RstPort()
         def body(self):
-            self.data = Wire(RvData())
+            self.data = Wire(RvData)
             self.checker = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
@@ -186,8 +184,8 @@ def test_reverse_buf(mode: str = "rtl"):
 
 def test_fifo(mode: str = "rtl"):
     class top(Module):
-        in1 = Input(RvData())
-        out1 = Output(RvData())
+        in1 = Input(RvData)
+        out1 = Output(RvData)
         clk = ClkPort()
         rst = RstPort()
 
@@ -199,7 +197,7 @@ def test_fifo(mode: str = "rtl"):
         clk = ClkPort()
         rst = RstPort()
         def body(self):
-            self.data = Wire(RvData())
+            self.data = Wire(RvData)
             self.checker = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
@@ -247,8 +245,8 @@ def test_fifo(mode: str = "rtl"):
 
 def test_delay_line(mode: str = "rtl"):
     class top(Module):
-        in1 = Input(RvData())
-        out1 = Output(RvData())
+        in1 = Input(RvData)
+        out1 = Output(RvData)
         clk = ClkPort()
         rst = RstPort()
 
@@ -260,7 +258,7 @@ def test_delay_line(mode: str = "rtl"):
         clk = ClkPort()
         rst = RstPort()
         def body(self):
-            self.data = Wire(RvData())
+            self.data = Wire(RvData)
             self.checker = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
@@ -310,8 +308,8 @@ def test_delay_line(mode: str = "rtl"):
 
 def test_pacer(mode: str = "rtl"):
     class top(Module):
-        in1 = Input(RvData())
-        out1 = Output(RvData())
+        in1 = Input(RvData)
+        out1 = Output(RvData)
         clk = ClkPort()
         rst = RstPort()
 
@@ -323,7 +321,7 @@ def test_pacer(mode: str = "rtl"):
         clk = ClkPort()
         rst = RstPort()
         def body(self):
-            self.data = Wire(RvData())
+            self.data = Wire(RvData)
             self.checker = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
@@ -370,13 +368,32 @@ def test_pacer(mode: str = "rtl"):
         test.simulation(sim_top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 
+def test_forward_buf_sim():
+    test_forward_buf("sim")
+
+def test_reverse_buf_sim():
+    test_reverse_buf("sim")
+
+def test_fifo_sim():
+    test_fifo("sim")
+
+def test_gen_chk_sim():
+    test_gen_chk("sim")
+
+def test_delay_line_sim():
+    test_delay_line("sim")
+
+def test_pacer_sim():
+    test_pacer("sim")
+
 if __name__ == "__main__":
     #test_forward_buf("rtl")
     #test_reverse_buf("rtl")
     #test_fifo("rtl")
     #test_forward_buf("sim")
     #test_reverse_buf("sim")
-    #test_fifo("sim")
+    test_fifo("sim")
+    #test_gen_chk("rtl")
     #test_gen_chk("sim")
-    test_delay_line("sim")
+    #test_delay_line("sim")
     #test_pacer("sim")

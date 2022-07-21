@@ -44,11 +44,9 @@ module Checker (
 );
 
 	logic [7:0] data_members_data;
-	logic [7:0] last_val;
 
 	assign data_members_data = input_port_data;
 	assign input_port_ready = 1'hx;
-	assign last_val = 8'hx;
 endmodule
 
 

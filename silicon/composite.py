@@ -1,13 +1,13 @@
 from typing import Tuple, Union, Any, Dict, Set, Optional, Generator, Sequence
 
-from .net_type import NetType, KeyKind
+from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta
 from .netlist import Netlist
 from .back_end import BackEnd
 from .exceptions import SimulationException, SyntaxErrorException
 from .module import Module, GenericModule, InlineExpression, InlineBlock, InlineStatement
 from .port import Input, Output, Port, Junction
 from .tracer import no_trace
-from .utils import TSimEvent, MEMBER_DELIMITER, adapt, Context
+from .utils import TSimEvent, MEMBER_DELIMITER, adapt, Context, is_net_type
 from collections import namedtuple, OrderedDict
 from copy import copy
 from .number import Unsigned, Number
@@ -23,123 +23,154 @@ class Reverse(object):
     If added to an interface member, it reverses the direction of the member. Useful for handshake signals.
     """
     def __init__(self, net_type: NetType):
-        if not isinstance(net_type, NetType):
+        if not is_net_type(net_type):
             raise SyntaxErrorException(f"Can only reverse Net types. {net_type} is of type {type(net_type)}.")
         self.net_type = net_type
 
+def is_reverse(thing: Any) -> bool:
+    return isinstance(thing, Reverse)
+
+def is_composite_member(thing: Any) -> bool:
+    if is_net_type(thing):
+        return True
+    return is_reverse(thing)
 class Composite(NetType):
     """
     A Composite type is the base for both interfaces and structs
     """
 
-    def __init__(self, support_reverse: bool):
-        super().__init__()
+    def __init_subclass__(cls, support_reverse: bool):
+        cls._support_reverse = support_reverse
+        cls._init_members()
 
-        self._support_reverse = support_reverse
-        self.members = OrderedDict()
-        for name in dir(type(self)):
-            val = getattr(self,name)
-            if isinstance(val, (NetType, Reverse)):
-                self.add_member(name, val)
+    @classmethod
+    def _init_members(cls):
+        cls.members = OrderedDict()
+        for name in dir(cls):
+            # Skip all dunder attributes
+            # The reason for it is that the type system is recursive. That is to say, that __base__ and such
+            # might contain things that are NetTypes, thus would qualify as a composite member.
+            if name.startswith("__") and not name.startswith("___"):
+                continue
+            try:
+                val = getattr(cls,name)
+            except AttributeError:
+                continue
+            if is_composite_member(val):
+                cls.add_member(name, val)
 
-    def add_member(self, name: str, member: Union[NetType, Reverse]) -> None:
-        if name in self.members:
-            raise SyntaxErrorException(f"Member {name} already exists on composite type {type(self)}")
-        if isinstance(member, NetType):
-            self.members[name] = (member, False)
-        elif isinstance(member, Reverse):
-            if self._support_reverse:
-                self.members[name] = (member.net_type, True)
+    @classmethod
+    def add_member(cls, name: str, member: Union[type, Reverse]) -> None:
+        if not hasattr(cls, "members"):
+            raise SyntaxErrorException("Can only add members to a Composite-derived type")
+        if name in cls.members:
+            raise SyntaxErrorException(f"Member {name} already exists on composite type {cls}")
+        if is_net_type(member):
+            cls.members[name] = (member, False)
+        elif is_reverse(member):
+            if cls._support_reverse:
+                cls.members[name] = (member.net_type, True)
             else:
-                raise SyntaxErrorException(f"Composite type {type(self)} doesn't support reverse members")
+                raise SyntaxErrorException(f"Composite type {cls} doesn't support reverse members")
         else:
             raise SyntaxErrorException(f"Composite type members must be either NetTypes or Reverse(NetType)-s. {member} is of type {type(member)}")
 
+    @classmethod
+    def get_members(cls) -> Dict[str, Tuple[Union[NetType, bool]]]:
+        return cls.members
 
-    def get_members(self) -> Dict[str, Tuple[Union[NetType, bool]]]:
-        return self.members
-
-    def get_all_members(self, prefix: str) -> Dict[str, Tuple[Union[NetType, bool]]]:
-        def get_sub_members(composite, prefix: Optional[str], reverse: bool) -> Dict[str, Tuple[Union[NetType, bool]]]:
-            def compose_name(prefix: Optional[str], member_name: str) -> str:
-                if prefix is None:
-                    return member_name
-                else:
-                    return f"{prefix}{MEMBER_DELIMITER}{member_name}"
-            ret_val = OrderedDict()
-            for (member_name, (member_type, member_reverse)) in composite.get_members().items():
-                if member_type.is_composite():
-                    ret_val.update(get_all_members(member_type, compose_name(prefix, member_name), reverse ^ member_reverse))
-                else:
-                    ret_val[compose_name(prefix, member_name)] = (member_type, member_reverse)
-            return ret_val
-
-        return get_sub_members(self, prefix, False)
-
-    def sort_source_keys(self, keys: Dict['Key', 'Junction'], back_end: 'BackEnd') -> Tuple['Key']:
+    @classmethod
+    def sort_source_keys(cls, keys: Dict['Key', 'Junction'], back_end: 'BackEnd') -> Tuple['Key']:
         """ Sort the set of blobs as required by the back-end """
         assert back_end.language == "SystemVerilog"
         return tuple(keys.keys())
-    def sort_sink_keys(self, keys: Dict['Key', Set['Junction']], back_end: 'BackEnd') -> Tuple['Key']:
+
+    @classmethod
+    def sort_sink_keys(cls, keys: Dict['Key', Set['Junction']], back_end: 'BackEnd') -> Tuple['Key']:
         """ Sort the set of blobs as required by the back-end """
-        return self.sort_source_keys(keys, back_end)
+        return cls.sort_source_keys(keys, back_end)
 
-    def generate_type_ref(self, back_end: 'BackEnd') -> str:
+    @classmethod
+    def generate_type_ref(cls, back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
-        return str(type(self).__name__)
+        return str(cls.__name__)
 
-    def generate_net_type_ref(self, for_port: 'Junction', back_end: 'BackEnd') -> str:
+    @classmethod
+    def generate_net_type_ref(cls, for_port: 'Junction', back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
-        return f"{self.generate_type_ref(back_end)}.{for_port.generate_junction_ref(back_end)}_port"
+        return f"{cls.generate_type_ref(back_end)}.{for_port.generate_junction_ref(back_end)}_port"
 
-    def get_num_bits(self) -> int:
-        return sum(member_type.get_num_bits() for member_type, member_reverse in self.get_members().values())
+    @classmethod
+    def get_num_bits(cls) -> int:
+        return sum(member_type.get_num_bits() for member_type, member_reverse in cls.get_members().values())
 
+    @classmethod
     @property
-    def vcd_type(self) -> str:
+    def vcd_type(cls) -> str:
         return None
 
-    def generate_assign(self, sink_name: str, source_expression: str, xnet: 'XNet', back_end: 'BackEnd') -> str:
+    @classmethod
+    def generate_assign(cls, sink_name: str, source_expression: str, xnet: 'XNet', back_end: 'BackEnd') -> str:
         # This function cannot be implemented (easily) for composite types. Luckily it should never be called as we never create XNets of composites.
         raise NotImplementedError
 
-    def setup_junction(self, junction: 'Junction') -> None:
-        for (member_name, (member_type, member_reverse)) in self.get_members().items():
+    @classmethod
+    def setup_junction(cls, junction: 'Junction') -> None:
+        for (member_name, (member_type, member_reverse)) in cls.get_members().items():
             junction.create_member_junction(member_name, member_type, member_reverse)
         super().setup_junction(junction)
 
-    def get_unconnected_sim_value(self) -> Any:
+    @classmethod
+    def get_unconnected_sim_value(cls) -> Any:
         assert False, "Simulation should never enquire about unconnected values of Composites"
 
-    def get_default_sim_value(self) -> Any:
+    @classmethod
+    def get_default_sim_value(cls) -> Any:
         assert False, "Simulation should never enquire about default values of Composites"
 
-    def __eq__(self, other):
-        return self is other or type(self) is type(other)
 
+def is_struct(thing: Any) -> bool:
+    try:
+        return issubclass(thing, Struct)
+    except TypeError:
+        return False
 
-class Struct(Composite):
-    def __init__(self):
-        super().__init__(support_reverse = False)
+class Struct(Composite, support_reverse=False):
+    def __init_subclass__(cls):
+        cls._init_members()
 
-    def __call__(self, *args, **kwargs) -> 'Junction':
+    def __new__(self, *args, **kwargs) -> Union['Struct', 'Junction']:
         """
         Here we should support the following formats:
-        my_wire <<= RGB(r_net, g_net, b_net) # which would assign the three constituents to the appropriate sections
-        my_wire <<= RGB(some_other_wire) # which is an explicit type-conversion
-        my_wire <<= RGB(5,7,9) # which is a constant assignment and should probably be interpreted as:
-        my_wire <<= RGB(Constant(5), Constant(7), Constant(9)) # so, essentially the first format.
+
+            my_wire <<= RGB(r_net, g_net, b_net) # which would assign the three constituents to the appropriate sections
+            my_wire <<= RGB(some_other_wire) # which is an explicit type-conversion
+            my_wire <<= RGB(5,7,9) # which is a constant assignment and should probably be interpreted as:
+            my_wire <<= RGB(Constant(5), Constant(7), Constant(9)) # so, essentially the first format.
 
         There is a degenerate case if the struct contains only a single member. In that case, we can't determine which format we're using, but
         that's fine: in that case, it doesn't really even matter.
 
         NOTE: we can use named arguments to make the assignment to elements cleaner:
 
-        my_wire <<= RGB(r=something, g=other, b=a_third_thing)
+            my_wire <<= RGB(r=something, g=other, b=a_third_thing)
+
+        We should also support:
+
+            my_wire = Input(RGB)
+
+        This will end up calling RGB() (eventually, when the type becomes part of the inheritance hierarchy), because the above is equivalent to:
+
+            my_wire = RGB_Input()
+
+        In this case we should simply return a Struct instance.
         """
+        if len(args) == 0 and len(kwargs) == 0:
+            # This is the port creation case
+            return super().__new__(self)
         if len(args) == 1 and len(kwargs) == 0:
             # This is te explicit type-conversion path
-            return super().__call__(self, *args)
+            return super().__new__(self, *args)
         # We're in the element-wise assignment regime
         args_idx = 0
         assigned_names = set()
@@ -189,7 +220,7 @@ class Struct(Composite):
         """
         assert len(net_types) > 0
         for net_type in net_types:
-            if not isinstance(net_type, Struct) and net_type is not None:
+            if not is_struct(net_type) and net_type is not None:
                 raise SyntaxErrorException("Can only determine union type if all constituents are Structs")
         if operation == "SELECT":
             start_idx = 0
@@ -200,13 +231,14 @@ class Struct(Composite):
                 if start_idx == len(net_types):
                     raise SyntaxErrorException(f"Can't determine net type for SELECT: none of the value ports have types")
             for net_type in net_types[start_idx:]:
-                if not first_type == net_type:
+                if first_type is not net_type:
                     raise SyntaxErrorException("SELECT is only supported on structs of the same type")
             return first_type
         else:
             return super().result_type(net_types, operation) # Will raise an exception.
 
-    def get_lhs_name(self, for_junction: Junction, back_end: BackEnd, target_namespace: Module, allow_implicit: bool=True) -> Optional[str]:
+    @classmethod
+    def get_lhs_name(cls, for_junction: Junction, back_end: BackEnd, target_namespace: Module, allow_implicit: bool=True) -> Optional[str]:
         assert back_end.language == "SystemVerilog"
         ret_val += "{"
         xnets = for_junction._impl.netlist.get_xnets_for_junction(for_junction)
@@ -315,9 +347,10 @@ class Struct(Composite):
             """
             return True
 
-    def adapt_to(self, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool) -> Optional['Junction']:
-        assert input.get_net_type() is self
-        if output_type == self:
+    @classmethod
+    def adapt_to(cls, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool) -> Optional['Junction']:
+        assert input.get_net_type() is cls
+        if output_type is cls:
             return input
         # We don't support implicit conversion
         if implicit:
@@ -328,13 +361,14 @@ class Struct(Composite):
             return raw_number
         return adapt(raw_number, output_type, implicit, force)
 
-    def adapt_from(self, input: Any, implicit: bool, force: bool) -> Any:
+    @classmethod
+    def adapt_from(cls, input: Any, implicit: bool, force: bool) -> Any:
         context = Context.current()
         if context == Context.simulation:
             raise SimulationException("Don't support simulation yet")
         elif context == Context.elaboration:
             input_type = input.get_net_type()
-            if input_type is self:
+            if input_type is cls:
                 return input
             # We don't support implicit conversion
             if implicit:
@@ -343,34 +377,37 @@ class Struct(Composite):
             input_as_num = adapt(input, Unsigned(length=input_type.get_num_bits()), implicit, force)
             if input_as_num is None:
                 raise AdaptTypeError
-            return Struct.FromNumber(self)(input_as_num)
+            return Struct.FromNumber(cls)(input_as_num)
         else:
-            assert False, f"Unkown context: {context}"
-class Interface(Composite):
-    def __init__(self):
-        super().__init__(support_reverse = True)
-    def get_unconnected_value(self, back_end: 'BackEnd') -> str:
+            assert False, f"Unknown context: {context}"
+class Interface(Composite, support_reverse=True):
+    def __init_subclass__(cls):
+        cls._init_members()
+
+    @classmethod
+    def get_unconnected_value(cls, back_end: 'BackEnd') -> str:
         raise SyntaxErrorException(f"Unconnected interfaces are not supported")
-    def get_default_value(self, back_end: 'BackEnd') -> str:
+    @classmethod
+    def get_default_value(cls, back_end: 'BackEnd') -> str:
         raise SyntaxErrorException(f"Unconnected interfaces are not supported")
 
 
+class ArrayMeta(NetTypeMeta):
+    pass
 
-class Array(Composite):
-    def __init__(self, member_type: NetType, size: int):
-        super().__init__(support_reverse = False)
+class _ArrayType(Composite, ArrayMeta, support_reverse=False):
+    Key = Number.Instance.Key
 
-        self.size = size
-        self.member_type = member_type
-        for idx in range(self.size):
-            super().add_member(f"element_{idx}", member_type)
+    def __init_subclass__(cls):
+        return super().__init_subclass__(support_reverse=False)
 
-    def add_member(self, name: str, member: Union[NetType, Reverse]) -> None:
+    @classmethod
+    def _add_member(cls, name: str, member: Union[NetType, Reverse]) -> None:
         raise SyntaxErrorException(f"Arrays don't support dynamic members")
 
     class Accessor(GenericModule):
         @staticmethod
-        def create_output_type(key: Number.Key, array: 'Array') -> 'Array':
+        def create_output_type(key: '_ArrayType.Key', array: '_ArrayType') -> '_ArrayType':
             if key.length == 1:
                 # This is a member access
                 return array.member_type
@@ -385,10 +422,10 @@ class Array(Composite):
         b <<= a[3:0]
         b <<= a[3:0][2]
 
-        They are instantiated from Array.get_slice, which is called from Junction.__getitem__ and from MemberGetter.get_underlying_junction
+        They are instantiated from _ArrayType.get_slice, which is called from Junction.__getitem__ and from MemberGetter.get_underlying_junction
         """
-        def construct(self, slice: Union[int, slice], array: 'Array') -> None:
-            self.key = Number.Key(slice)
+        def construct(self, slice: Union[int, slice], array: '_ArrayType') -> None:
+            self.key = _ArrayType.Key(slice)
             self.input_port = Input(array)
             self.output_port = Output(self.create_output_type(self.key, array))
 
@@ -422,8 +459,8 @@ class Array(Composite):
             return ret_val, op_precedence
 
         @staticmethod
-        def static_sim(in_junction: Junction, key: 'Number.Key'):
-            output_type = Array.Accessor.create_output_type(key, in_junction.get_net_type())
+        def static_sim(in_junction: Junction, key: '_ArrayType.Key'):
+            output_type = _ArrayType.Accessor.create_output_type(key, in_junction.get_net_type())
             members = in_junction.get_all_member_junctions(add_self=False)
             important_members = []
             for idx, (member) in reversed(enumerate(members)):
@@ -432,7 +469,7 @@ class Array(Composite):
             return output_type(*important_members)
 
         def simulate(self) -> TSimEvent:
-            output_type = Array.Accessor.create_output_type(self.key, self.input_port.get_net_type())
+            output_type = _ArrayType.Accessor.create_output_type(self.key, self.input_port.get_net_type())
             members = self.input_port.get_all_member_junctions(add_self=False)
             important_members = []
             for idx, (member) in reversed(enumerate(members)):
@@ -450,13 +487,15 @@ class Array(Composite):
             """
             return True
 
-    def get_slice(self, key: Any, junction: Junction) -> Any:
+    @classmethod
+    def get_slice(cls, key: Any, junction: Junction) -> Any:
         if Context.current() == Context.simulation:
-            return Array.Accessor.static_sim(junction, Number.Key(key))
+            return _ArrayType.Accessor.static_sim(junction, _ArrayType.Key(key))
         else:
-            return Number.Accessor(slice=key, array=self)(junction)
+            return Number.Accessor(slice=key, array=cls)(junction)
 
-    def set_member_access(self, key: Any, value: Any, junction: Junction) -> None:
+    @classmethod
+    def set_member_access(cls, key: Any, value: Any, junction: Junction) -> None:
         # The junction conversion *has* to happen before the creation of the Concatenator.
         # Otherwise, the auto-created converter object (such as Constant) will be evaluated in the wrong order
         # and during the evaluation of the Concatenator, the inlined expression forwarding logic will break.
@@ -474,7 +513,7 @@ class Array(Composite):
         remaining_keys, key = cls.resolve_key_sequence_for_set(keys)
         if len(remaining_keys) == 0:
             remaining_keys = None
-        return remaining_keys, Array.Accessor(slice=key, array=for_junction.get_net_type())(for_junction)
+        return remaining_keys, _ArrayType.Accessor(slice=key, array=for_junction.get_net_type())(for_junction)
     @classmethod
     def resolve_key_sequence_for_set(cls, keys: Sequence[Tuple[Any, KeyKind]]) -> Any:
         # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing for concatenators (set context)
@@ -482,8 +521,8 @@ class Array(Composite):
 
         def _slice_of_slice(outer_key: Any, inner_key: Any) -> Any:
             # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing
-            outer_key = Number.Key(outer_key)
-            inner_key = Number.Key(inner_key)
+            outer_key = _ArrayType.Key(outer_key)
+            inner_key = _ArrayType.Key(inner_key)
             result_key = outer_key.apply(inner_key)
             if result_key.start == result_key.end:
                 return result_key.start
@@ -491,9 +530,11 @@ class Array(Composite):
                 return slice(result_key.start, result_key.end, -1)
 
         def key_length(key):
-            if isinstance(key, int):
+            try:
+                _ = int(key)
                 return 1
-            return key.end - key.start + 1
+            except TypeError:
+                return key.end - key.start + 1
 
         key = keys[0]
         assert key[1] is KeyKind.Index, "Array doesn't support member access, only slices"
@@ -509,6 +550,29 @@ class Array(Composite):
                     break
         return keys[1:][idx:-1], key
 
+
+class Array(NetTypeFactory, net_type=_ArrayType):
+    instances = {}
+
+    @classmethod
+    def construct(cls, net_type, member_type: NetTypeMeta, size: int):
+        try:
+            size = int(size)
+        except TypeError:
+            raise SyntaxErrorException("Array size must be an integer")
+
+        # NOTE: the name of the type could be anything really, doesn't have to be something that's a valid identifier.
+        #       This could be important, because we can avoid name-collisions this way.
+        type_name = f"Array_{member_type.__name__}[{size}]"
+        key = (member_type, size)
+        if net_type is not None:
+            net_type.member_type = member_type
+            net_type.size = size
+            for idx in range(size):
+                net_type.add_member(f"element_{idx}", member_type)
+            # Disabling further adding of members
+            net_type.add_member = net_type._add_member
+        return type_name, key
 
 
 # DUST-BIN: these objects aren't used at the momemnt, but might be in the future...

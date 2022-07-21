@@ -14,7 +14,7 @@ from .constant import get_net_type_for_const
 from .back_end import str_to_id
 from collections import OrderedDict
 from typing import Any, Optional, Tuple
-from enum import Enum
+from .enum import Enum, is_enum
 
 def _format_state_name(state: Any):
     if isinstance(state, Enum):
@@ -124,9 +124,9 @@ class FSM(GenericModule):
         if self._state_type is None:
             self._state_type = type(current_state)
         if not isinstance(current_state, self._state_type):
-            raise SyntaxErrorException(f"All states of an FSM must of the same type. In this case all are expected to be of {self._state_type}, yet current_state {current_state} is of type {type(current_state)}")
+            raise SyntaxErrorException(f"All states of an FSM must be of the same type. In this case all are expected to be of {self._state_type}, yet current_state {current_state} is of type {type(current_state)}")
         if not isinstance(new_state, self._state_type):
-            raise SyntaxErrorException(f"All states of an FSM must of the same type. In this case all are expected to be of {self._state_type}, yet current_state {new_state} is of type {type(new_state)}")
+            raise SyntaxErrorException(f"All states of an FSM must be of the same type. In this case all are expected to be of {self._state_type}, yet current_state {new_state} is of type {type(new_state)}")
         if self._state_net_type is None:
             self._state_net_type = get_net_type_for_const(current_state)
         if self._state_net_type is None:

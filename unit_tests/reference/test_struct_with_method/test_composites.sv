@@ -2,18 +2,18 @@
 // AlphaBender
 ////////////////////////////////////////////////////////////////////////////////
 module AlphaBender (
-	input logic [11:0] in1_r,
-	input logic [11:0] in1_g,
 	input logic [11:0] in1_b,
+	input logic [11:0] in1_g,
+	input logic [11:0] in1_r,
 
-	input logic [11:0] in2_r,
-	input logic [11:0] in2_g,
 	input logic [11:0] in2_b,
+	input logic [11:0] in2_g,
+	input logic [11:0] in2_r,
 
 	input logic [7:0] alpha,
-	output logic [11:0] outp_r,
+	output logic [11:0] outp_b,
 	output logic [11:0] outp_g,
-	output logic [11:0] outp_b
+	output logic [11:0] outp_r
 );
 
 	logic [20:0] u6_output_port;

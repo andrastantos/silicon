@@ -1,4 +1,17 @@
 #!/usr/bin/python3
+
+### TODO: add tests for all sorts of slices:
+# a[3:1]
+# a[1:3]
+# a[3:3]
+# a[3:1:-1]
+# a[1:3:-1]
+# a[3:3:-1]
+# a[3:1:1]
+# a[1:3:1]
+# a[3:3:1]
+# a[1]
+
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent / ".."))
@@ -733,7 +746,7 @@ def test_float_convert():
 if __name__ == "__main__":
     #test_sim_value_fract()
     #test_sim_value_int()
-    #test_mix1()
+    test_mix1()
     #test_binary_ops()
     #test_closure()
     #test_closure1()
@@ -752,7 +765,7 @@ if __name__ == "__main__":
     #test_precedence()
     #test_fractional1()
     #test_fractional2()
-    test_fractional1_sim()
+    #test_fractional1_sim()
     #test_fractional_const()
     #test_float_convert()
     pass

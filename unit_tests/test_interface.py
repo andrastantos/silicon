@@ -16,8 +16,8 @@ def test_interface1(mode = "rtl"):
         valid = logic
 
     class top(Module):
-        in_a = Input(MyInterface())
-        out_a = Output(MyInterface())
+        in_a = Input(MyInterface)
+        out_a = Output(MyInterface)
 
         def body(self):
             pass
@@ -42,8 +42,8 @@ def test_interface2(mode = "rtl"):
         valid = logic
 
     class top(Module):
-        in_a = Input(MyInterface())
-        out_a = Output(MyInterface())
+        in_a = Input(MyInterface)
+        out_a = Output(MyInterface)
 
         def body(self):
             self.out_a = self.in_a
@@ -65,8 +65,8 @@ def test_interface3(mode = "rtl"):
         valid = logic
 
     class top(Module):
-        in_a = Input(MyInterface())
-        out_a = Output(MyInterface())
+        in_a = Input(MyInterface)
+        out_a = Output(MyInterface)
         x_in = Input(Unsigned(8))
 
         def body(self):
@@ -90,15 +90,15 @@ def test_composite_interface(mode = "rtl"):
         ready = Reverse(logic)
         valid = logic
     class BusIf(Interface):
-        data_write_bus = Channel()
-        addr_write_bus = Channel()
-        resp_write_bus = Reverse(Channel())
-        data_read_bus = Reverse(Channel())
-        addr_read_bus = Channel()
+        data_write_bus = Channel
+        addr_write_bus = Channel
+        resp_write_bus = Reverse(Channel)
+        data_read_bus = Reverse(Channel)
+        addr_read_bus = Channel
 
     class top(Module):
-        side_a = Input(BusIf())
-        side_b = Output(BusIf())
+        side_a = Input(BusIf)
+        side_b = Output(BusIf)
 
         def body(self):
             self.side_b.data_write_bus.data[3:0] <<= self.side_a.data_write_bus.data[7:4]
@@ -115,15 +115,15 @@ def test_composite_interface2(mode = "rtl"):
         ready = Reverse(logic)
         valid = logic
     class BusIf(Interface):
-        data_write_bus = Channel()
-        addr_write_bus = Channel()
-        resp_write_bus = Reverse(Channel())
-        data_read_bus = Reverse(Channel())
-        addr_read_bus = Channel()
+        data_write_bus = Channel
+        addr_write_bus = Channel
+        resp_write_bus = Reverse(Channel)
+        data_read_bus = Reverse(Channel)
+        addr_read_bus = Channel
 
     class top(Module):
-        side_a = Input(BusIf())
-        side_b = Output(BusIf())
+        side_a = Input(BusIf)
+        side_b = Output(BusIf)
 
         def body(self):
             self.side_b <<= self.side_a
@@ -139,15 +139,15 @@ def test_composite_interface3(mode = "rtl"):
         ready = Reverse(logic)
         valid = logic
     class BusIf(Interface):
-        data_write_bus = Channel()
-        addr_write_bus = Channel()
-        resp_write_bus = Reverse(Channel())
-        data_read_bus = Reverse(Channel())
-        addr_read_bus = Channel()
+        data_write_bus = Channel
+        addr_write_bus = Channel
+        resp_write_bus = Reverse(Channel)
+        data_read_bus = Reverse(Channel)
+        addr_read_bus = Channel
 
     class top(Module):
-        side_a = Input(BusIf())
-        side_b = Output(BusIf())
+        side_a = Input(BusIf)
+        side_b = Output(BusIf)
 
         def body(self):
             self.side_b.addr_write_bus <<= self.side_a.addr_write_bus
@@ -163,15 +163,15 @@ def test_composite_interface4(mode = "rtl"):
         ready = Reverse(logic)
         valid = logic
     class BusIf(Interface):
-        data_write_bus = Channel()
-        addr_write_bus = Channel()
-        resp_write_bus = Reverse(Channel())
-        data_read_bus = Reverse(Channel())
-        addr_read_bus = Channel()
+        data_write_bus = Channel
+        addr_write_bus = Channel
+        resp_write_bus = Reverse(Channel)
+        data_read_bus = Reverse(Channel)
+        addr_read_bus = Channel
 
     class top(Module):
-        side_a = Input(BusIf())
-        side_b = Output(BusIf())
+        side_a = Input(BusIf)
+        side_b = Output(BusIf)
 
         def body(self):
             self.side_b.addr_write_bus <<= self.side_b.resp_write_bus

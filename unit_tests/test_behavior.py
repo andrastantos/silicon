@@ -8,8 +8,6 @@ from typing import *
 
 from silicon import *
 from test_utils import *
-import inspect
-from types import MethodType
 
 iadd_call_cnt = 0
 
@@ -34,15 +32,16 @@ class BehavingType(NetType):
         @prop.setter
         def prop(self, x):
             self.prop_value = x
-        
+
         def __iadd__(self, other):
             globals()['iadd_call_cnt'] += 1
             print(f"__iadd___ called with __class__: {__class__}")
             super().say_hello()
             return self
 
-    def get_behaviors(self):
-        return self.Behaviors("hello")
+    @classmethod
+    def get_behaviors(cls):
+        return cls.Behaviors("hello")
 
 
 def test_main():
@@ -50,10 +49,10 @@ def test_main():
     i1 = Input()
     o1 = Output()
     w1 = Wire()
-    j2 = Junction(BehavingType())
-    i2 = Input(BehavingType())
-    o2 = Output(BehavingType())
-    w2 = Wire(BehavingType())
+    j2 = Junction(BehavingType)
+    i2 = Input(BehavingType)
+    o2 = Output(BehavingType)
+    w2 = Wire(BehavingType)
 
     print(f"o2.class_member: {o2.class_member}")
     w2 += w1

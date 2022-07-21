@@ -456,8 +456,8 @@ class Pixel(Struct):
 
 def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered_output: bool = False):
     class Top(Module):
-        data_in = Input(Pixel())
-        data_out = Output(Pixel())
+        data_in = Input(Pixel)
+        data_out = Output(Pixel)
         addr = Input(Unsigned(8))
         write_en = Input(logic)
         clk = ClkPort()

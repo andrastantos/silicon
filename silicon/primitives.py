@@ -7,7 +7,7 @@ from .exceptions import FixmeException, SyntaxErrorException, SimulationExceptio
 from .tracer import no_trace
 from collections import OrderedDict
 from .utils import first, get_common_net_type, BoolMarker
-from .number import logic
+from .number import logic, NumberMeta
 from .utils import TSimEvent, is_module
 
 class Select(Module):
@@ -45,7 +45,7 @@ class Select(Module):
         name = f"value_{idx-1}"
         return (name, self.create_named_port(name))
 
-    def generate_output_type(self) -> Optional['Number']:
+    def generate_output_type(self) -> Optional['NumberMeta']:
         value_ports = list(self.value_ports.values())
         if self.default_port.is_specialized():
             value_ports.append(self.default_port)
@@ -68,7 +68,7 @@ class Select(Module):
         if self.has_default:
             raise SyntaxErrorException("Default values for 'Select' modules are not supported: generation of inline verilog is rather difficult for them.")
         new_net_type = self.generate_output_type()
-        assert not self.output_port.is_specialized() or self.output_port.get_net_type() == new_net_type
+        assert not self.output_port.is_specialized() or self.output_port.get_net_type() is new_net_type
         if not self.output_port.is_specialized():
             self.output_port.set_net_type(new_net_type)
 
@@ -238,7 +238,7 @@ class _SelectOneHot(Module):
 
 
 
-    def generate_output_type(self) -> Optional['Number']:
+    def generate_output_type(self) -> Optional['NumberMeta']:
         value_ports = list(self.value_ports.values())
         if self.default_port.is_specialized():
             value_ports.append(self.default_port)
@@ -258,7 +258,7 @@ class _SelectOneHot(Module):
         if len(self.value_ports) == 0:
             raise SyntaxErrorException(f"Select must have at least one value port")
         new_net_type = self.generate_output_type()
-        assert not self.output_port.is_specialized() or self.output_port.get_net_type() == new_net_type
+        assert not self.output_port.is_specialized() or self.output_port.get_net_type() is new_net_type
         if not self.output_port.is_specialized():
             self.output_port.set_net_type(new_net_type)
 
@@ -476,7 +476,7 @@ class Concatenator(Module):
                     raise SyntaxErrorException(f"Input key {key} is not unique for concatenator output type {common_net_type}")
                 self.input_map[key] = input
 
-    def generate_output_type(self) -> Optional['Number']:
+    def generate_output_type(self) -> Optional['NumberMeta']:
         from .number import Number
         common_net_type = get_common_net_type(self.get_inputs().values())
         if common_net_type is None:
@@ -528,7 +528,7 @@ class Reg(Module):
         new_net_type = self.input_port.get_net_type() if self.input_port.is_specialized() else None
         if new_net_type is None:
             raise SyntaxErrorException(f"Can't figure out output port type for Reg")
-        assert not self.output_port.is_specialized() or self.output_port.get_net_type() == new_net_type
+        assert not self.output_port.is_specialized() or self.output_port.get_net_type() is new_net_type
         if not self.output_port.is_specialized():
             self.output_port.set_net_type(new_net_type)
 
@@ -539,14 +539,14 @@ class Reg(Module):
     def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
         assert len(self.get_outputs()) == 1
         if self.output_port.is_composite():
-            if self.input_port.get_net_type() != self.output_port.get_net_type():
+            if self.input_port.get_net_type() is not self.output_port.get_net_type():
                 raise SyntaxErrorException(f"Can only register composite types if the input and output types are the same.")
 
             input_members = self.input_port.get_all_member_junctions(add_self=False)
             output_members = self.output_port.get_all_member_junctions(add_self=False)
 
             if self.reset_value_port.is_specialized():
-                if self.input_port.get_net_type() != self.reset_value_port.get_net_type():
+                if self.input_port.get_net_type() is not self.reset_value_port.get_net_type():
                     raise SyntaxErrorException(f"Can only register composite types if the input and reset_value_port types are the same.")
                 reset_value_members = self.reset_value_port.get_all_member_junctions(add_self=False)
             else:

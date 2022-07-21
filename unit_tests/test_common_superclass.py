@@ -6,6 +6,7 @@ sys.path.append(str(Path(__file__).parent / ".."))
 from typing import *
 
 from silicon import *
+from silicon.utils import common_superclass
 from test_utils import *
 
 def test_common_superclass():
@@ -24,10 +25,10 @@ def test_common_superclass():
     class B1(B):
         pass
 
-    assert common_superclass(A(),B()) is object
-    assert common_superclass(A(),A1()) is A
-    assert common_superclass(A1(),A21()) is A1
-    assert common_superclass(A21B(),A1(),B1()) is object
+    assert common_superclass(A,B) is object
+    assert common_superclass(A,A1) is A
+    assert common_superclass(A1,A21) is A1
+    assert common_superclass(A21B,A1,B1) is object
 
 if __name__ == "__main__":
     test_common_superclass()

@@ -1,10 +1,10 @@
 from typing import Tuple, Dict, Optional, Set, Any, Type, Sequence, Union, Callable
 
-from .net_type import NetType, KeyKind
+from .net_type import NetType, KeyKind, NetTypeMeta
 from .tracer import no_trace, NoTrace
 from .ordered_set import OrderedSet
 from .exceptions import SyntaxErrorException, SimulationException
-from .utils import convert_to_junction, is_iterable, is_junction, is_input_port, is_output_port, is_wire, get_caller_local_junctions, is_junction_member, BoolMarker, is_module, implicit_adapt, MEMBER_DELIMITER, Context, ContextMarker
+from .utils import convert_to_junction, is_iterable, is_junction, is_input_port, is_output_port, is_wire, get_caller_local_junctions, is_junction_member, BoolMarker, is_module, implicit_adapt, MEMBER_DELIMITER, Context, ContextMarker, is_net_type
 from .port import KeyKind
 from collections import OrderedDict
 from enum import Enum
@@ -30,7 +30,7 @@ class EdgeType(Enum):
     Undefined = 3
 
 class Junction(JunctionBase):
-    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False):
+    def __init__(self, net_type: Optional[NetTypeMeta] = None, parent_module: 'Module' = None, *, keyword_only: bool = False):
         # !!!!! SUPER IMPORTANT !!!!!
         # In most cases, Ports of a Module are set on the cls level, not inside __init__() (or construct()).
         # There is a generic 'deepcopy' call in _init_phase2 that creates the instance-level copies for all the ports.
@@ -44,7 +44,6 @@ class Junction(JunctionBase):
         from .module import Module
         self.source: Optional['Port'] = None
         self.sinks: Set[Junction] = OrderedSet()
-        assert parent_module is None or isinstance(parent_module, Module)
         self._parent_module = parent_module
         self._in_attr_access = False
         self.interface_name = None # set to a string showing the interface name when the port/wire is assigned to a Module attribute (in Module.__setattr__)
@@ -56,16 +55,8 @@ class Junction(JunctionBase):
         self._parent_junction = None # Reverences back to the container for struct/interface/vector members
         self._net_type = None
         if net_type is not None:
-            try:
-                if issubclass(net_type, NetType):
-                    try:
-                        net_type = net_type()
-                    except:
-                        raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType, or at least default-constructable.")
-            except:
-                pass
-            if not isinstance(net_type, NetType):
-                raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType. (Did you forget to construct an instance?)")
+            if not is_net_type(net_type):
+                raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType.")
             self.set_net_type(net_type)
 
     def __str__(self) -> str:
@@ -130,7 +121,7 @@ class Junction(JunctionBase):
         # Only allow the net_type to be set if it's not set yet, or if it's an abstract type (that is to allow specialization of a port)
         # TODO: For now we also allow the net_type to be set from one abstract type to another one, but that can probably be tightened later
         #       For example, we could say that the new prot type must be an instance of the old port type...
-        if self._net_type == net_type:
+        if self._net_type is net_type:
             return
         assert not self.is_specialized()
         self._net_type = net_type
@@ -617,13 +608,13 @@ class Junction(JunctionBase):
             if other is None:
                 for self_member in self.get_all_member_junctions(add_self=False):
                     self_member._set_sim_val(None)
-            elif isinstance(other, Junction):
+            elif is_junction(other):
                 # If something is connected to an otherwise unconnected port, we should support that.
                 if other.source is None:
                     for self_member in self.get_all_member_junctions(add_self=False):
                         self_member._set_sim_val(None)
                 else:
-                    if self.get_net_type() != other.get_net_type():
+                    if self.get_net_type() is not other.get_net_type():
                         raise SimulationException(f"Assignment to compound types during simulation is only supported between identical net types", self)
                     for self_member, other_member in zip(self.get_all_member_junctions(add_self=False), other.get_all_member_junctions(add_self=False)):
                         self_member._set_sim_val(other_member)

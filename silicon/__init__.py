@@ -9,7 +9,7 @@ from .gates import *
 from .back_end import *
 from .adaptor import *
 from .primitives import *
-from .utils import get_common_net_type, common_superclass, explicit_adapt, cast
+from .utils import get_common_net_type, explicit_adapt, cast
 from .simulator import Simulator
 from .fsm import FSM
 from .composite import Reverse, Interface, Struct, Array

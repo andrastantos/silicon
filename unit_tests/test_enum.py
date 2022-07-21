@@ -12,14 +12,14 @@ from test_utils import *
 import inspect
 
 def test_enum1(mode = "rtl"):
-    class E1(PyEnum):
+    class E1(Enum):
         first=1
         second=2
         third=3
 
     class top(Module):
-        in_a = Input(Enum(E1))
-        out_a = Output(Enum(E1))
+        in_a = Input(EnumNet(E1))
+        out_a = Output(EnumNet(E1))
 
         def body(self):
             self.out_a = self.in_a
@@ -40,14 +40,14 @@ def test_enum1(mode = "rtl"):
         test.simulation(top_tb, "test_enum1")
 
 def test_enum_const():
-    class E1(PyEnum):
+    class E1(Enum):
         first=1
         second=2
         third=3
 
     class top(Module):
-        in_a = Input(Enum(E1))
-        out_a = Output(Enum(E1))
+        in_a = Input(EnumNet(E1))
+        out_a = Output(EnumNet(E1))
 
         def body(self):
             self.out_a = E1.first
@@ -55,13 +55,13 @@ def test_enum_const():
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_enum_add(mode = "rtl"):
-    class E1(PyEnum):
+    class E1(Enum):
         first=1
         second=2
         third=3
 
     class top(Module):
-        in_a = Input(Enum(E1))
+        in_a = Input(EnumNet(E1))
         out_a = Output()
 
         def body(self):
@@ -83,15 +83,15 @@ def test_enum_add(mode = "rtl"):
         test.simulation(top_tb, "test_enum_add")
 
 def test_enum_and1():
-    class E1(PyEnum):
+    class E1(Enum):
         zero=0
         first=1
         second=2
         third=3
 
     class top(Module):
-        in_a = Input(Enum(E1))
-        out_a = Output(Enum(E1))
+        in_a = Input(EnumNet(E1))
+        out_a = Output(EnumNet(E1))
 
         def body(self):
             self.out_a = E1.first & self.in_a
@@ -100,13 +100,13 @@ def test_enum_and1():
         test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_enum_and2():
-    class E1(PyEnum):
+    class E1(Enum):
         first=1
         second=2
         third=3
 
     class top(Module):
-        in_a = Input(Enum(E1))
+        in_a = Input(EnumNet(E1))
         out_a = Output()
 
         def body(self):
@@ -116,7 +116,7 @@ def test_enum_and2():
 
 @skip_iverilog
 def test_enum_adapt():
-    class E1(PyEnum):
+    class E1(Enum):
         zero=0
         first=1
         second=2
@@ -124,17 +124,17 @@ def test_enum_adapt():
 
     class top(Module):
         in_a = Input(logic)
-        out_a = Output(Enum(E1))
+        out_a = Output(EnumNet(E1))
 
         def body(self):
-            self.out_a = explicit_adapt(self.in_a, Enum(E1))
+            self.out_a = explicit_adapt(self.in_a, EnumNet(E1))
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 
 @skip_iverilog
 def test_enum_adapt2(mode = "rtl"):
-    class E1(PyEnum):
+    class E1(Enum):
         zero=0
         first=1
         second=2
@@ -142,10 +142,10 @@ def test_enum_adapt2(mode = "rtl"):
 
     class top(Module):
         in_a = Input(Unsigned(5))
-        out_a = Output(Enum(E1))
+        out_a = Output(EnumNet(E1))
 
         def body(self):
-            self.out_a = explicit_adapt(self.in_a, Enum(E1))
+            self.out_a = explicit_adapt(self.in_a, EnumNet(E1))
 
     class top_tb(top):
         def simulate(self):
@@ -170,8 +170,8 @@ def test_enum_adapt2_sim():
 if __name__ == "__main__":
     #test_enum1()
     #test_enum_const()
-    test_enum_add()
+    #test_enum_add()
     #test_enum_and1()
     #test_enum_and2()
     #test_enum_adapt()
-    #test_enum_adapt2("sim")
+    test_enum_adapt2("sim")
