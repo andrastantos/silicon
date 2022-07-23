@@ -69,27 +69,59 @@ Of course, real-life modules are way more complex than this, and contain state a
 
 # Nets and their types
 
-Modules have ports. Ports can be inputs or outputs (no bidirectional ports are supported in Silicon). Modules are instantiated in a hierarchy, and their ports are connected to one another as well. Connecting ports together is called 'binding'. If a set of ports are bound to one another, they are forming a net. Each net can have at most a single driver or source, but can have any number of sinks.
+Modules have ports. Ports can be inputs, outputs or uncommitted; no bidirectional ports are supported in Silicon. Modules are instantiated in a hierarchy, and their ports are connected to one another as well. Connecting ports together is called 'binding'. If a set of ports are bound to one another, they are forming a net. Each net can have at most a single driver or source, but can have any number of sinks.
 
 Nets exist strictly within a single level in the module instantiation hierarchy. This means that they either are driven by an input of the enclosing module or by an output of a submodule. Sinks can be outputs of the enclosing module or an input of a submodule.
 
-Each net has a single, unique type, a `NetType` instance. It could be as simple as a `logic`, which is just a one-bit wire. It could also be a bundle of wires, say a 32-bit integer, denoted as `Unsigned(32)`. It could also be more complex, such as a `Struct` or an `Interface`, carrying more complex information. Whatever the type is, in the end, it will be represented by a set of wires carrying electrons from one place to another, which is more or less the only restriction on what `NetTypes` could be.
+## Wires
+
+On top of inputs and outputs, Modules can also have internal wires. These are different from Nets in that they only provide a naming alias (and potentially typing hints) to the framework. They themselves are nodes on a net just as inputs and outputs are.
+## Uncommitted ports
+
+In some corner-cases it is beneficial to not specify the direction of a port when it's defined. For instance, imagine the following expression:
+`a[3:0]`, where `a` is some `Junction`. If this expression appears on the left-hand-side of a bind operation: `a[3:0] <<= b`, it is treated as a partial assignment to `a`. If it appears on the right-hand side (`b <<= a[3:0]`), it is a slice operation. Partial assignments get collected into a single Module, and each of the assignments get converted into an input port on them. Slice operations are converted into slice modules, where each slice is turned into an output port.
+
+The point is that when the `[]` operator is evaluated, it's not yet known if it's going to appear on the right- or the left-hand side.
+
+> To be more precise: it isn't clear if there are cascaded `[]` operators in the form of `a[3:0][1:0][0]` for instance.
+
+Because of that, a dummy module is created with two uncommitted. One for the whole net (`a` in the above example) and another for the result of the `[]` operation. If this module ends up being used in the left-hand side context, the ports get changed into output and input respectively. If it ends up being used in a right-hand-side context, the ports are changed into input and output instead.
+
+> NOTE: I'm not sure, this is useful: we still need to collect all the partial assigns and create a single module, so it's unclear how much this concept simplifies things. What I'm really after here is a Phi-node concept: the LHS use eventually creates a type of Phi-node. If we were to ever deal with if-statements, those would create similar constructs.
+
+## Constructing nets
+
+Initially, when a modules `body` is evaluated, very little is checked about the validity of the connections. Source-sink relationships for instance are not validated, every connected net is simply thrown into the basket of a net.
+
+After the evaluation of the `body` is complete, a pass scans each net and select the driver. If multiple drivers are found, an error is raised. Once the driver is identified, the graph of the net is re-arranged such that the driver sources all other junctions in the net, and each sink directly sinks from the driver. This allows for the re-use of sinks as drivers of other junctions, most importantly, it allows for the use of the enclosing Modules output ports to be used as inputs to expressions (which Verilog allows, but VHDL doesn't).
+
+> NOTE: at this point, net types are not propagated and coalesced yet. That means, that the source might not have the same type as some of its sinks. Later on, an implicit adaptor will be inserted for those cases and the net will be broken into pieces. The re-arranging of the connectivity graph of the net means that multiple implicit adaptors could be inserted, where-as the original connectivity graph would need fewer. What's important to note is that since only implicit adaptation is allows, and implicit adaption means that we only allow the expansion of the represented value-space, the change in topology doesn't result in a change of behavior; unless of course the user defines a custom type with a botched `adapt_from` implementation, but that's a different topic.
+
+## NetTypes and type propagation
+
+Each net has a single type, a `NetType`. It could be as simple as a `logic`, which is just a one-bit wire. It could also be a bundle of wires, say a 32-bit integer, denoted as `Unsigned(32)`. It could also be more complex, such as a `Struct` or an `Interface`, carrying more complex information. Whatever the type is, in the end, it will be represented by a set of wires carrying electrons from one place to another, which is more or less the only restriction on what `NetTypes` could be.
 
 Initially, when the netlist is constructed, only connectivity is established. That is to say that type-compatibility is not checked or ensured.
 
-Once all submodule instances are instantiated, a separate phase takes over: type-propagation. During this phase, the framework attempts to propagate type information from sources to sinks across nets. This process can have several outcomes:
+Once a modules `body` finished executing, the type-propagation phase takes over. During this phase, the framework attempts to propagate type information from sources to sinks across nets. This process can have several outcomes:
 
  - If the sink has a type, the sources type might need to be adapted (using `implicit_adapt`) to the sink type. This process would instantiate an 'adaptor' class instance, and brake the net in two.
  - If the sink doesn't have a type, its type is set to be the same as that of the source.
  - It's also possible that the adaption attempt fails, in which case an error is raised.
 
-At the end of type-propagation, every port must have a well-defined type, including the modules own output ports. If that cannot be achieved (and there are cases, where the coder needs to help the algorithm by specifying some types manually), an error is raised.
+Once type-propagation completes, some submodules might have all of their inputs 'specialized'; that is to say, they have type information. These sub-modules are ready for instantiation, and their `body` can be called recursively.
 
-Obviously the previously described process only works if the source has a type defined. An important piece of information is the following: the guts of a module (the `body` method) is only invoked if all its input ports have a defined type. This of course means that when the `body` method returns, and type-propagation begins for that module, all its inputs have well-defined types.
+The consequence of instantiation is that the submodules outputs gain their types, become specialized. This gives type-propagation new opportunities to determine (or coalesce) types for more nets; which in turn will allow for more submodule instantiation.
 
-These inputs are sources to submodule ports within the module, so their types can be propagated. In most cases, this step results in some submodules having all their inputs having types. The `body` method of these submodules can be called, and type-propagation can be completed in the submodule recursively. When this recursion returns, the outputs of the submodule have well-defined types which - again - are sources for some net in the enclosing scope. Type propagation can continue with those nets. Eventually, the process either finds a type for all nets, or realizes that it can't make any forward progress, in which case an error is raised.
+This (recursive) process continues until no more progress can be made. This can be for one of two chief reasons:
+ - all nets are fully specialized, the module is properly instantiated
+ - some nets are not specialized, in which case the framework raises an error.
 
-Why would there be cases when no forward progress can be made? The simple answer is loops. One way of thinking about the description of the behavior of a module (the netlist that `body` creates) is that it is a data-flow graph. As long as that graph is an acyclic one (a DAG), type-propagation should terminate. However, not all data-flow graphs are DAGs. As soon as we introduce state into the module, we can have feedback edges in the graph. Imagine the following simple counter:
+Obviously the previously described process only works if the source of at least some nets has a type defined. An important piece of information is the following: a module only gets instantiated - its `body` method is only invoked - if all its input ports are specialized. s.
+
+> DO WE NEED THIS? WHERE TO PUT IT, IF SO? These inputs are sources to submodule ports within the module, so their types can be propagated. In most cases, this step results in some submodules having all their inputs having types. The `body` method of these submodules can be called, and type-propagation can be completed in the submodule recursively. When this recursion returns, the outputs of the submodule have well-defined types which - again - are sources for some net in the enclosing scope. Type propagation can continue with those nets. Eventually, the process either finds a type for all nets, or realizes that it can't make any forward progress, in which case an error is raised.
+
+Why would there be cases when no forward progress can be made? The simple answer is: loops. One way of thinking about the description of the behavior of a module (the netlist that `body` creates) is that it is a data-flow graph. As long as that graph is an acyclic one (a DAG), type-propagation should terminate. However, not all data-flow graphs are DAGs. As soon as we introduce state into the module, we can have feedback edges in the graph. Imagine the following simple counter:
 
     class Counter(Module):
         clk = Input(logic)
@@ -105,7 +137,7 @@ To understand what's happening here, it's important to note two things:
  - `Input` and `Output` can be created without any types, as in `cnt` in our example
  - `Select` is a binary encoded mux. For our purposes, if `set` is 0, it'll output `cnt+1`, otherwise `val`.
 
-What is the data-type `Select` though? Well, it must be the type of... the common type of `cnt+1` and `val`. A common type is something that can represent all values from - in this case - `cnt+1` and `val`. On the one hand, `val` is easy: it's an 8-bit unsigned integer. But what is `cnt+1` or `cnt` for that matter? It's the output type of `Reg`, which is presumably the same is its input type. This input type is the output type of `Select`, which is - as we've said before - the common type of `cnt+1` and `val`. We have a loop here, and the type-propagation algorithm will get stuck.
+What is the data-type of the output of `Select` though? Well, it must be the type of... the common type of `cnt+1` and `val`. A common type is something that can represent all values from - in this case - `cnt+1` and `val`. On the one hand, `val` is easy: it's an 8-bit unsigned integer. But what is `cnt+1` or `cnt` for that matter? It's the output type of `Reg`, which is presumably the same is its input type. This input type is the output type of `Select`, which is - as we've said before - the common type of `cnt+1` and `val`. We have a loop here, and the type-propagation algorithm will get stuck.
 
 To help it out, we can do the following:
 
@@ -142,8 +174,22 @@ With the type conversion, we're finally good. In fact, this solution would also 
         def body():
             self.cnt <<= Reg(Select(self.set, Unsigned(8)(self.cnt+1), self.val), clk_port=self.clk)
 
+# What I want for ports.
+
+Ports are types. In fact, they are a type with multiple-inheritance. They both subtype their Input/Output etc. port type as well as their NetType. So, for instance:
+
+    my_input = Input(Signed(16))
+
+creates a new type (if it doesn't exist already), which is roughly speaking `Signed16.Input`, which inherits from both `Signed16` and `Input`. my_input is then an instance of that type.
+
+
 # More on types: Number and its relatives
 
+Net Types MUST have a __new__ implementation, that creates an instance if no parameters are passed in. That is, because Port types use multiple inheritance in a way that JunctionBase.__new__ will end up calling net-types' __new__ with no parameters.
+
+This of course should be OK, as parametric net-types are implemented using NetTypeFactory subclasses.
+
+BTW: why aren't parametric types NetTypeFactory instances, instead of subclasses? That makes NO SENSE, except for maybe hiding some types.
 # Type conversion
 
 There are several ways to achieve type conversion. Probably the simplest way is to use the name of the target type:
