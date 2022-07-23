@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import Tuple, Dict, Optional, Any, Type, Sequence, Union
 from types import MethodType
 from .tracer import no_trace
@@ -48,6 +49,7 @@ class NetTypeFactory(object):
             cls.instances[key] = obj
             return obj
     @classmethod
+    @abstractmethod
     def construct(cls, net_type, *args, **kwargs):
         """
         If called with net_type == None, returns a name for the created NetType and it's key.
