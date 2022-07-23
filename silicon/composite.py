@@ -1,6 +1,8 @@
 from typing import Tuple, Union, Any, Dict, Set, Optional, Generator, Sequence
 
-from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta
+from attr import Attribute
+
+from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta, suppress_init
 from .netlist import Netlist
 from .back_end import BackEnd
 from .exceptions import SimulationException, SyntaxErrorException
@@ -139,7 +141,7 @@ class Struct(Composite, support_reverse=False):
     def __init_subclass__(cls):
         cls._init_members()
 
-    def __new__(self, *args, **kwargs) -> Union['Struct', 'Junction']:
+    def __new__(cls, *args, **kwargs) -> Union['Struct', 'Junction']:
         """
         Here we should support the following formats:
 
@@ -167,21 +169,22 @@ class Struct(Composite, support_reverse=False):
         """
         if len(args) == 0 and len(kwargs) == 0:
             # This is the port creation case
-            return super().__new__(self)
+            return super().__new__(cls)
         if len(args) == 1 and len(kwargs) == 0:
             # This is te explicit type-conversion path
-            return super().__new__(self, *args)
+            return super().__new__(cls, *args)
         # We're in the element-wise assignment regime
         args_idx = 0
         assigned_names = set()
         # First assign positional arguments, only after exhausting that list, start looking at named ones
-        members = self.get_members()
-        output_junction = Wire(self)
+        members = cls.get_members()
+        output_junction = Wire(cls)
         for member_name, (member, reversed) in members.items():
             if args_idx < len(args):
                 if (reversed):
                     raise SyntaxErrorException("Can't assign to reversed members of a Composite type")
-                setattr(output_junction, member_name, args[args_idx])
+                member = getattr(output_junction, member_name)
+                member <<= args[args_idx]
                 assigned_names.add(member_name)
                 args_idx += 1
         # Make sure we've actually exhausted all positional arguments
@@ -194,9 +197,10 @@ class Struct(Composite, support_reverse=False):
             member, reversed = members[member_name]
             if (reversed):
                 raise SyntaxErrorException("Can't assign to reversed members of a Composite type")
-            setattr(output_junction, member_name, value)
+            member = getattr(output_junction, member_name)
+            member <<= value
             assigned_names.add(member_name)
-        return output_junction
+        return suppress_init(output_junction)
 
     @classmethod
     def result_type(cls, net_types: Sequence[Optional['NetType']], operation: str) -> 'NetType':
@@ -392,18 +396,19 @@ class Interface(Composite, support_reverse=True):
         raise SyntaxErrorException(f"Unconnected interfaces are not supported")
 
 
-class ArrayMeta(NetTypeMeta):
-    pass
-
-class _ArrayType(Composite, ArrayMeta, support_reverse=False):
+class _ArrayType(Composite, support_reverse=False):
     Key = Number.Instance.Key
 
     def __init_subclass__(cls):
-        return super().__init_subclass__(support_reverse=False)
+        cls._init_members()
 
     @classmethod
-    def _add_member(cls, name: str, member: Union[NetType, Reverse]) -> None:
+    def _add_member_override(cls, name: str, member: Union[NetType, Reverse]) -> None:
         raise SyntaxErrorException(f"Arrays don't support dynamic members")
+    @classmethod
+    def _init_members_override(cls):
+        pass
+
 
     class Accessor(GenericModule):
         @staticmethod
@@ -570,8 +575,9 @@ class Array(NetTypeFactory, net_type=_ArrayType):
             net_type.size = size
             for idx in range(size):
                 net_type.add_member(f"element_{idx}", member_type)
-            # Disabling further adding of members
-            net_type.add_member = net_type._add_member
+            # Disabling further adding of members, even when the Array is further sub-classed
+            net_type.add_member = net_type._add_member_override
+            net_type._init_members = net_type._init_members_override
         return type_name, key
 
 

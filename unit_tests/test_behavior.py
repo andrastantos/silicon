@@ -59,7 +59,7 @@ def test_main():
     assert iadd_call_cnt == 1
     i2 += w2
     assert iadd_call_cnt == 2
-    w1.set_net_type(BehavingType())
+    w1.set_net_type(BehavingType)
     w1 += w2
     assert iadd_call_cnt == 3
     assert w2.class_member == 42

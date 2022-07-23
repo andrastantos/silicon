@@ -140,7 +140,7 @@ def test_reverse_buf(mode: str = "rtl"):
         rst = RstPort()
 
         def body(self):
-            self.out1 = ReverseBuf(self.in1)
+            self.out1 <<= ReverseBuf(self.in1)
 
     class sim_top(Module):
         clk = ClkPort()
@@ -391,8 +391,8 @@ if __name__ == "__main__":
     #test_reverse_buf("rtl")
     #test_fifo("rtl")
     #test_forward_buf("sim")
-    #test_reverse_buf("sim")
-    test_fifo("sim")
+    test_reverse_buf("sim")
+    #test_fifo("sim")
     #test_gen_chk("rtl")
     #test_gen_chk("sim")
     #test_delay_line("sim")

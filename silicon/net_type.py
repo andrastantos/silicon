@@ -1,4 +1,5 @@
 from typing import Tuple, Dict, Optional, Any, Type, Sequence, Union
+from types import MethodType
 from .tracer import no_trace
 from .netlist import Netlist
 from .exceptions import AdaptTypeError, SyntaxErrorException
@@ -75,18 +76,28 @@ class NetTypeMeta(type):
             assert False
         return False
 
+class __FakeInit(object):
+    def __init__(self, *args, **kwargs):
+        pass
+
+def suppress_init(obj: object) -> object:
+    """
+    Replaces the __init__ method on the object with one that does nothing
+    """
+    obj.__class__ = type(obj.__class__.__name__, (__FakeInit, obj.__class__, ), {})
+    return obj
+
 class NetType(object, metaclass=NetTypeMeta):
     class Behaviors(object):
         """
         An empty Behaviors class to make sure the inheritance chain for behaviors has always somewhere to terminate
         """
-        pass
 
     def __init_subclass__(cls, /, **kwargs):
         for name, value in kwargs.items():
             setattr(cls, name, value)
 
-    def __new__(self, input_port: Optional['Junction'] = None, /, **kwargs) -> Union['NetType', 'Junction']:
+    def __new__(cls, input_port: Optional['Junction'] = None, /, **kwargs) -> Union['NetType', 'Junction']:
         """
         If called with parameters, this is the explicit type-conversion case.
 
@@ -96,8 +107,12 @@ class NetType(object, metaclass=NetTypeMeta):
         assert len(kwargs) == 0
         from .utils import cast
         if input_port is None:
-            return super().__new__(self)
-        return cast(input_port, self)
+            return super().__new__(cls)
+        ret_val = cast(input_port, cls)
+        # We'll have to do a trick here: ret_val is an OutputPort instance. However, Ports derive from NetType, so
+        # if we simply returned it, Python would call __init__ on it, which is not what we want.
+        # So we'll create an intermediary type, that overrides __init__ and return that.
+        return suppress_init(ret_val)
 
     @classmethod
     def generate_type_ref(cls, back_end: 'BackEnd') -> str:
@@ -328,8 +343,6 @@ class NetType(object, metaclass=NetTypeMeta):
             behaviors_class = getattr(cls, "Behaviors") # This should always succeed
         except:
             raise SyntaxErrorException("The Behaviors class should always be defined in NetTypes, unless something is really screwed up in the inheritance relationships")
-        try:
-            behaviors_instances = behaviors_class()
-            return behaviors_instances
-        except:
+        if behaviors_class is NetType.Behaviors:
             return None
+        return behaviors_class()

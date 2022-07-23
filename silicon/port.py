@@ -1,5 +1,5 @@
 from typing import Tuple, Dict, Optional, Set, Any, Type, Sequence, Union, Callable
-
+import inspect
 from .net_type import NetType, KeyKind, NetTypeMeta
 from .tracer import no_trace, NoTrace
 from .ordered_set import OrderedSet
@@ -9,13 +9,18 @@ from .port import KeyKind
 from collections import OrderedDict
 from enum import Enum
 
+
+
 class JunctionBase(object):
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
     def __init__(self):
         # Create an empty intermediary class until we have no type assigned.
         # This will get replaced by the behavior class corresponding to the type
         # once a type is assigned
-        cls = self.__class__
-        self.__class__ = cls.__class__(cls.__name__ + "Instance", (cls, ), {})
+        super().__init__()
+        #cls = self.__class__
+        #self.__class__ = cls.__class__(cls.__name__ + "--JunctionBaseHack--", (cls, ), {})
     @classmethod
     def same_type_as(cls, other):
         if not type(other) is type:
@@ -117,6 +122,13 @@ class Junction(JunctionBase):
                 self.concatenator.freeze_interface()
                 self.concatenator._body()
 
+    def get_junction_type(self) -> type:
+        if type(self) is Junction:
+            return Junction
+        for cls in inspect.getmro(type(self))[1:]:
+            if issubclass(cls, Junction):
+                return cls
+
     def set_net_type(self, net_type: Optional[NetType]) -> None:
         # Only allow the net_type to be set if it's not set yet, or if it's an abstract type (that is to allow specialization of a port)
         # TODO: For now we also allow the net_type to be set from one abstract type to another one, but that can probably be tightened later
@@ -124,13 +136,17 @@ class Junction(JunctionBase):
         if self._net_type is net_type:
             return
         assert not self.is_specialized()
-        self._net_type = net_type
         if net_type is not None:
+            self._net_type = net_type
             # We replace the empty intermediary class with the behaviors from net_type:
-            behavior_instance = net_type.get_behaviors()
-            if behavior_instance is not None:
-                true_port_type = type(self).__mro__[1]
-                self.__class__ = true_port_type.__class__(true_port_type.__name__ + "Instance", (true_port_type, type(behavior_instance)), behavior_instance.__dict__)
+            behavior_obj = net_type.get_behaviors()
+            if behavior_obj is not None:
+                extra_bases = (type(behavior_obj), )
+                extra_dict = behavior_obj.__dict__
+            else:
+                extra_bases = None
+                extra_dict = None
+            self.__class__ = create_junction_type(self.get_junction_type(), net_type, extra_bases, extra_dict)
             net_type.setup_junction(self)
         # We need to ensure port type compatibility with all sinks/source
         if self.is_specialized():
@@ -286,23 +302,6 @@ class Junction(JunctionBase):
         # I'm not sure what this even means in this context
         raise TypeError()
 
-
-    def __getattr__(self, name: str) -> Any:
-        if "_member_junctions" in dir(self) and name in self._member_junctions:
-            return self._member_junctions[name][0]
-        if self.is_specialized() and hasattr(self.get_net_type(), "get_junction_member"):
-            return self.get_net_type().get_junction_member(self, name)
-        raise AttributeError
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        if "_member_junctions" in dir(self) and name in self._member_junctions:
-            if value is self._member_junctions[name][0]:
-                return
-            self._member_junctions[name][0] <<= value
-        if self.is_specialized() and hasattr(self.get_net_type(), "set_junction_member"):
-            if self.get_net_type().set_junction_member(self, name, value):
-                return
-        super().__setattr__(name, value)
 
     def allow_bind(self) -> bool:
         """
@@ -754,6 +753,16 @@ class Junction(JunctionBase):
     def get_member_junction_kind(cls, is_reversed: bool) -> Type:
         raise NotImplementedError
 
+    class MemberJunctionProperty(property):
+        def __init__(self, name):
+            def fget(obj):
+                return obj._member_junctions[name][0]
+            def fset(obj, value):
+                if obj._member_junctions[name][0] is not value:
+                    raise SyntaxErrorException("Can't assign to member junction: use the '<<=' operator")
+                #obj._member_junctions[name][0] <<= value
+            super().__init__(fget=fget, fset=fset)
+
     def create_member_junction(self, name: str, net_type: 'NetType', reversed: bool) -> None:
         assert self.is_specialized(), "Can only add members to a specialized port. In fact, create_member_junction should only be called from the junctions type."
         junction_type = self.get_member_junction_kind(reversed)
@@ -762,6 +771,7 @@ class Junction(JunctionBase):
             member.set_interface_name(f"{self.interface_name}{MEMBER_DELIMITER}{name}")
         member._parent_junction = self
         self._member_junctions[name] = [member, reversed]
+        setattr(self.__class__, name, Junction.MemberJunctionProperty(name))
 
     def is_composite(self) -> bool:
         return len(self._member_junctions) > 0
@@ -827,7 +837,7 @@ class Port(Junction):
 
 
 
-class Input(Port):
+class InputPort(Port):
 
     def bind(self, other_junction: Junction) -> None:
         assert is_junction(other_junction), "Can only bind to junction"
@@ -868,7 +878,7 @@ class Input(Port):
 
 
 
-class Output(Port):
+class OutputPort(Port):
 
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None):
         super().__init__(net_type, parent_module)
@@ -930,7 +940,7 @@ class Output(Port):
 
 # Wires are special ports that only exist within a Module and aren't part of the interface.
 # These special ports can be created within the body of a Module and can be checked/assigned within simulate.
-class Wire(Junction):
+class WireJunction(Junction):
 
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None):
         from .module import Module
@@ -1032,3 +1042,45 @@ def junction_ref(junction: Optional[Junction]) -> Optional[JunctionRef]:
     if junction is None:
         return None
     return JunctionRef(junction)
+
+
+
+
+_JunctionInstances = {}
+
+def create_junction_type(junction_type: 'JunctionBase', net_type: Optional[NetTypeMeta] = None, extra_bases: Optional[Sequence[type]] = None, extra_dict: Optional[Dict] = None) -> 'type':
+    # We never cache types with extra dictionaries.
+    if extra_dict is None:
+        try:
+            return _JunctionInstances[(junction_type, net_type)]
+        except KeyError:
+            pass
+    if net_type is None:
+        bases = (junction_type, )
+        type_name = f"None.{junction_type.__name__}"
+    else:
+        bases = (junction_type, net_type)
+        type_name = f"{net_type.__name__}.{junction_type.__name__}"
+    if extra_bases is not None:
+        bases += extra_bases
+
+    typed_junction_type = type(type_name, bases, {} if extra_dict is None else extra_dict)
+
+    if extra_dict is None:
+        _JunctionInstances[(junction_type, net_type)] = typed_junction_type
+    return typed_junction_type
+
+def create_junction(junction_type: 'JunctionBase', net_type: Optional[NetTypeMeta] = None, *args, **kwargs) -> 'Junction':
+    typed_junction_type = create_junction_type(junction_type, net_type)
+    ret_val = typed_junction_type(net_type, *args, **kwargs)
+    return ret_val
+
+def Input(net_type: Optional[NetTypeMeta] = None, *args, **kwargs) -> InputPort:
+    return create_junction(InputPort, net_type, *args, **kwargs)
+
+def Output(net_type: Optional[NetTypeMeta] = None, *args, **kwargs) -> OutputPort:
+    return create_junction(OutputPort, net_type, *args, **kwargs)
+
+def Wire(net_type: Optional[NetTypeMeta] = None, *args, **kwargs) -> WireJunction:
+    return create_junction(WireJunction, net_type, *args, **kwargs)
+

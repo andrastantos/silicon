@@ -332,7 +332,7 @@ def adapt(input: Any, output_type: 'NetType', implicit: bool, force: bool) -> 'J
         try:
             return input.get_net_type().adapt_to(output_type, input, implicit, force)
         except AdaptTypeError:
-            raise SyntaxErrorException(f"Can't generate adaptor from {input.get_net_type()} to {output_type} for port {input}")
+            raise SyntaxErrorException(f"Can't generate adaptor from {input.get_net_type().__name__} to {output_type.__name__} for port {input}")
         except AttributeError:
             raise SyntaxErrorException(f"Can't generate adaptor from {input} to {output_type}")
 

@@ -1,6 +1,7 @@
 from .composite import Interface, Reverse, Struct, is_reverse
 from .number import logic
 from typing import Union, Callable, Optional
+from types import MethodType
 from .net_type import NetType
 from .port import Junction, Input, Output, Wire, EdgeType
 from .auto_input import ClkPort, RstPort
@@ -14,11 +15,8 @@ class ReadyValid(Interface):
     valid = logic
 
     class Behaviors(Interface.Behaviors):
-        def get_data_member_type(self) -> NetType:
-            return self.get_net_type().get_data_member_type()
-
         def get_data_members(self) -> Junction:
-            output_type = self.get_net_type().get_data_member_type()
+            output_type = self.get_data_member_type()
             ret_val = Wire(output_type)
             for name, (junction, _) in self.get_member_junctions().items():
                 if name not in ("ready", "valid"):
@@ -35,20 +33,32 @@ class ReadyValid(Interface):
                 my_wire = getattr(self, name)
                 my_wire <<= junction
 
+    def __init_subclass__(cls):
+        cls._init_members()
+        # We'll make sure that the subclass doesn't try to reinitialize it's members
+        # Sub-classing an interface *will* happen when ports are created.
+        def fake_init(cls):
+            pass
+        cls.__init_subclass__ = MethodType(fake_init, cls)
+        # We'll mark the class 'derived' so that add_member will work.
+        cls._data_member_type = None
+
     @classmethod
     def get_data_member_type(cls) -> Struct:
         try:
-            return cls._data_member_type
+            if cls._data_member_type is not None:
+                return cls._data_member_type
         except AttributeError:
-            cls._data_member_type = type(f"{cls.__name__}.DataMemberStruct", (Struct,), {})
-            for name, (member, _) in cls.members.items():
-                if name not in ("ready", "valid"):
-                    cls._data_member_type.add_member(name, member)
-            return cls._data_member_type
+            raise SyntaxErrorException("To use ReadyValid interfaces, you must create a subclass of ReadyValid")
+        cls._data_member_type = type(f"{cls.__name__}.DataMemberStruct", (Struct,), {})
+        for name, (member, _) in cls.members.items():
+            if name not in ("ready", "valid"):
+                cls._data_member_type.add_member(name, member)
+        return cls._data_member_type
 
     @classmethod
     def add_member(cls, name: str, member: Union[NetType, Reverse]) -> None:
-        if hasattr(cls, "_data_member_type"):
+        if hasattr(cls, "_data_member_type") and cls._data_member_type is not None:
             raise SyntaxErrorException(f"ReadyValid interface {cls.__name__} doesn't support member addition after data member type is created")
         if is_reverse(member) and name != "ready":
             raise SyntaxErrorException(f"ReadyValid interface {cls.__name__} doesn't support reverse members")

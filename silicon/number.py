@@ -1032,20 +1032,6 @@ class Number(NetTypeFactory):
             return value
 
         @classmethod
-        def get_junction_member(cls, junction: Junction, name:str) -> Any:
-            if name == "signed":
-                return cls.signed
-            if name == "length":
-                return cls.length
-            if name == "min_val":
-                return cls.min_val
-            if name == "max_val":
-                return cls.max_val
-            if name == "precision":
-                return cls.precision
-            raise AttributeError
-
-        @classmethod
         def adapt_from(cls, input: Any, implicit: bool, force: bool) -> Any:
             context = Context.current()
 
@@ -1530,10 +1516,10 @@ const_convert_lookup[str] = str_to_const
 const_convert_lookup[bool] = bool_to_const
 const_convert_lookup[float] = float_to_const
 
-def Signed(length: int=None):
+def Signed(length: int=None) -> NumberMeta:
     return Number(length=length, signed=True)
 
-def Unsigned(length: int=None):
+def Unsigned(length: int=None) -> NumberMeta:
     return Number(length=length, signed=False)
 
 logic = Number(length=1, signed=False)

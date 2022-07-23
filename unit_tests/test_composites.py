@@ -123,11 +123,11 @@ def test_struct_of_struct():
                 pix1 = in1 * self.alpha
                 pix2 = in2 * (255-self.alpha)
                 return (pix1 + pix2 + 127)[15:8]
-            self.outp.pixel.r = blend_mono(self.in1.pixel.r, self.in2.pixel.r)
-            self.outp.pixel.g = blend_mono(self.in1.pixel.g, self.in2.pixel.g)
-            self.outp.pixel.b = blend_mono(self.in1.pixel.b, self.in2.pixel.b)
-            self.outp.valid = self.in1.valid & self.in2.valid
-            self.error = self.in1.valid ^ self.in2.valid
+            self.outp.pixel.r <<= blend_mono(self.in1.pixel.r, self.in2.pixel.r)
+            self.outp.pixel.g <<= blend_mono(self.in1.pixel.g, self.in2.pixel.g)
+            self.outp.pixel.b <<= blend_mono(self.in1.pixel.b, self.in2.pixel.b)
+            self.outp.valid <<= self.in1.valid & self.in2.valid
+            self.error <<= self.in1.valid ^ self.in2.valid
 
     test.rtl_generation(AlphaBender, inspect.currentframe().f_code.co_name)
 
@@ -159,9 +159,9 @@ def test_generic_struct():
                 pix1 = in1 * self.alpha
                 pix2 = in2 * ((2**pixel_width)-1-self.alpha)
                 return (pix1 + pix2 + (2**(pixel_width)-1)-1)[15:8]
-            self.outp.r = blend_mono(self.in1.r, self.in2.r)
-            self.outp.g = blend_mono(self.in1.g, self.in2.g)
-            self.outp.b = blend_mono(self.in1.b, self.in2.b)
+            self.outp.r <<= blend_mono(self.in1.r, self.in2.r)
+            self.outp.g <<= blend_mono(self.in1.g, self.in2.g)
+            self.outp.b <<= blend_mono(self.in1.b, self.in2.b)
 
     test.rtl_generation(AlphaBender, inspect.currentframe().f_code.co_name)
 
@@ -182,9 +182,9 @@ def test_struct_with_method():
                     top = self.r.get_net_type().length + 8 - 1
                     return (pix1 + pix2 + 127)[top:8]
                 result = Wire(Pixel)
-                result.r = blend_mono(self.r, other.r)
-                result.g = blend_mono(self.g, other.g)
-                result.b = blend_mono(self.b, other.b)
+                result.r <<= blend_mono(self.r, other.r)
+                result.g <<= blend_mono(self.g, other.g)
+                result.b <<= blend_mono(self.b, other.b)
                 return result
 
     class AlphaBender(Module):
@@ -380,8 +380,8 @@ if __name__ == "__main__":
     #test_struct_sub_module("rtl")
     #test_number_to_struct("rtl")
     #test_number_to_struct("sim")
-    test_interface_wire("rtl")
+    #test_interface_wire("rtl")
     #test_interface_wire2("rtl")
     #test_interface_wire3("rtl")
     #test_number_to_struct_sim()
-    #test_multi_assign("sim")
+    test_multi_assign("sim")

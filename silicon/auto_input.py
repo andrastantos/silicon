@@ -1,4 +1,4 @@
-from .port import Junction, Input, JunctionRef, junction_ref
+from .port import Junction, InputPort, JunctionRef, junction_ref, create_junction
 from typing import Optional, Union, Sequence, Any, Dict, Type, Callable
 from .net_type import NetType
 from .exceptions import SyntaxErrorException, SimulationException
@@ -7,7 +7,7 @@ from .back_end import BackEnd
 from .utils import MEMBER_DELIMITER
 from .number import logic
 
-class AutoInput(Input):
+class AutoInputPort(InputPort):
     """
     An input port variant that supports automatic binding to a set of named nets in the enclosing namespace.
     """
@@ -62,7 +62,7 @@ def ClkPort(
     auto_port_names: Union[str, Sequence[str]] = ("clk", "clk_port", "clock", "clock_port"),
     optional: bool = False
 ):
-    return AutoInput(
+    return create_junction(AutoInputPort,
         net_type=net_type,
         parent_module=parent_module,
         keyword_only=keyword_only,
@@ -77,7 +77,7 @@ def ClkEnPort(
     auto_port_names: Union[str, Sequence[str]] = ("clk_en", "clk_en_port", "clock_enable", "clock_enable_port"),
     optional: bool = False
 ):
-    return AutoInput(
+    return create_junction(AutoInputPort,
         net_type=net_type,
         parent_module=parent_module,
         keyword_only=keyword_only,
@@ -92,7 +92,7 @@ def RstPort(
     auto_port_names: Union[str, Sequence[str]] = ("rst", "rst_port", "reset", "reset_port"),
     optional: bool = True
 ):
-    return AutoInput(
+    return create_junction(AutoInputPort,
         net_type=net_type,
         parent_module=parent_module,
         keyword_only=keyword_only,
@@ -107,7 +107,7 @@ def RstValPort(
     auto_port_names: Union[str, Sequence[str]] = ("rst_val", "rst_val_port", "reset_value", "reset_value_port"),
     optional: bool = True
 ):
-    return AutoInput(
+    return create_junction(AutoInputPort,
         net_type=net_type,
         parent_module=parent_module,
         keyword_only=keyword_only,
@@ -115,3 +115,17 @@ def RstValPort(
         optional=optional
     )
 
+def AutoInput(
+    net_type: Optional[NetType] = None,
+    parent_module: Module = None, *,
+    keyword_only: bool = False,
+    auto_port_names: Union[str, Sequence[str]],
+    optional: bool = True
+):
+    return create_junction(AutoInputPort,
+        net_type=net_type,
+        parent_module=parent_module,
+        keyword_only=keyword_only,
+        auto_port_names=auto_port_names,
+        optional=optional
+    )

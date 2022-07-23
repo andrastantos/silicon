@@ -69,7 +69,7 @@ class ReverseBuf(Module):
 
         buf_valid <<= Reg(Select(out_ready, Select(buf_load, buf_valid, 1), 0))
 
-        self.output_port.valid = Select(out_ready & ~buf_valid, buf_valid, in_valid & in_ready)
+        self.output_port.valid <<= Select(out_ready & ~buf_valid, buf_valid, in_valid & in_ready)
 
         out_data = Wire(data.get_net_type())
         out_data <<= Select(out_ready & ~buf_valid, buf_data, data)
