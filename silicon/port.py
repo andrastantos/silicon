@@ -12,21 +12,19 @@ from enum import Enum
 
 
 class JunctionBase(object):
-    def __new__(cls, *args, **kwargs):
-        return super().__new__(cls)
-    def __init__(self):
-        # Create an empty intermediary class until we have no type assigned.
-        # This will get replaced by the behavior class corresponding to the type
-        # once a type is assigned
-        super().__init__()
-        #cls = self.__class__
-        #self.__class__ = cls.__class__(cls.__name__ + "--JunctionBaseHack--", (cls, ), {})
-    @classmethod
-    def same_type_as(cls, other):
-        if not type(other) is type:
-            other = type(other)
-        return cls.__mro__[1] is other.__mro__[1]
+    """
+    Pretty much same as Junction, but allows for wrappers, such as ScopedPort.
 
+    At this point, the only two things deriving from JunctionBase are
+    Junction (d'uh) and ScopedPort.
+    """
+    def __new__(cls, *args, **kwargs):
+        # Clean up all arguments before passing down the __new__-chain.
+        # This is important, because - for typed ports - we'll eventually
+        # end up in NetType.__new__ which is tricky. It uses the number of
+        # arguments passed in to determine if we wanted a type-cast or a new
+        # type instance. 
+        return super().__new__(cls)
 
 class EdgeType(Enum):
     NoEdge = 0
@@ -986,6 +984,19 @@ class WireJunction(Junction):
     junction_kind: str = "wire"
 
 class ScopedPort(JunctionBase):
+    """
+    A Port wrapper that can be used as an alias for a port within a 'with' clause:
+
+    with master_clk as clk:
+        something <<= Reg(another_thing)
+
+    Here, master_clk becomes a ScopedPort instance for the duration of the with block.
+    Since Python doesn't really get rid of locals introduces in 'with' blocks, master_clk
+    as a name still exists within 'locals' after __exit__ is called. What ScopedPort does
+    is it disallows automatic binding after __exit__ is executed. This way, while the name
+    technically still exists, and can be used explicitly, it won't automatically bind to
+    ports anymore. 
+    """
     attributes = ("_real_junction")
     def __init__(self, real_junction: Union[Junction, 'MemberGetter']):
         self._real_junction = real_junction
