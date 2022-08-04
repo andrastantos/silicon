@@ -63,7 +63,7 @@ class NetTypeFactory(object):
         It in fact could even be the empty string. It is advisable though to give the created NetType a descriptive name as
         debuggers and interactive prompts will use it to display information to the user.
         """
-        raise SyntaxErrorException("Generic types can be implemented by inheriting from GenericType, then overriding the construct class-method")
+        raise NotImplementedError("Generic types can be implemented by inheriting from GenericType, then overriding the construct classmethod")
 
 class NetTypeMeta(type):
     assert_on_eq = False

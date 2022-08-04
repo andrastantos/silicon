@@ -30,17 +30,17 @@ class Stack(object):
             return len(self.queue)
     
     class Context(object):
-        def __init__(self, parent: 'Stack'):
-            self.parent = parent
+        def __init__(self, parent_stack: 'Stack'):
+            self.parent_stack = parent_stack
         def __enter__(self):
-            self.parent.lock.__enter__()
+            self.parent_stack.lock.__enter__()
             return self
         def __exit__(self, type, value, traceback) -> Optional[bool]:
-            self.parent.pop()
-            return self.parent.lock.__exit__(self, type, value, traceback)
+            self.parent_stack.pop()
+            return self.parent_stack.lock.__exit__(self, type, value, traceback)
         def top(self) -> Any:
-            return self.parent.top()
+            return self.parent_stack.top()
         def peek(self, idx: int) -> Any:
-            return self.parent.peek(idx)
+            return self.parent_stack.peek(idx)
         def __len__(self) -> int:
-            return len(self.parent)
+            return len(self.parent_stack)

@@ -6,7 +6,7 @@ from .utils import first, TSimEvent, Context
 from .exceptions import SimulationException, SyntaxErrorException, AdaptTypeError
 from .netlist import Netlist
 from .module import Module, InlineBlock, InlineExpression
-from .port import Input, Output, Junction, is_junction
+from .port import Input, Output, Junction, is_junction_base
 
 # Python Enums are weird to say the least: Even though you inherit from Enum, the actual enum *type* is EnumMeta. The *values* of the enum become
 # the type of the class you subclass from Enum. As such, it's not possible (or at least very hard) to mix-in NetType with EnumMeta. So, for now
@@ -111,7 +111,7 @@ class EnumNet(Number):
             if context == Context.simulation:
                 if input is None:
                     return None
-                if is_junction(input):
+                if is_junction_base(input):
                     input = input.sim_value
                 elif isinstance(input, cls.base_type):
                     input = EnumNet.NetValue(input)

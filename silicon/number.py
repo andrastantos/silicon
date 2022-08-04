@@ -2,9 +2,9 @@ from typing import Optional, Any, Tuple, Generator, Union, Dict, Set, Sequence, 
 from .exceptions import FixmeException, SyntaxErrorException, SimulationException, AdaptTypeError
 from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta
 from .module import GenericModule, Module, InlineBlock, InlineExpression, has_port
-from .port import Input, JunctionBase, Output, Junction, Port
+from .port import Input, JunctionBase, Output, Junction, Port, get_sinks
 from .tracer import no_trace
-from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, NetValue, is_junction
+from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, NetValue, is_junction_base
 from collections import OrderedDict
 import re
 try:
@@ -652,20 +652,26 @@ class Number(NetTypeFactory):
             # The reason for that is partial assignments, that are not allowed.
             # Let's say we have something, like this:
             #     w = Wire(Unsigned(8))
-            #     w[0] = 1
+            #     w[0] <<= 1 # All other bits are left unassigned
             # This piece of code should not elaborate. However, if MemberSetter
             # auto-determines its output type, it'll think it's a 1-bit output.
             # Then auto-type-conversion simply zero-extends that to the rest of the bits.
             # To make things even more confusing for the user, this is an error:
             #     w = Wire(Unsigned(8))
-            #     w[1] = 1
-            # So, to remedy that, we'll look at the transitive closure of all sinks
+            #     w[1] = 1 # All other bits are left unassigned
+            # Since nets don't really care about the assignment hierarchy, by the time
+            # we get here, all our sinks are flattened into a single set. We can't see
+            # through the enclosing module boundary with a single Net instance, but that
+            # should be OK: the net types outside our module should not concern us, not
+            # to mention that they are not necessarily determined. External loop-backs
+            # (that is when an output of the enclosing module drives an input of the same)
+            # is also uninteresting because all the inputs are typed, so any problems should
+            # become apparent on the outside.
+            #
+            # To remedy all of that, we'll look at the all sinks
             # of our output and use the smallest output range from them.
-            # Why the smallest? Because if there are multiple sources,
-            # those should participate in auto-extension. If it so happens
-            # that our direct output is not the most restritive, that would
-            # mean that somewhere in the assignment chain, there was a narrowing,
-            # which will eventually blow up.
+            # Why the smallest? Because if there are multiple sinks,
+            # those should participate in auto-extension.
             #
             # Precision auto-extends the other way: we need to make sure the least precise sink
             # is still good enough. It's always OK to append a bunch of 0-s to make the Number more 'precise'.
@@ -675,7 +681,7 @@ class Number(NetTypeFactory):
             if not is_number(common_net_type):
                 raise SyntaxErrorException(f"MemberSetter result type is {common_net_type}. It should be a Number")
             self.finalize_input_map(common_net_type)
-            sinks = self.output_port.get_all_sinks()
+            sinks = get_sinks(self.output_port)
             min_val = None
             max_val = None
             precision = None
@@ -1038,7 +1044,7 @@ class Number(NetTypeFactory):
             if context == Context.simulation:
                 if input is None:
                     return None
-                if is_junction(input):
+                if is_junction_base(input):
                     input = input.sim_value
                 elif isinstance(input, Number.NetValue):
                     pass

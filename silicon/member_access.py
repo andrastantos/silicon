@@ -72,7 +72,7 @@ class MemberGetter(object):
 
         def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
             # Trampoline to the inner implementation for inlining. The only difference is that we'll have to update the referenced port.
-            implementor = self.output_port.source.get_parent_module()
+            implementor = self.output_port.get_source_net().get_source().get_parent_module()
             for ret_val in implementor.get_inline_block(back_end, target_namespace):
                 assert len(ret_val.target_ports) == 1
                 ret_val.set_target_ports((self.output_port, )) # Override target port
@@ -112,7 +112,7 @@ class MemberGetter(object):
             # That can only happen later, once the net_type of self._parent_junction is known, that is when GetSlice.body()
             # gets called. Still, we have now an output port that can be used within the netlist.
             self._slice_port = MemberGetter.GetSlice(keys=self._keys)(self._parent_junction)
-        return self._slice_port
+        return self._slice_port.get_underlying_junction()
 
     def __ilshift__(self, other: Any) -> 'Junction':
         if not self._parent_junction.is_specialized():

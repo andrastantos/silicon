@@ -70,10 +70,15 @@ def is_iterable(thing: Any) -> bool:
 def is_subscriptable(thing: Any) -> bool:
     return hasattr(thing, "__getitem__")
 
-def is_junction(thing: Any) -> bool:
+def is_junction_base(thing: Any) -> bool:
     #return hasattr(thing, "junction_kind")
     from .port import JunctionBase
     return isinstance(thing, JunctionBase)
+
+def is_junction(thing: Any) -> bool:
+    #return hasattr(thing, "junction_kind")
+    from .port import Junction
+    return isinstance(thing, Junction)
 
 def is_port(thing: Any) -> bool:
     from .port import Port
@@ -84,7 +89,7 @@ def is_junction_member(thing: Any) -> bool:
     return isinstance(thing, MemberGetter)
 
 def is_junction_or_member(thing: Any) -> bool:
-    return is_junction_member(thing) or is_junction(thing)
+    return is_junction_member(thing) or is_junction_base(thing)
 
 def is_output_port(thing: Any) -> bool:
     return hasattr(thing, "junction_kind") and thing.junction_kind == "output"
@@ -374,7 +379,9 @@ def get_common_net_type(junctions: Sequence['Junction'], partial_results: bool =
             raise SyntaxErrorException(f"Ports {junction_list_as_str} don't have a common superclass.")
     return superclass
 
-def get_caller_local_junctions(frame_cnt: int = 1) -> Dict[str, 'Junction']:
+def get_caller_local_junctions(frame_cnt: int = 1, filter: Optional['JunctionBase'] = None) -> Dict[str, 'JunctionBase']:
+    # IMPORTANT! We're deliberately NOT resolving the underlying junction here. The reason for this is that we might
+    # be looking for ScopedPort instances at the end of a 'with' block to deactivate them.
     import inspect as inspect
     caller_frame = inspect.currentframe()
     while frame_cnt > 0:
@@ -383,7 +390,8 @@ def get_caller_local_junctions(frame_cnt: int = 1) -> Dict[str, 'Junction']:
     caller_local_junctions = {}
     for name, value in caller_frame.f_locals.items():
         if (is_junction_or_member(value)) and value.allow_bind():
-            caller_local_junctions[name] = value
+            if filter is None or value is filter:
+                caller_local_junctions[name] = value
     del value
     del caller_frame
     return caller_local_junctions

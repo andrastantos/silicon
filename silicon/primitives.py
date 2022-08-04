@@ -58,21 +58,17 @@ class Select(Module):
     def get_operation_str(self) -> str:
         return "SELECT"
 
-    @property
-    def has_default(self) -> bool:
-        return self.default_port.has_driver()
-
     def body(self) -> None:
         if len(self.value_ports) == 0:
             raise SyntaxErrorException(f"Select must have at least one value port")
-        if self.has_default:
-            raise SyntaxErrorException("Default values for 'Select' modules are not supported: generation of inline verilog is rather difficult for them.")
         new_net_type = self.generate_output_type()
         assert not self.output_port.is_specialized() or self.output_port.get_net_type() is new_net_type
         if not self.output_port.is_specialized():
             self.output_port.set_net_type(new_net_type)
 
     def simulate(self) -> TSimEvent:
+        if self._impl.netlist.has_driver(self.default_port):
+            raise SyntaxErrorException("Default values for 'Select' modules are not supported: generation of inline verilog is rather difficult for them.")
         while True:
             yield self.get_inputs().values()
             if self.selector_port.sim_value is None:
@@ -86,6 +82,8 @@ class Select(Module):
 
     def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
         assert len(self.get_outputs()) == 1
+        if self._impl.netlist.has_driver(self.default_port):
+            raise SyntaxErrorException("Default values for 'Select' modules are not supported: generation of inline verilog is rather difficult for them.")
         if self.output_port.is_composite():
             output_port_members = tuple(self.output_port.get_all_member_junctions(add_self=False))
             value_port_members = []
@@ -211,9 +209,6 @@ class _SelectOneHot(Module):
         if output_net_type is not None and has_port(self, "output_port"):
             raise SyntaxErrorException("Gate already has an output port defined. Can't redefine output_net_type")
         return super().__call__(*args, **kwargs)
-    @property
-    def has_default(self) -> bool:
-        return self.default_port.has_driver()
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         assert False
     def create_named_port(self, name: str) -> Optional[Port]:
@@ -242,9 +237,7 @@ class _SelectOneHot(Module):
         value_ports = list(self.value_ports.values())
         if self.default_port.is_specialized():
             value_ports.append(self.default_port)
-        all_inputs_specialized = all(tuple(input.is_specialized() for input in self.get_inputs().values()))
-        if self.has_default:
-            all_inputs_specialized &= self.default_port.is_specialized()
+        all_inputs_specialized = all(tuple(input.is_specialized() for input in value_ports))
         common_net_type = get_common_net_type(value_ports, not all_inputs_specialized)
         if common_net_type is None:
             raise SyntaxErrorException(f"Can't figure out output port type for Select")
@@ -550,7 +543,7 @@ class Reg(Module):
                     raise SyntaxErrorException(f"Can only register composite types if the input and reset_value_port types are the same.")
                 reset_value_members = self.reset_value_port.get_all_member_junctions(add_self=False)
             else:
-                assert not self.reset_value_port.has_driver(), f"Strange: didn't expect a non-specialized input to have a driver..."
+                assert not self._impl.netlist.has_driver(self.reset_value_port), f"Strange: didn't expect a non-specialized input to have a driver..."
                 # will cause the logic inside generate_inline_statement to go down the proper path to generate default reset values
                 reset_value_members = (self.reset_value_port, ) * len(output_members)
 
@@ -570,12 +563,12 @@ class Reg(Module):
         output_name = output_port.get_lhs_name(back_end, target_namespace)
         assert output_name is not None
         clk, _ = self.clock_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("()")) # Get parenthesis around the expression if it's anything complex
-        if not self.reset_port.has_driver():
+        if not self._impl.netlist.has_driver(self.reset_port):
             input_expression, _ = input_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("<="))
             ret_val = f"always_ff @(posedge {clk}) {output_name} <= {input_expression};\n"
         else:
             rst_expression, rst_precedence = self.reset_port.get_rhs_expression(back_end, target_namespace)
-            if reset_value_port.has_driver():
+            if self._impl.netlist.has_driver(self.reset_value_port):
                 rst_val_expression, _ = reset_value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), back_end.get_operator_precedence("?:"))
             else:
                 rst_val_expression = output_port.get_net_type().get_default_value(back_end)
@@ -591,7 +584,7 @@ class Reg(Module):
 
     def simulate(self) -> TSimEvent:
         def reset():
-            if self.reset_value_port.has_driver():
+            if self._impl.netlist.has_driver(self.reset_value_port):
                 self.output_port <<= self.reset_value_port
             else:
                 if self.output_port.is_composite():
@@ -601,7 +594,7 @@ class Reg(Module):
                 else:
                     self.output_port <<= self.output_port.get_net_type().get_default_sim_value()
 
-        has_reset = self.reset_port.has_driver()
+        has_reset = self._impl.netlist.has_driver(self.reset_port)
         has_async_reset = not self.sync_reset and has_reset
         while True:
             if has_async_reset:

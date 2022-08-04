@@ -35,7 +35,7 @@ class XNet(object):
 
     def __init__(self):
         from .port import Port, Wire
-        self.source: Junction = None
+        self.source: 'Junction' = None
         self.sinks: Set[Port] = OrderedSet()
         self.transitions: Set[Port] = OrderedSet()
         self.aliases: Set[Wire] = OrderedSet()
@@ -251,24 +251,27 @@ class Netlist(object):
                     xnets += create_xnets_for_junction(member_junction)
                 return xnets
             else:
-                if for_junction.source is not None:
+                if for_junction.get_source_net() is None:
                     # Only create XNets for things that source something. Sinks will get added to existing XNets once the source is identified.
                     return []
                 else:
+                    assert for_junction.get_source_net().get_source() is not None, "We should have inserted a Constant module for these kinds of un-driven nets"
                     x_net = XNet()
 
                     def trace_x_net(current_junction: Junction):
-                        for sink in current_junction.sinks:
-                            if is_wire(sink):
-                                x_net.aliases.add(sink)
-                            else:
-                                if len(sink.sinks) == 0:
-                                    # No sinks of this junction: this is a terminal node.
-                                    x_net.sinks.add(sink)
+                        if current_junction.get_sink_net() is not None:
+                            for sink in current_junction.get_sink_net().get_sinks():
+                                if is_wire(sink):
+                                    x_net.aliases.add(sink)
                                 else:
-                                    x_net.transitions.add(sink)
-                            self.junction_to_xnet_map[sink] = x_net
-                            trace_x_net(sink)
+                                    if sink.get_sink_net() is None:
+                                        # No sinks of this junction: this is a terminal node.
+                                        x_net.sinks.add(sink)
+                                    else:
+                                        assert len(sink.get_sink_net().get_sinks()) > 0
+                                        x_net.transitions.add(sink)
+                                self.junction_to_xnet_map[sink] = x_net
+                                trace_x_net(sink)
 
                     self.junction_to_xnet_map[for_junction] = x_net
                     trace_x_net(for_junction)
@@ -403,6 +406,21 @@ class Netlist(object):
             assert module in rank_map
 
         return rank_list, rank_map
+
+    def has_driver(self, junction: 'JunctionBase') -> bool:
+        """
+        Returns True if the junction has a driver
+        """
+        # For compound types, we can't easily answer this question. It's the individual members that may or may not have drivers.
+        junction = junction.get_underlying_junction()
+        if junction.is_composite():
+            return False
+        try:
+            xnet = self.get_xnet_for_junction(junction)
+        except SyntaxErrorException:
+            # We're not even part of an XNet, let alone having a driver
+            return False
+        return xnet.source is not None
 
     def get_xnet_for_junction(self, junction: 'Junction') -> 'XNet':
         if junction not in self.junction_to_xnet_map:

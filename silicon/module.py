@@ -1,9 +1,9 @@
 # We will be able to rework generic modules when https://www.python.org/dev/peps/pep-0637/ becomes reality (currently targetting python 3.10)
 # Well, that PEP got rejected, so I guess there goes that...
-from typing import Union, Set, Tuple, Dict, Any, Optional, List, Iterable, Generator, Sequence, Callable
+from typing import ParamSpecArgs, Union, Set, Tuple, Dict, Any, Optional, List, Iterable, Generator, Sequence, Callable
 import typing
 from collections import OrderedDict
-from .port import Junction, Port, Output, Input, Wire, JunctionBase
+from .port import Junction, Port, Output, Input, Wire, JunctionBase, Net
 from .net_type import NetType, NetTypeMeta
 from .utils import convert_to_junction, BoolMarker, str_block, CountMarker, TSimEvent, ContextMarker, first, Context
 from .stack import Stack
@@ -14,7 +14,7 @@ from .ordered_set import OrderedSet
 from .exceptions import SimulationException, SyntaxErrorException
 from threading import RLock
 from itertools import chain, zip_longest
-from .utils import is_port, is_input_port, is_output_port, is_wire, is_junction_member, is_module, fill_arg_names, is_junction_or_member, is_junction, is_iterable, MEMBER_DELIMITER, first
+from .utils import is_port, is_input_port, is_output_port, is_wire, is_junction_member, is_module, fill_arg_names, is_junction_or_member, is_junction_base, is_iterable, MEMBER_DELIMITER, first
 from .state_stack import StateStackElement
 import inspect
 
@@ -26,6 +26,23 @@ class InlineBlock(object):
         self.target_ports = target_ports
     def set_target_ports(self, target_ports: Port):
         self.target_ports = target_ports
+
+def create_submodule(parent: 'Module', constructor: Callable, *args, **kwargs) -> Any:
+    assert is_module(parent)
+    impl = parent._impl
+    with Module._parent_modules.push(parent):
+        assert impl.is_interface_frozen()
+        with Module.Context(impl):
+            with ContextMarker(Context.elaboration):
+                ret_val = constructor(*args, **kwargs)
+                # We'll have to make sure the newly created Adaptor it's properly registered.
+                try:
+                    module = ret_val[0].get_parent_module()
+                except TypeError:
+                    module = ret_val.get_parent_module()
+                module._impl.freeze_interface()
+                module._impl._body(trace=False)
+    return ret_val
 
 class InlineExpression(InlineBlock):
     def __init__(self, target_port: Port, expression: str, precedence: int):
@@ -147,6 +164,9 @@ class Module(object):
 
 
     def __call__(self, *args, **kwargs) -> Union[Port, Tuple[Port]]:
+        scope = self._impl.get_parent_module()
+        if scope is None and (len(args) > 0 or len(kwargs) > 0):
+            raise SyntaxErrorException(f"Can't use call-style instantiation with port-bindings of top level module")
         if Context.current() != Context.elaboration:
             raise SyntaxErrorException(f"Can't bind module using call-syntax outside of elaboration context")
         def do_call() -> Union[Port, Tuple[Port]]:
@@ -160,19 +180,19 @@ class Module(object):
                         raise SyntaxErrorException(f"Module {self} doesn't support dynamic creation of more positional ports")
                     my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
                 if arg_junction is not None:
-                    my_positional_inputs[idx].bind(arg_junction)
+                    my_positional_inputs[idx].set_source(arg_junction, scope)
             for arg_name, arg_value in kwargs.items():
                 arg_junction = convert_to_junction(arg_value, type_hint=None) if arg_value is not None else None
                 if not has_port(self, arg_name) and not self._impl._in_create_port:
                     self._impl._create_named_port(arg_name, arg_junction.get_net_type() if arg_junction is not None else None)
                 if arg_junction is not None:
-                    getattr(self, arg_name).bind(arg_junction)
+                    getattr(self, arg_name).set_source(arg_junction, scope)
             ret_val = tuple(self._impl.get_outputs().values())
             if len(ret_val) == 1:
                 return ret_val[0]
             return ret_val
 
-        if self._impl.parent is not None:
+        if self._impl.get_parent_module() is not None:
             ret_val = do_call()
             return ret_val
         else:
@@ -352,7 +372,7 @@ class Module(object):
                     sub_module_ports = sub_module.get_ports()
                     last_port_idx = len(sub_module_ports) - 1
                     for idx, (sub_module_port_name, sub_module_port) in enumerate(sub_module_ports.items()):
-                        if sub_module_port.is_deleted():
+                        if sub_module_port.is_deleted(netlist):
                             continue
                         if sub_module_port.is_composite():
                             members = sub_module_port.get_all_member_junctions(False)
@@ -498,7 +518,6 @@ class Module(object):
                 #print(f"================= module init called from: {self._filename}:{self._lineno} for module {type(self)}")
                 self._context = None
                 self.setattr__impl = self.__setattr__normal
-                self._inside = BoolMarker()
                 self._in_generate = BoolMarker()
                 self._in_create_port = BoolMarker()
                 self._in_construct = BoolMarker()
@@ -512,6 +531,7 @@ class Module(object):
                 self._positional_outputs = OrderedDict()
                 self._wires = OrderedDict()
                 self._junctions = OrderedDict()
+                self._nets: Set[Net] = OrderedSet()
                 self._local_wires = [] # A list of all the wires declared in the body of the module
                 self._generate_needed = False # Set to True if body generation is needed, False if not (that is if module got inlined)
                 self._body_generated = False # Set to true if a body was already generated. This prevents body generation, even if _generate_needed is set
@@ -524,17 +544,17 @@ class Module(object):
                     parent = Module._parent_modules.top()
                     parent._impl.register_sub_module(self._true_module)
                     self.netlist = parent._impl.netlist
-                    self.parent = parent
+                    self._parent_module = parent
                 else:
                     self.netlist = Netlist(self._true_module)
-                    self.parent = None
+                    self._parent_module = None
 
         def _init_phase2(self, *args, **kwargs):
             with self._no_junction_bind:
-                with self._inside:
+                with Module._parent_modules.push(self):
                     from copy import deepcopy
 
-                    def ports(m: Union['Module', type]) -> Tuple[Tuple[Union[str, Port]]]:
+                    def ports(m: Union['Module', type]) -> Tuple[Tuple[str, Port]]:
                         ret_val = []
                         #for name in dir(m):
                         #    val = getattr(m,name)
@@ -550,9 +570,9 @@ class Module(object):
                     for (port_name, port_object) in ports(type(self._true_module)):
                         if port_name in get_reserved_names():
                             raise SyntaxErrorException(f"Class {self} uses reserved name as port definition {port_name}")
-                        if port_object.source is not None:
+                        if port_object.get_source_net() is not None:
                             raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with source already bound")
-                        if len(port_object.sinks) != 0:
+                        if port_object.get_sink_net() is not None:
                             raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with sinks already bound")
                         if port_object.get_parent_module() is not None:
                             raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with parent module already assigned")
@@ -588,6 +608,9 @@ class Module(object):
                 del self._parent_local_junctions
             #show_callers_locals()
 
+        def get_parent_module(self) -> Optional['Module']:
+            return self._parent_module
+
         def _context_change(self, context: Context) -> None:
             # Called by Context every time there's a change in context
             if context == Context.simulation:
@@ -597,6 +620,11 @@ class Module(object):
 
         def get_sub_modules(self) -> Sequence['Module']:
             return self._sub_modules
+
+        def add_net(self, net: Net) -> None:
+            self._nets.add(net)
+        def remove_net(self, net: Net) -> None:
+            self._nets.remove(net)
 
         def order_sub_module(self, sub_module: 'Module'):
             """
@@ -654,7 +682,7 @@ class Module(object):
         def get_junctions(self) -> 'OrderedDict[str, Junction]':
             return self._junctions
         def __get_instance_name(self) -> str:
-            if self.parent is None and self.name is None:
+            if self.get_parent_module() is None and self.name is None:
                 return type(self).__name__
             assert self.name is not None, f"Node {self} somehow doesn't have a name. Maybe didn't elaborate???"
             return self.name
@@ -662,8 +690,8 @@ class Module(object):
             from .utils import FQN_DELIMITER
             node = self
             name = self.__get_instance_name()
-            while node.parent is not None:
-                node = node.parent._impl
+            while node.get_parent_module() is not None:
+                node = node.get_parent_module()._impl
                 name = node.__get_instance_name() + FQN_DELIMITER + name
             return name
         def get_diagnostic_name(self, add_location: bool = True) -> str:
@@ -673,8 +701,8 @@ class Module(object):
                 name = f"<unnamed:{type(self).__name__}>"
             else:
                 name = self.name
-            while node.parent is not None:
-                node = node.parent._impl
+            while node.get_parent_module() is not None:
+                node = node.get_parent_module()._impl
                 name = node.get_diagnostic_name(False) + FQN_DELIMITER + name
             if add_location:
                 name += self.get_diagnostic_location(" at ")
@@ -691,7 +719,7 @@ class Module(object):
                 # If we happen to override an existing Junction object, make sure it gets removed from port lists as well
                 if name in self._true_module.__dict__:
                     old_attr = self._true_module.__dict__[name]
-                    if is_junction(old_attr):
+                    if is_junction_base(old_attr):
                         if not is_wire(old_attr):
                             del self._ports[name]
                         if name in self._inputs:
@@ -709,7 +737,7 @@ class Module(object):
                         elif name in self._positional_outputs:
                             del self._positional_outputs[name]
                 # If we insert a new Junction object, update the port lists as well
-                if is_junction(value):
+                if is_junction_base(value):
                     from .back_end import get_reserved_names
                     if name in get_reserved_names():
                         raise SyntaxErrorException(f"Class {self} uses reserved name as wire definition {name}")
@@ -750,7 +778,7 @@ class Module(object):
             if name in self.__dict__ and self.__dict__[name] is value:
                 return
             else:
-                # For speedup reasons, removed is_junction calls, replaced tests with exceptions
+                # For speedup reasons, removed is_junction_base calls, replaced tests with exceptions
                 try:
                     junction = self._true_module.__dict__[name]
                 except KeyError:
@@ -761,7 +789,7 @@ class Module(object):
                 except AttributeError:
                     return self.__set_no_bind_attr__(name, value, super_setter)
                 '''
-                if name in self._true_module.__dict__ and is_junction(self._true_module.__dict__[name]):
+                if name in self._true_module.__dict__ and is_junction_base(self._true_module.__dict__[name]):
                     if port is not value:
                         port._set_sim_val(value)
                 else:
@@ -775,8 +803,8 @@ class Module(object):
                     return
                 if name in ("_no_junction_bind"):
                     return self.__set_no_bind_attr__(name, value, super_setter)
-                if (hasattr(self, "_no_junction_bind") and self._no_junction_bind) or (is_junction(value) and self._in_create_port):
-                    if is_junction(value):
+                if (hasattr(self, "_no_junction_bind") and self._no_junction_bind) or (is_junction_base(value) and self._in_create_port):
+                    if is_junction_base(value):
                         assert value.get_parent_module() is self._true_module or value.get_parent_module() is None
                         value.set_parent_module(self._true_module)
                     return self.__set_no_bind_attr__(name, value, super_setter)
@@ -784,16 +812,16 @@ class Module(object):
                 if context is None:
                     return self.__set_no_bind_attr__(name, value, super_setter)
                 elif context == Context.elaboration:
-                    if is_junction(value):
+                    if is_junction_base(value):
                         if value.get_parent_module() is None:
                             # If the attribute doesn't exist and we do a direct-assign to a free-standing port, assume that this is a port-creation request
                             if hasattr(self._true_module, name):
                                 raise SyntaxErrorException(f"Can't create new {('port', 'wire')[is_wire(value)]} {name} as that attribute allready exists")
                             return self.__set_no_bind_attr__(name, value, super_setter)
-                        elif (value.get_parent_module() is self._true_module and is_input_port(value)) or (value.get_parent_module()._impl.parent is self._true_module and is_output_port(value)):
+                        elif (value.get_parent_module() is self._true_module and is_input_port(value)) or (value.get_parent_module()._impl.get_parent_module() is self._true_module and is_output_port(value)):
                             # We assign a port of a submodule to a new attribute. Create a Wire for it, if it doesn't exist already
                             if hasattr(self._true_module, name):
-                                if not is_junction(getattr(self._true_module,name)):
+                                if not is_junction_base(getattr(self._true_module,name)):
                                     raise SyntaxErrorException(f"Can't create new wire {name} as that attribute allready exists")
                             else:
                                 self.__set_no_bind_attr__(name, Wire(), super_setter)
@@ -805,30 +833,16 @@ class Module(object):
                     if not hasattr(self._true_module, name):
                         return self.__set_no_bind_attr__(name, value, super_setter)
                     # At this point, the attribute exists, either because we've created as a junction just now or because it already was there. See if it's a junction...
-                    if is_junction(getattr(self._true_module, name)):
-                        try:
-                        #if True:
-                            junction_value = convert_to_junction(value, type_hint=None)
-                            if junction_value is None:
-                                # We couldn't create a port out of the value:
-                                raise SyntaxErrorException(f"couldn't convert '{value}' to Junction.")
-                        except Exception as ex:
-                            raise SyntaxErrorException(f"couldn't bind junction to value '{value}' with exception '{ex}'")
-                        assert isinstance(junction_value, JunctionBase)
-                        junction_inst = getattr(self._true_module, name)
-                        if junction_value is junction_inst:
-                            # This happens with self.port <<= something constructors: we do the <<= operator, which returns the RHS, then assign it to the old property.
-                            pass
+                    junction_inst = getattr(self._true_module, name)
+                    if is_junction_base(junction_inst):
+                        scope = Module._parent_modules.top()
+                        if scope is self._true_module:
+                            junction_inst.set_source(value, self._true_module)
                         else:
-                            #print("accessing existing port --> binding")
-                            # assignment-style binding is only allowed for outputs (on the inside) and inputs (on the outside)
-                            if self.is_inside():
-                                if is_input_port(junction_inst):
-                                    raise SyntaxErrorException(f"Can't assign to {junction_inst.junction_kind} port '{name}' from inside the module")
-                            else:
-                                if not is_input_port(junction_inst):
-                                    raise SyntaxErrorException(f"Can't assign to {junction_inst.junction_kind} port '{name}' from outside the module")
-                            junction_inst.bind(junction_value)
+                            scope = self.get_parent_module()
+                            if scope is None:
+                                raise SyntaxErrorException(f"Can't assign to {junction_inst.junction_kind} port '{name}' at the top level")
+                            junction_inst.set_source(value, scope)
                     else:
                         # If the attribute is not a port, simply set it to the new value
                         return self.__set_no_bind_attr__(name, value, super_setter)
@@ -860,8 +874,6 @@ class Module(object):
                 with self._no_junction_bind:
                     setattr(self._true_module, name_and_port[0], name_and_port[1])
                 name_and_port[1].set_net_type(net_type)
-        def is_inside(self):
-            return self._inside
         def freeze_interface(self) -> None:
             with self._no_junction_bind:
                 self._frozen_port_list = True
@@ -876,12 +888,13 @@ class Module(object):
             for name in port_name_list:
                 if name in self._parent_local_junctions:
                     return self._parent_local_junctions[name].get_underlying_junction()
-            if self.parent is not None:
-                parent_ports = self.parent.get_ports()
+            parent = self.get_parent_module()
+            if parent is not None:
+                parent_ports = parent.get_ports()
                 for name in port_name_list:
                     if name in parent_ports:
                         return parent_ports[name].get_underlying_junction()
-                parent_wires = self.parent.get_wires()
+                parent_wires = parent.get_wires()
                 for name in port_name_list:
                     if name in parent_wires:
                         return parent_wires[name].get_underlying_junction()
@@ -894,7 +907,7 @@ class Module(object):
             # Remove all wires without sources and sinks.
             for wire_name, wire in tuple(self._wires.items()):
                 if not wire.is_specialized():
-                    if len(wire.sinks) == 0:
+                    if wire.get_sink_net() is None:
                         print(f"WARNING: deleting unused wire: {wire_name} in module {self._true_module}")
                         self._wires.pop(wire_name)
                         self._junctions.pop(wire_name)
@@ -907,7 +920,7 @@ class Module(object):
                 self._body(trace) # Will create all the sub-modules
 
             for wire in tuple(self._local_wires):
-                if len(wire.sinks) == 0 and wire.source is None:
+                if wire.get_sink_net() is None and wire.get_source_net() is None:
                     print(f"WARNING: deleting unused local wire: {wire}")
                     self._local_wires.remove(wire)
 
@@ -915,21 +928,64 @@ class Module(object):
                 # handle any pending auto-binds
                 for port in sub_module.get_ports().values():
                     if port._auto:
-                        port.auto_bind() # If already bound, this is a no-op, so it's safe to call it multiple times
+                        port.auto_bind(self._true_module) # If already bound, this is a no-op, so it's safe to call it multiple times
 
             # Go through each sub-module in a loop, and finalize their interface until everything is frozen
 
             def propagate_net_types():
-                incomplete_junctions = OrderedSet(junction for junction in chain(self.get_junctions().values(), self._local_wires) if not junction.is_specialized() and junction.source is not None)
                 changes = True
-                while len(incomplete_junctions) > 0 and changes:
+                while changes:
                     changes = False
-                    for junction in tuple(incomplete_junctions):
-                        if junction.source.is_specialized():
-                            junction.set_net_type(junction.source.get_net_type())
-                            changes = True
-                            incomplete_junctions.remove(junction)
-                return
+                    for net in tuple(self._nets):
+                        changes |= net.propagate_net_type()
+
+
+
+            def is_as_specialized_as_cant_be(junction: 'JunctionBase', scope: 'Module'):
+                """
+                Returns True if the input is (or cannot be) specialized.
+
+                There are a few special cases for optional auto-inputs:
+                1. If the auto-input is not connected, it will never get a type, but that's fine
+                2. If the auto-input is connected to an input (on the module we're looking at), that itself
+                    doesn't have type, it won't ever get a type either, but that's fine too.
+                    NB: the only reason that could be is if the input source itself is an optional auto-input.
+                3. All top-level ports must have types, optional or otherwise
+                (otherwise huge chunks of stuff would get deleted silently because clk is deleted).
+                """
+                assert is_module(scope)
+                junction = junction.get_underlying_junction()
+                if junction.is_specialized():
+                    return True
+                if junction.get_parent_module().is_top_level():
+                    return False
+                if not is_input_port(junction):
+                    return False
+                if not junction.is_optional():
+                    return False
+
+                # At this point we have an optional input. If it's not driven (recursively), it can't have a type, but that's OK.
+                # We're not going to leave the scope though: the perimeter should either have types or be itself an optional, deleted input.
+                source = junction
+                while True:
+                    net = junction.get_source_net()
+                    if net is None:
+                        # The optional input has no driver, so no type either. That's OK
+                        return True
+                    if net.get_parent_module() is not scope:
+                        # We reached the enclosing scope, but couldn't find a net with a type: that must mean
+                        # that our source is also an optional input that wasn't driven.
+                        assert is_input_port(source)
+                        assert source.is_optional()
+                        return True
+                    source = net.get_source()
+                    if source is None:
+                        # We are at the end of the source chain and found no driver. That's OK
+                        return True
+                    if source.is_specialized():
+                        # We have found a type, which eventually should propagate to us. So far it haven't.
+                        return False 
+                assert False
 
             incomplete_sub_modules = OrderedSet(self._sub_modules)
             changes = True
@@ -940,11 +996,8 @@ class Module(object):
 
                 changes = False
                 for sub_module in tuple(incomplete_sub_modules):
-                    # propagate all newly assigned ports
-                    for input in sub_module.get_inputs().values():
-                        if not input.is_specialized() and input.source is not None and input.source.is_specialized():
-                            input.set_net_type(input.source.get_net_type())
-                    all_inputs_specialized = all(tuple(input.is_specialized() or not input.has_driver() for input in sub_module.get_inputs().values()))
+                    # TODO OPTIMIZE: We can optimize this loop quite a bit, creating an account of what inputs need specialization as we go about type propagation
+                    all_inputs_specialized = all(tuple(is_as_specialized_as_cant_be(input, self._true_module) for input in sub_module.get_inputs().values()))
                     if all_inputs_specialized:
                         with Module.Context(sub_module._impl):
                             sub_module._impl._elaborate(hier_level + 1, trace)
@@ -956,22 +1009,18 @@ class Module(object):
                 # Collect all nets that don't have a type, but must to continue
                 input_list = []
                 for sub_module in tuple(incomplete_sub_modules):
-                    input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or not input.has_driver()))
+                    input_list += (input for input in sub_module.get_inputs().values() if not (is_as_specialized_as_cant_be(input, self._true_module)))
                 if len(input_list) > 10:
                     list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list[:5]) + "\n    ...\n    " + "\n    ".join(i.get_diagnostic_name() for i in input_list[-5:])
                 else:
                     list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list)
                 raise SyntaxErrorException(f"Can't determine net types for:\n    {list_str}")
 
-            # Propagate output types, if needed
+            # Test that all our outputs have types
             for output in self.get_outputs().values():
-                if not output.is_specialized():
-                    if output.source is not None:
-                        if output.source.is_specialized():
-                            output.set_net_type(output.source.get_net_type())
-                        else:
-                            raise SyntaxErrorException(f"Output port {output} is not fully specialized after body call. Can't finalize interface")
-            assert all((output.is_specialized() or output.source is None) for output in self.get_outputs().values())
+                if not output.is_specialized() and output.get_source_net() is not None:
+                    raise SyntaxErrorException(f"Output port {output} is not fully specialized after body call. Can't finalize interface")
+            assert all((output.is_specialized() or output.get_source_net() is None) for output in self.get_outputs().values())
 
         def is_top_level(self) -> bool:
             return self.netlist.top_level is self._true_module
@@ -979,7 +1028,7 @@ class Module(object):
         def elaborate(self, *, add_unnamed_scopes: bool = False) -> Netlist:
 
             assert self not in self.netlist.modules, f"Module {self._true_module} has already been elaborated."
-            assert self.parent is None, "Only top level modules can be elaborated"
+            assert self.get_parent_module() is None, "Only top level modules can be elaborated"
 
             self.freeze_interface()
 
@@ -1000,42 +1049,41 @@ class Module(object):
             """
             Called from the framework as a wrapper for the per-module (class) body method
             """
-            with self._inside:
-                with Module._parent_modules.push(self._true_module):
-                    assert self.is_interface_frozen()
-                    with Module.Context(self):
-                        if trace:
-                            with Tracer():
-                                self._true_module.body()
-                        else:
+            with Module._parent_modules.push(self._true_module):
+                assert self.is_interface_frozen()
+                with Module.Context(self):
+                    if trace:
+                        with Tracer():
                             self._true_module.body()
+                    else:
+                        self._true_module.body()
 
-                    # Finish ordering sub-modules:
-                    for sub_module in self._unordered_sub_modules:
-                        self._sub_modules.append(sub_module)
-                    self._unordered_sub_modules.clear()
+                # Finish ordering sub-modules:
+                for sub_module in self._unordered_sub_modules:
+                    self._sub_modules.append(sub_module)
+                self._unordered_sub_modules.clear()
 
-                    def finalize_slices(junction):
-                        if junction.is_composite():
-                            for member, _ in junction.get_member_junctions().values():
-                                finalize_slices(member)
-                        else:
-                            junction.finalize_slices()
+                def finalize_slices(junction):
+                    if junction.is_composite():
+                        for member, _ in junction.get_member_junctions().values():
+                            finalize_slices(member)
+                    else:
+                        junction.finalize_slices()
 
-                    # Go through each junction and make sure their Concatenators are created if needed
-                    for junction in self.get_junctions().values():
-                        finalize_slices(junction)
-                    for junction in self._local_wires:
-                        finalize_slices(junction)
+                # Go through each junction and make sure their Concatenators are created if needed
+                for junction in self.get_junctions().values():
+                    finalize_slices(junction)
+                for junction in self._local_wires:
+                    finalize_slices(junction)
 
-                    # The above code might have added some modules into _unordered_sub_modules, so let's clear them once again
-                    for sub_module in self._unordered_sub_modules:
-                        self._sub_modules.append(sub_module)
+                # The above code might have added some modules into _unordered_sub_modules, so let's clear them once again
+                for sub_module in self._unordered_sub_modules:
+                    self._sub_modules.append(sub_module)
 
-                    del self._unordered_sub_modules # This will force all subsequent module instantiations (during type-propagation) to directly go to _sub_modules
+                del self._unordered_sub_modules # This will force all subsequent module instantiations (during type-propagation) to directly go to _sub_modules
 
 
-        def is_equivalent(self, other: 'module', netlist: 'NetList') -> bool:
+        def is_equivalent(self, other: 'module', netlist: 'Netlist') -> bool:
             """
             Determines if 'self' and 'other' can share the same module body. We use the following rules:
 
@@ -1132,7 +1180,7 @@ class Module(object):
             first_port = True
             is_composite = False
             for port_name, port in ports.items():
-                if not port.is_deleted():
+                if not port.is_deleted(self.netlist):
                     port_interface_strs = port.generate_interface(back_end, port_name)
                     after_composite = is_composite
                     is_composite = len(port_interface_strs) > 1
@@ -1261,7 +1309,7 @@ class Module(object):
                                 source_module = sub_module
                             else:
                                 source_module = source_port.get_parent_module()
-                                if source_module._impl.parent is not self._true_module:
+                                if source_module._impl.get_parent_module() is not self._true_module:
                                     source_port = sub_port
                                     source_module = sub_module
                             assert source_module is not None, "Strange: I don't think it's possible that an xnet is sourced by a floating port..."
@@ -1278,7 +1326,7 @@ class Module(object):
             if not self._generate_needed:
                 return None
             with self._in_generate:
-                with self._inside:
+                with Module._parent_modules.push(self):
                     return self._true_module.generate(netlist, back_end)
 
 
@@ -1318,11 +1366,8 @@ class DecoratorModule(GenericModule):
             if return_port is None:
                 raise SyntaxErrorException(f"Modularized function must return output ports or at least things that can be turned into output ports")
             assert isinstance(return_port, JunctionBase)
-            assert output_port.source is None
+            assert output_port.get_source_net() is None
             output_port <<= return_port
-            #for sink in output_port.sinks:
-            #    assert sink.source is output_port
-            #    sink.set_source(return_port)
             #delattr(self, name)
             #setattr(self, name, return_value)
             #del output_port
@@ -1332,8 +1377,11 @@ class DecoratorModule(GenericModule):
         # For all other arguments, we simply pass them on as-is
         self._impl._args = []
         self._impl._kwargs = dict()
+        scope = self._impl.get_parent_module()
         ports_needing_name = {}
         for arg in args:
+            if scope is None:
+                raise SyntaxErrorException("Can't instantiate top level module with call-syntax and port-bindings") 
             if is_junction_or_member(arg):
                 my_arg = Input()
                 ports_needing_name[my_arg] = arg
@@ -1342,10 +1390,12 @@ class DecoratorModule(GenericModule):
             self._impl._args.append(my_arg)
         # Named arguments are easy: we know what to bind them to and we know their name as well, so we need no magic
         for name, arg in kwargs:
+            if scope is None:
+                raise SyntaxErrorException("Can't instantiate top level module with call-syntax and port-bindings") 
             if is_junction_or_member(arg):
                 my_arg = Input()
                 setattr(self, name, my_arg)
-                my_arg.bind(arg)
+                my_arg.set_source(arg, scope)
             else:
                 my_arg = arg
             self._impl._kwargs[name] = my_arg
@@ -1359,7 +1409,7 @@ class DecoratorModule(GenericModule):
         for name, arg in bound_args.items():
             if arg in ports_needing_name:
                 setattr(self, name, arg)
-                arg.bind(convert_to_junction(ports_needing_name[arg], type_hint=None))
+                arg.set_source(ports_needing_name[arg], scope)
                 del ports_needing_name[arg]
         # Work through the remaining inputs and simply name them consecutively
         for idx, port, arg_junction in enumerate(ports_needing_name.items()):
@@ -1368,7 +1418,7 @@ class DecoratorModule(GenericModule):
                 if hasattr(self, port_name):
                     raise SyntaxErrorException("Can't add port {port_name} to modularized function: the attribute already exists")
             setattr(self, port_name, port)
-            port.bind(convert_to_junction(arg_junction, type_hint=None))
+            port.set_source(arg_junction, scope)
 
         ret_val = tuple(self._impl.get_outputs().values())
         if len(ret_val) == 1:

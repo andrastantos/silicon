@@ -25,7 +25,7 @@ def _sim_value(arg: Any) -> Any:
         return raw_val.as_number()
     except AttributeError:
         return raw_val
-    #if is_junction(arg):
+    #if is_junction_base(arg):
     #    return arg.sim_value
     #return arg
 

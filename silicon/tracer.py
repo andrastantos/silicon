@@ -87,49 +87,14 @@ class Tracer(object):
                         junction_parent_module = junction.get_parent_module()
                         parent_module = Module._parent_modules.top()
                         same_level = junction_parent_module is parent_module
-                        sub_level = junction_parent_module._impl.parent is parent_module
-                        is_unused_local_wire = is_wire(junction) and junction.source is None and len(junction.sinks) == 0
+                        sub_level = junction_parent_module._impl.get_parent_module() is parent_module
+                        is_unused_local_wire = is_wire(junction) and junction.get_source_net() is None and junction.get_sink_net() is None
                         if (same_level and not is_unused_local_wire) or (sub_level and not is_wire(junction)):
                             wire = Wire(parent_module=parent_module)
                             wire.local_name = local_name
+                            wire.set_source(junction, parent_module)
                             if Tracer.debug_print_level > 1:
                                 print(f"\tJUNCTION {wire.local_name} {id(wire):x} CREATED for {func_name}")
-                            # We have to figure out the best way to splice the new wire into the junction topology.
-                            # This normally doesn't matter, but interfaces are sensitive to it: they insist on a straight
-                            # topology with no bifurcations as the reversed members don't know how to deal with that.
-                            # The following cases are possible:
-                            # 1. junction is same-level input: we splice in after
-                            # 2. junction is same-level output: we splice in before
-                            # 3. junction is same-level wire: we splice in before/after, doesn't matter
-                            # 5. junction is sub-level input: we splice in before
-                            # 6. junction is sub-level output: we splice in after
-                            # 7. junction is sub-level wire: this is not supported, so leave as-is, don't try to interfere <-- this is handled in the condition above
-                            if (is_input_port(junction) and same_level) or (is_output_port(junction) and sub_level) or (is_wire(junction) and same_level):
-                                # splice after
-                                old_sink = first(junction.sinks) if len(junction.sinks) > 0 else None
-                                if Tracer.debug_print_level > 1:
-                                    print(f"\tjunction {id(junction):x} connectivity:")
-                                    if junction.source is not None:
-                                        print(f"\t   source: {id(junction.source):x}")
-                                    sinks = "; ".join(f"{id(sink):x}" for sink in junction.sinks)
-                                    print(f"\t   sinks: {sinks}")
-                                if old_sink is not None:
-                                    if Tracer.debug_print_level > 1:
-                                        print(f"\t-- splice after SETTING SOURCE OF {id(old_sink):x} to {id(wire):x} (used to be {id(old_sink.source):x})")
-                                    old_sink.set_source(wire)
-                                if Tracer.debug_print_level > 1:
-                                    print(f"\t-- splice after SETTING SOURCE OF {id(wire):x} to {id(junction):x}")
-                                wire.set_source(junction)
-                            else:
-                                # splice before
-                                old_source = junction.source
-                                if old_source is not None:
-                                    if Tracer.debug_print_level > 1:
-                                        print(f"\t-- splice before SETTING SOURCE OF {id(wire):x} to {id(old_source):x}")
-                                    wire.set_source(old_source)
-                                if Tracer.debug_print_level > 1:
-                                    print(f"\t-- splice before SETTING SOURCE OF {id(junction):x} to {id(wire):x} (used to be {id(junction.source):x})")
-                                junction.set_source(wire)
                         elif same_level and not is_unused_local_wire:
                             # This is an unused local wire.
                             if Tracer.debug_print_level > 0:

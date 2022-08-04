@@ -22,25 +22,43 @@ class AutoInputPort(InputPort):
     def find_cadidates(self):
         assert self.get_parent_module() is not None
         self._candidate = junction_ref(self.get_parent_module()._impl.get_auto_port_to_bind(self._auto_port_names))
-    def auto_bind(self):
-        # If someone bound to this port, let's not override that
-        if self.source is not None:
+    def auto_bind(self, scope: 'Module'):
+        # If someone drives to this port, let's not override that
+        if self.get_source_net() is not None:
             return
         if self._candidate is None and not self._optional:
             raise SyntaxErrorException(f"Can't auto-connect port {self}: none of the names {self._auto_port_names} could be found in the enclosing module")
         if self._candidate is not None:
-            self.set_source(self._candidate.junction)
-    def is_deleted(self) -> bool:
+            self.set_source(self._candidate.junction, scope)
+    def is_deleted(self, netlist: 'Netlist') -> bool:
         """
         Returns True if the port (an optional auto-port with no driver) got deleted from the interface
+
+        NOTE: netlist could be derived from 'self', but passed in to ensure this method is only called at the proper phase, that is when
+              we *have* a netlist already.
         """
         if self.get_parent_module()._impl.is_top_level():
             return False
-        return not self.has_driver() and self._optional
+
+        if self.is_specialized():
+            return False
+        try:
+            _ = netlist.get_xnet_for_junction(self)
+        except SyntaxErrorException:
+            pass
+        # There are two options here:
+        #  - We are not on any XNet: we must have no driver
+        #  - We're part of an XNet, yet we don't have a type, that means the XNet must not have a driver.
+        # Either way, should have only gotten this far if we are indeed optional, and we're deleted.
+        assert self._optional
+        return True
+
+    def is_optional(self) -> bool:
+        return self._optional
 
     def generate_interface(self, back_end: 'BackEnd', port_name: str) -> Sequence[str]:
         if not self.is_specialized():
-            assert self.is_deleted()
+            assert self._optional
             return []
 
         assert back_end.language == "SystemVerilog"
