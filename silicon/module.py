@@ -147,6 +147,9 @@ class Module(object):
 
 
     def __call__(self, *args, **kwargs) -> Union[Port, Tuple[Port]]:
+        scope = self._impl.parent
+        if scope is None and (len(args) > 0 or len(kwargs) > 0):
+            raise SyntaxErrorException(f"Can't use call-style instantiation with port-bindings of top level module")
         if Context.current() != Context.elaboration:
             raise SyntaxErrorException(f"Can't bind module using call-syntax outside of elaboration context")
         def do_call() -> Union[Port, Tuple[Port]]:
@@ -160,13 +163,13 @@ class Module(object):
                         raise SyntaxErrorException(f"Module {self} doesn't support dynamic creation of more positional ports")
                     my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
                 if arg_junction is not None:
-                    my_positional_inputs[idx].bind(arg_junction)
+                    my_positional_inputs[idx].set_source(arg_junction, scope)
             for arg_name, arg_value in kwargs.items():
                 arg_junction = convert_to_junction(arg_value, type_hint=None) if arg_value is not None else None
                 if not has_port(self, arg_name) and not self._impl._in_create_port:
                     self._impl._create_named_port(arg_name, arg_junction.get_net_type() if arg_junction is not None else None)
                 if arg_junction is not None:
-                    getattr(self, arg_name).bind(arg_junction)
+                    getattr(self, arg_name).set_source(arg_junction, scope)
             ret_val = tuple(self._impl.get_outputs().values())
             if len(ret_val) == 1:
                 return ret_val[0]
@@ -820,15 +823,14 @@ class Module(object):
                             # This happens with self.port <<= something constructors: we do the <<= operator, which returns the RHS, then assign it to the old property.
                             pass
                         else:
-                            #print("accessing existing port --> binding")
-                            # assignment-style binding is only allowed for outputs (on the inside) and inputs (on the outside)
-                            if self.is_inside():
-                                if is_input_port(junction_inst):
-                                    raise SyntaxErrorException(f"Can't assign to {junction_inst.junction_kind} port '{name}' from inside the module")
+                            scope = Module._parent_modules.top()
+                            if scope is self._true_module:
+                                junction_inst.set_source(junction_value, self._true_module)
                             else:
-                                if not is_input_port(junction_inst):
-                                    raise SyntaxErrorException(f"Can't assign to {junction_inst.junction_kind} port '{name}' from outside the module")
-                            junction_inst.bind(junction_value)
+                                scope = self.parent
+                                if scope is None:
+                                    raise SyntaxErrorException(f"Can't assign to {junction_inst.junction_kind} port '{name}' at the top level")
+                                junction_inst.set_source(junction_value, scope)
                     else:
                         # If the attribute is not a port, simply set it to the new value
                         return self.__set_no_bind_attr__(name, value, super_setter)
@@ -915,7 +917,7 @@ class Module(object):
                 # handle any pending auto-binds
                 for port in sub_module.get_ports().values():
                     if port._auto:
-                        port.auto_bind() # If already bound, this is a no-op, so it's safe to call it multiple times
+                        port.auto_bind(self._true_module) # If already bound, this is a no-op, so it's safe to call it multiple times
 
             # Go through each sub-module in a loop, and finalize their interface until everything is frozen
 
@@ -1333,7 +1335,10 @@ class DecoratorModule(GenericModule):
         self._impl._args = []
         self._impl._kwargs = dict()
         ports_needing_name = {}
+        scope = self._impl.parent
         for arg in args:
+            if scope is None:
+                raise SyntaxErrorException("Can't instantiate top level module with call-syntax and port-bindings") 
             if is_junction_or_member(arg):
                 my_arg = Input()
                 ports_needing_name[my_arg] = arg
@@ -1342,10 +1347,12 @@ class DecoratorModule(GenericModule):
             self._impl._args.append(my_arg)
         # Named arguments are easy: we know what to bind them to and we know their name as well, so we need no magic
         for name, arg in kwargs:
+            if scope is None:
+                raise SyntaxErrorException("Can't instantiate top level module with call-syntax and port-bindings") 
             if is_junction_or_member(arg):
                 my_arg = Input()
                 setattr(self, name, my_arg)
-                my_arg.bind(arg)
+                my_arg.set_source(arg, scope)
             else:
                 my_arg = arg
             self._impl._kwargs[name] = my_arg
@@ -1359,7 +1366,7 @@ class DecoratorModule(GenericModule):
         for name, arg in bound_args.items():
             if arg in ports_needing_name:
                 setattr(self, name, arg)
-                arg.bind(convert_to_junction(ports_needing_name[arg], type_hint=None))
+                arg.set_source(convert_to_junction(ports_needing_name[arg], type_hint=None), scope)
                 del ports_needing_name[arg]
         # Work through the remaining inputs and simply name them consecutively
         for idx, port, arg_junction in enumerate(ports_needing_name.items()):
@@ -1368,7 +1375,7 @@ class DecoratorModule(GenericModule):
                 if hasattr(self, port_name):
                     raise SyntaxErrorException("Can't add port {port_name} to modularized function: the attribute already exists")
             setattr(self, port_name, port)
-            port.bind(convert_to_junction(arg_junction, type_hint=None))
+            port.set_source(convert_to_junction(arg_junction, type_hint=None), scope)
 
         ret_val = tuple(self._impl.get_outputs().values())
         if len(ret_val) == 1:

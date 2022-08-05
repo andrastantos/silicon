@@ -33,6 +33,11 @@ class EdgeType(Enum):
     Undefined = 3
 
 class Junction(JunctionBase):
+    class NetEdge(object):
+        def __init__(self, far_end: 'Junction', scope: 'Module'):
+            self.far_end = far_end
+            self.scope = scope
+
     def __init__(self, net_type: Optional[NetTypeMeta] = None, parent_module: 'Module' = None, *, keyword_only: bool = False):
         # !!!!! SUPER IMPORTANT !!!!!
         # In most cases, Ports of a Module are set on the cls level, not inside __init__() (or construct()).
@@ -45,8 +50,8 @@ class Junction(JunctionBase):
         Context.register(self._context_change)
         assert parent_module is None or is_module(parent_module)
         from .module import Module
-        self.source: Optional['Port'] = None
-        self.sinks: Set[Junction] = OrderedSet()
+        self._source: Optional['Junction.NetEdge'] = None
+        self._sinks: Dict['Junction', 'Module'] = {}
         self._parent_module = parent_module
         self._in_attr_access = False
         self.interface_name = None # set to a string showing the interface name when the port/wire is assigned to a Module attribute (in Module.__setattr__)
@@ -62,6 +67,13 @@ class Junction(JunctionBase):
                 raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType.")
             self.set_net_type(net_type)
 
+    @property
+    def sinks(self):
+        return tuple(self._sinks.keys())
+    @property
+    def source(self):
+        if self._source is None: return None
+        return self._source.far_end
     def __str__(self) -> str:
         ret_val = self.get_diagnostic_name()
         if not self.is_specialized():
@@ -109,7 +121,8 @@ class Junction(JunctionBase):
         if len(self.raw_input_map) > 0:
             assert not self.is_composite() # We can only generate slices of non-compound types (TODO: what about vectors???)
             self.concatenator = self.get_net_type().create_member_setter()
-            self.set_source(self.concatenator.output_port)
+            self.set_source(self.concatenator.output_port, self.concatenator._impl.parent)
+            from .module import Module
             for (key, real_junction) in self.raw_input_map:
                 self.concatenator.add_input(key, real_junction)
             self.raw_input_map = [] # Prevent re-creation of Concatenator
@@ -148,13 +161,12 @@ class Junction(JunctionBase):
             net_type.setup_junction(self)
         # We need to ensure port type compatibility with all sinks/source
         if self.is_specialized():
-            for sink in tuple(self.sinks): # set_source can modify the list, so make an immutable copy
+            for sink, scope in tuple(self._sinks.items()): # set_source can modify the list, so make an immutable copy
                 if sink.is_specialized():
                     # Insert adaptor if needed (through set_source)
-                    sink.set_source(self)
-            if self.source is not None and self.source.is_specialized():
-                source = self.source
-                self.set_source(source)
+                    sink.set_source(self, scope)
+            if self._source is not None and self._source.far_end is not None and self._source.far_end.is_specialized():
+                self.set_source(self._source.far_end, self._source.scope)
 
     def has_driver(self, allow_non_auto_inputs: bool = False) -> bool:
         """
@@ -181,16 +193,18 @@ class Junction(JunctionBase):
             return False
         return self._net_type is not None
 
-    def set_source(self, source: 'Junction') -> None:
+    def set_source(self, source: 'JunctionBase', scope: 'Module') -> None:
+
         old_source = f"{id(self.source):x}" if self.source is not None else "--NONE--"
         def del_source() -> None:
             """
             Removes the potentially existing binding between this port and its source
             """
             #assert not self.is_composite() <-- we call this on composites now as well, but only after all the members are patched up. So it's OK to only deal with the top-level.
-            if self.source is not None:
-                self.source.sinks.remove(self)
-            self.source = None
+            if self._source is not None:
+                source = self._source.far_end
+                del source._sinks[self]
+            self._source = None
 
         # If both ports have types, make sure they're compatible.
         if source.is_specialized() and self.is_specialized():
@@ -226,9 +240,10 @@ class Junction(JunctionBase):
                         adaptor._impl._body(trace=False)
             if source is not old_junction and old_junction.get_parent_module()._impl.has_explicit_name:
                 with scope._impl._inside:
-                    naming_wire = Wire(source.get_net_type(), source.get_parent_module()._impl.parent)
+                    scope = source.get_parent_module()._impl.parent
+                    naming_wire = Wire(source.get_net_type(), scope)
                     naming_wire.local_name = old_junction.interface_name # This creates duplicates of course, but that will be resolved later on
-                    naming_wire.bind(source)
+                    naming_wire.set_source(source, scope=scope)
         # At this point source is compatible with us. The actual binding however will have to be done port-wise for composite types and recursively
         if self.is_composite():
             if not source.is_specialized():
@@ -241,14 +256,14 @@ class Junction(JunctionBase):
                 source.set_net_type(self.get_net_type())
             for member_name, (member_junction, reversed) in self.get_member_junctions().items():
                 if reversed:
-                    source.get_member_junctions()[member_name][0].set_source(member_junction)
+                    source.get_member_junctions()[member_name][0].set_source(member_junction, scope=scope)
                 else:
-                    member_junction.set_source(source.get_member_junctions()[member_name][0])
+                    member_junction.set_source(source.get_member_junctions()[member_name][0], scope=scope)
 
         del_source()
-        self.source = source
-        assert self not in source.sinks
-        source.sinks.add(self)
+        self._source = Junction.NetEdge(source, scope)
+        assert self not in source._sinks.keys()
+        source._sinks[self] = scope
         # TODO: deal with this through inheritance instead of type-check!
         if is_output_port(source):
             parent_module = source.get_parent_module()
@@ -581,6 +596,8 @@ class Junction(JunctionBase):
 
 
     def __ilshift__elab(self, other: Any) -> 'Junction':
+        if self.source is not None:
+            raise SyntaxErrorException(f"{self} is already bound to {self.source}.")
         try:
             junction_value = convert_to_junction(other, type_hint=None)
             if junction_value is None:
@@ -588,16 +605,21 @@ class Junction(JunctionBase):
                 raise SyntaxErrorException(f"Couldn't convert '{other}' to Junction.")
         except Exception as ex:
             raise SyntaxErrorException(f"Couldn't bind port to value '{other}' with exception '{ex}'")
-        # assignment-style binding is only allowed for outputs (on the inside) and inputs (on the outside)
-        if self.is_inside():
-            if is_input_port(self):
-                raise SyntaxErrorException(f"Can't assign to {self.junction_kind} port '{self.get_diagnostic_name()}' from inside the module")
-        else:
-            if not is_input_port(self):
-                raise SyntaxErrorException(f"Can't assign to {self.junction_kind} port '{self.get_diagnostic_name()}' from outside the module")
-        if self.source is not None:
-            raise SyntaxErrorException(f"Can't assign to {self.get_diagnostic_name()}: it already has a source")
-        self.bind(junction_value)
+        from .module import Module
+        scope = Module._parent_modules.top()
+        # We allow the following:
+        #
+        #    a <<= b
+        #    a <<= c
+        #
+        # This will blow up later, as both b and c are sources for a Net, but we can't be certain about it just here.
+        # That is because, this is fine:
+        #
+        #   b <<= a
+        #   a <<= c
+        #
+        # In both instances 'a' has a Net and since it's not organized, we don't know if a is a source or a sink in it.
+        self.set_source(junction_value, scope)
         return self
 
     def __ilshift__sim(self, other: Any) -> 'Junction':
@@ -836,28 +858,6 @@ class Port(Junction):
 
 
 class InputPort(Port):
-
-    def bind(self, other_junction: Junction) -> None:
-        assert is_junction(other_junction), "Can only bind to junction"
-        assert self.get_parent_module() is not None, "Can't bind free-standing junction"
-        assert other_junction.get_parent_module() is not None, "Can't bind to free-standing junctio"
-        assert not self.is_inside() or not other_junction.is_inside() or self.get_parent_module() is other_junction.get_parent_module(), "INTERNAL ERROR: how can it be that we're inside two modules at the same time?"
-        if not self.allow_bind():
-            raise SyntaxErrorException(f"Can't bind to port {self}: Port doesn't allow binding")
-        if not other_junction.allow_bind():
-            raise SyntaxErrorException(f"Can't bind port {other_junction}: Port doesn't allow binding")
-        if bool(self.is_inside()) == bool(other_junction.is_inside()):
-            # We're either outside of both modules, or we're inside a single module: connect inputs to outputs only
-            assert not is_input_port(other_junction), "Cannot bind input to input within the same hierarchy level"
-        else:
-            # We're inside one of the modules and outside the other: connect inputs to inputs only
-            # Actually that's not true: the other port could be either an input or an output
-            #assert is_input_port(other_junction), "Cannot bind input to output through hierarchy levels"
-            pass
-        if self.is_inside():
-            other_junction.set_source(self)
-        else:
-            self.set_source(other_junction)
     @classmethod
     def generate_junction_ref(cls, back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
@@ -882,25 +882,6 @@ class OutputPort(Port):
         super().__init__(net_type, parent_module)
         self.rhs_expression: Optional[Tuple[str, int]] = None # Filled-in by the parent_module during the 'generation' phase to contain the expression for the right-hand-side value, if inline expressions are supported for this port.
 
-    def bind(self, other_junction: Junction) -> None:
-        assert is_junction(other_junction), "Can only bind to junction"
-        assert self.get_parent_module() is not None, "Can't bind free-standing junction"
-        assert other_junction.get_parent_module() is not None, "Can't bind to free-standing junction"
-        assert not self.is_inside() or not other_junction.is_inside() or self.get_parent_module() is other_junction.get_parent_module(), "INTERNAL ERROR: how can it be that we're inside two modules at the same time?"
-        if not self.allow_bind():
-            raise SyntaxErrorException(f"Can't bind to port {self}: Port doesn't allow binding")
-        if not other_junction.allow_bind():
-            raise SyntaxErrorException(f"Can't bind port {other_junction}: Port doesn't allow binding")
-        if self.is_inside() == other_junction.is_inside():
-            # We're either outside of both modules, or we're inside a single module: connect inputs to outputs only
-            assert not is_output_port(other_junction), "Cannot bind output to output within the same hierarchy level"
-        else:
-            # We're inside one of the modules and outside the other: connect inputs to inputs only
-            assert not is_input_port(other_junction), "Cannot bind output to input through hierarchy levels"
-        if self.is_inside():
-            self.set_source(other_junction)
-        else:
-            other_junction.set_source(self)
     @classmethod
     def generate_junction_ref(cls, back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
@@ -951,25 +932,6 @@ class WireJunction(Junction):
         self.rhs_expression: Optional[Tuple[str, int]] = None # Filled-in by the parent_module during the 'generation' phase to contain the expression for the right-hand-side value, if inline expressions are supported for this port.
         self.local_name: Optional[str] = None
 
-    def bind(self, other_junction: Junction) -> None:
-        assert is_junction(other_junction), "Can only bind to junction"
-        assert self.get_parent_module() is not None, "Can't bind free-standing junction"
-        assert other_junction.get_parent_module() is not None, "Can't bind to free-standing junction"
-        assert not self.is_inside() or not other_junction.is_inside() or self.get_parent_module() is other_junction.get_parent_module(), "INTERNAL ERROR: how can it be that we're inside two modules at the same time?"
-        if not self.allow_bind():
-            raise SyntaxErrorException(f"Can't bind to wire {self}: Wire doesn't allow binding")
-        if not other_junction.allow_bind():
-            raise SyntaxErrorException(f"Can't bind net {other_junction}: Net doesn't allow binding")
-        if self.is_inside() == other_junction.is_inside():
-            # We're either outside of both modules, or we're inside a single module: connect inputs to outputs only
-            assert not is_output_port(other_junction), "Cannot bind output to output within the same hierarchy level"
-        else:
-            # We're inside one of the modules and outside the other: connect inputs to inputs only
-            assert not is_input_port(other_junction), "Cannot bind output to input through hierarchy levels"
-        if self.is_inside():
-            self.set_source(other_junction)
-        else:
-            other_junction.set_source(self)
     @classmethod
     def is_instantiable(cls) -> bool:
         return True

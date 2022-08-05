@@ -116,20 +116,20 @@ class Tracer(object):
                                 if old_sink is not None:
                                     if Tracer.debug_print_level > 1:
                                         print(f"\t-- splice after SETTING SOURCE OF {id(old_sink):x} to {id(wire):x} (used to be {id(old_sink.source):x})")
-                                    old_sink.set_source(wire)
+                                    old_sink.set_source(wire, scope=parent_module)
                                 if Tracer.debug_print_level > 1:
                                     print(f"\t-- splice after SETTING SOURCE OF {id(wire):x} to {id(junction):x}")
-                                wire.set_source(junction)
+                                wire.set_source(junction, scope=parent_module)
                             else:
                                 # splice before
                                 old_source = junction.source
                                 if old_source is not None:
                                     if Tracer.debug_print_level > 1:
                                         print(f"\t-- splice before SETTING SOURCE OF {id(wire):x} to {id(old_source):x}")
-                                    wire.set_source(old_source)
+                                    wire.set_source(old_source, scope=parent_module)
                                 if Tracer.debug_print_level > 1:
                                     print(f"\t-- splice before SETTING SOURCE OF {id(junction):x} to {id(wire):x} (used to be {id(junction.source):x})")
-                                junction.set_source(wire)
+                                junction.set_source(wire, scope=parent_module)
                         elif same_level and not is_unused_local_wire:
                             # This is an unused local wire.
                             if Tracer.debug_print_level > 0:

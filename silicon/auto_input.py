@@ -22,14 +22,14 @@ class AutoInputPort(InputPort):
     def find_cadidates(self):
         assert self.get_parent_module() is not None
         self._candidate = junction_ref(self.get_parent_module()._impl.get_auto_port_to_bind(self._auto_port_names))
-    def auto_bind(self):
+    def auto_bind(self, scope: 'Module'):
         # If someone bound to this port, let's not override that
         if self.source is not None:
             return
         if self._candidate is None and not self._optional:
             raise SyntaxErrorException(f"Can't auto-connect port {self}: none of the names {self._auto_port_names} could be found in the enclosing module")
         if self._candidate is not None:
-            self.set_source(self._candidate.junction)
+            self.set_source(self._candidate.junction, scope)
     def is_deleted(self) -> bool:
         """
         Returns True if the port (an optional auto-port with no driver) got deleted from the interface
