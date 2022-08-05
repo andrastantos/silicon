@@ -13,6 +13,27 @@ quite work now as we don't necessarily have source-sink info on the nets when `s
 
 + Nets are now just one 'level' of an Xnet: one source and its sinks. This is very similar to what we used to maintain, except we keep it outside and it allows for late-assignment of the source. As such, we allow reading of outputs inside modules.
 
+# Nets: a new approach
+
+After all, I think what I want is a netlist, that is the actual graph representation. That is to say, we have two classes of objects:
+- NetEdges, which have one source and one sink, plus a scope and a potential type attached to them
+- NetNodes, which are essentially Junctions, renamed.
+
+This way we can have an output for instance driving sinks both inside and outside its module, no need to re-purposing its driver. This can be re-written, if needed during RTL generation. The only limitation is: outputs can't appear on the LHS outside and inputs on the LHS inside a module. All other connections are legal.
+
+We can have three ways of storing (and looking up) nets:
+
+    my_port.parent_module.nets_by_source[my_port]
+    my_port.parent_module.nets_by_sink[my_port]
+
+    my_port.sources[my_port.parent_module]
+    my_port.sinks[my_port.parent_module]
+
+    Netlist[my_port.parent_module].nets_by_source[my_port]
+    Netlist[my_port.parent_module].nets_by_sink[my_port]
+
+The last one doesn't require any knowledge of the nets inside the NetNode object or a Module for that matter. It appears to me that all require three hash lookups, so there shouldn't be a huge performance delta. That is to say: I'm going with the last approach
+
 ## More on Nets
 
 Here's a new concept: the connectivity in the end of an XNet is a tree. As such, each (non-terminal) node has a 'previous' (source) and a set of 'subsequent' (sink) nodes. Let's call a Net one `Junction` and all its sinks. A `Junction` is then part of at most two Nets. One as a sink, another as a source. Each Net though *does* have both a source and a set of sinks. Each Net also has a unique scope, the `Module` instance that contains the net.

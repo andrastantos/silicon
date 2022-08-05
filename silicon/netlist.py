@@ -199,6 +199,11 @@ class XNet(object):
     def get_num_bits(self) -> int:
         return self.get_net_type().get_num_bits()
 
+class NetEdge(object):
+    def __init__(self, source: 'JunctionBase', sink: 'Junction', scope: 'Module'):
+        self.scope = scope
+        self.source = source
+        self.sink = sink
 class Netlist(object):
     def __init__(self, top_level: 'Module'):
         assert is_module(top_level)
@@ -213,7 +218,67 @@ class Netlist(object):
         self.xnets = OrderedSet()
         self.junction_to_xnet_map = OrderedDict()
         self.module_to_xnet_map = OrderedDict()
+        # Raw netlist support
+        self.scopes: Dict['Module', Tuple[Dict['Junction', 'Net'], Dict['Junction', 'Net']]] = OrderedDict()
+        self.source_to_net_map = OrderedDict()
+        self.sink_to_net_map = OrderedDict()
 
+    # Raw netlist support
+    ###############################################
+    def add_edge(self, source: 'Junction', sink: 'Junction', scope: 'Module'):
+        if is_output_port(sink) and sink.get_parent_module() is not scope:
+            raise SyntaxErrorException(f"Can' only assign to output port '{sink}' inside module '{scope}'")
+        if is_input_port(sink) and sink.get_parent_module() is scope:
+            raise SyntaxErrorException(f"Can' only assign to input port '{sink}' outside module '{scope}'")
+        net = NetEdge(source, sink, scope)
+        try:
+            self.source_to_net_map[source].add(net)
+        except KeyError:
+            self.source_to_net_map[source] = OrderedSet((net,))
+        try:
+            self.sink_to_net_map[sink].add(net)
+        except KeyError:
+            self.sink_to_net_map[sink] = OrderedSet((net,))
+        try:
+            scoped_nets = self.scopes[scope]
+        except KeyError:
+            scoped_nets = (OrderedDict(), OrderedDict())
+            self.scopes[scope] = scoped_nets
+        try:
+            scoped_nets[0][source].add(net)
+        except KeyError:
+            scoped_nets[0][source] = OrderedSet((net,))
+        try:
+            scoped_nets[1][sink].add(net)
+        except KeyError:
+            scoped_nets[1][sink] = OrderedSet((net,))
+
+    def get_sinks_for(self, source: 'Junction', scope: Optional['Module'] = None) -> Sequence[NetEdge]:
+        if scope is None:
+            try:
+                return self.source_to_net_map[source]
+            except KeyError:
+                return OrderedSet()
+        else:
+            try:
+                return self.scopes[scope][0][source]
+            except KeyError:
+                return OrderedSet()
+
+    def get_sinks_for(self, source: 'Junction', scope: Optional['Module'] = None) -> Sequence[NetEdge]:
+        if scope is None:
+            try:
+                return self.source_to_net_map[source]
+            except KeyError:
+                return OrderedSet()
+        else:
+            try:
+                return self.scopes[scope][0][source]
+            except KeyError:
+                return OrderedSet()
+
+    # Flattened netlist (XNet) support
+    ###############################################
     def _register_net_type(self, net_type: 'NetType'):
         type_name = net_type.get_type_name()
         if type_name is not None:
