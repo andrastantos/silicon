@@ -193,7 +193,15 @@ class Junction(JunctionBase):
             return False
         return self._net_type is not None
 
-    def set_source(self, source: 'JunctionBase', scope: 'Module') -> None:
+    def set_source(self, source: Any, scope: 'Module') -> None:
+        passed_in_source = source
+        if source is not None:
+            source = convert_to_junction(source, type_hint=None)
+            if source is None:
+                # We couldn't create a port out of the value:
+                raise SyntaxErrorException(f"couldn't convert '{passed_in_source}' to Junction.")
+            source = source.get_underlying_junction()
+            assert isinstance(source, Junction)
 
         old_source = f"{id(self.source):x}" if self.source is not None else "--NONE--"
         def del_source() -> None:
@@ -600,28 +608,9 @@ class Junction(JunctionBase):
     def __ilshift__elab(self, other: Any) -> 'Junction':
         if self.source is not None:
             raise SyntaxErrorException(f"{self} is already bound to {self.source}.")
-        try:
-            junction_value = convert_to_junction(other, type_hint=None)
-            if junction_value is None:
-                # We couldn't create a port out of the value:
-                raise SyntaxErrorException(f"Couldn't convert '{other}' to Junction.")
-        except Exception as ex:
-            raise SyntaxErrorException(f"Couldn't bind port to value '{other}' with exception '{ex}'")
         from .module import Module
         scope = Module._parent_modules.top()
-        # We allow the following:
-        #
-        #    a <<= b
-        #    a <<= c
-        #
-        # This will blow up later, as both b and c are sources for a Net, but we can't be certain about it just here.
-        # That is because, this is fine:
-        #
-        #   b <<= a
-        #   a <<= c
-        #
-        # In both instances 'a' has a Net and since it's not organized, we don't know if a is a source or a sink in it.
-        self.set_source(junction_value, scope)
+        self.set_source(other, scope)
         return self
 
     def __ilshift__sim(self, other: Any) -> 'Junction':

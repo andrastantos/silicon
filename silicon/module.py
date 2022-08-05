@@ -5,7 +5,7 @@ import typing
 from collections import OrderedDict
 from .port import Junction, Port, Output, Input, Wire, JunctionBase
 from .net_type import NetType, NetTypeMeta
-from .utils import convert_to_junction, BoolMarker, str_block, CountMarker, TSimEvent, ContextMarker, first, Context
+from .utils import BoolMarker, str_block, CountMarker, TSimEvent, ContextMarker, first, Context
 from .stack import Stack
 from .tracer import Tracer, Trace, NoTrace, trace, no_trace
 from .netlist import Netlist
@@ -155,21 +155,19 @@ class Module(object):
         def do_call() -> Union[Port, Tuple[Port]]:
             my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
             for idx, arg in enumerate(args):
-                arg_junction = convert_to_junction(arg, type_hint=None) if arg is not None else None
                 if idx >= len(my_positional_inputs) and not self._impl._in_create_port:
                     input_cnt = len(my_positional_inputs)
-                    self._impl._create_positional_port(idx, arg_junction.get_net_type() if arg_junction is not None else None)
+                    self._impl._create_positional_port(idx, None)
                     if len(self._impl.get_inputs()) == input_cnt:
                         raise SyntaxErrorException(f"Module {self} doesn't support dynamic creation of more positional ports")
                     my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
-                if arg_junction is not None:
-                    my_positional_inputs[idx].set_source(arg_junction, scope)
+                if arg is not None:
+                    my_positional_inputs[idx].set_source(arg, scope)
             for arg_name, arg_value in kwargs.items():
-                arg_junction = convert_to_junction(arg_value, type_hint=None) if arg_value is not None else None
                 if not has_port(self, arg_name) and not self._impl._in_create_port:
-                    self._impl._create_named_port(arg_name, arg_junction.get_net_type() if arg_junction is not None else None)
-                if arg_junction is not None:
-                    getattr(self, arg_name).set_source(arg_junction, scope)
+                    self._impl._create_named_port(arg_name, None)
+                if arg_value is not None:
+                    getattr(self, arg_name).set_source(arg_value, scope)
             ret_val = tuple(self._impl.get_outputs().values())
             if len(ret_val) == 1:
                 return ret_val[0]
@@ -809,28 +807,19 @@ class Module(object):
                         return self.__set_no_bind_attr__(name, value, super_setter)
                     # At this point, the attribute exists, either because we've created as a junction just now or because it already was there. See if it's a junction...
                     if is_junction(getattr(self._true_module, name)):
-                        try:
-                        #if True:
-                            junction_value = convert_to_junction(value, type_hint=None)
-                            if junction_value is None:
-                                # We couldn't create a port out of the value:
-                                raise SyntaxErrorException(f"couldn't convert '{value}' to Junction.")
-                        except Exception as ex:
-                            raise SyntaxErrorException(f"couldn't bind junction to value '{value}' with exception '{ex}'")
-                        assert isinstance(junction_value, JunctionBase)
                         junction_inst = getattr(self._true_module, name)
-                        if junction_value is junction_inst:
+                        if value is junction_inst:
                             # This happens with self.port <<= something constructors: we do the <<= operator, which returns the RHS, then assign it to the old property.
                             pass
                         else:
                             scope = Module._parent_modules.top()
                             if scope is self._true_module:
-                                junction_inst.set_source(junction_value, self._true_module)
+                                junction_inst.set_source(value, self._true_module)
                             else:
                                 scope = self.parent
                                 if scope is None:
                                     raise SyntaxErrorException(f"Can't assign to {junction_inst.junction_kind} port '{name}' at the top level")
-                                junction_inst.set_source(junction_value, scope)
+                                junction_inst.set_source(value, scope)
                     else:
                         # If the attribute is not a port, simply set it to the new value
                         return self.__set_no_bind_attr__(name, value, super_setter)
@@ -1314,20 +1303,11 @@ class DecoratorModule(GenericModule):
         if len(return_values) != len(self._impl.get_outputs()):
             raise SyntaxErrorException(f"Modularized function returned {len(return_values)} values, where decorator declared {len(self._impl.get_outputs())} outputs. These two must match")
         for return_value, (name, output_port) in zip(return_values, self._impl.get_outputs().items()):
-            # We need to do a little slight of hands here: the original output port needs to be replaced with the one returned by the function.
-            # TODO: That's not true, I don't think. We can simply hook up the real outputs as sources to the previously created output
-            return_port = convert_to_junction(return_value, type_hint=None)
-            if return_port is None:
-                raise SyntaxErrorException(f"Modularized function must return output ports or at least things that can be turned into output ports")
-            assert isinstance(return_port, JunctionBase)
             assert output_port.source is None
-            output_port <<= return_port
-            #for sink in output_port.sinks:
-            #    assert sink.source is output_port
-            #    sink.set_source(return_port)
-            #delattr(self, name)
-            #setattr(self, name, return_value)
-            #del output_port
+            try:
+                output_port <<= return_value
+            except SyntaxErrorException:
+                raise SyntaxErrorException(f"Modularized function must return output ports or at least things that can be turned into output ports")
 
     def __call__(self, *args, **kwargs) -> Union[Port, Tuple[Port]]:
         # For any port argument, we'll create an input port (yet unnamed and not added to the interface)
@@ -1366,7 +1346,7 @@ class DecoratorModule(GenericModule):
         for name, arg in bound_args.items():
             if arg in ports_needing_name:
                 setattr(self, name, arg)
-                arg.set_source(convert_to_junction(ports_needing_name[arg], type_hint=None), scope)
+                arg.set_source(ports_needing_name[arg], scope)
                 del ports_needing_name[arg]
         # Work through the remaining inputs and simply name them consecutively
         for idx, port, arg_junction in enumerate(ports_needing_name.items()):
@@ -1375,7 +1355,7 @@ class DecoratorModule(GenericModule):
                 if hasattr(self, port_name):
                     raise SyntaxErrorException("Can't add port {port_name} to modularized function: the attribute already exists")
             setattr(self, port_name, port)
-            port.set_source(convert_to_junction(arg_junction, type_hint=None), scope)
+            port.set_source(arg_junction, scope)
 
         ret_val = tuple(self._impl.get_outputs().values())
         if len(ret_val) == 1:

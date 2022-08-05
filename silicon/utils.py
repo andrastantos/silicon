@@ -119,6 +119,8 @@ def convert_to_junction(thing: Any, type_hint: Optional['NetType']=None) -> Opti
     from .primitives import Concatenator
     import collections
 
+    if is_junction(thing):
+        return thing
     context = Context.current()
     if context == Context.elaboration:
         if hasattr(thing, "get_underlying_junction"):
