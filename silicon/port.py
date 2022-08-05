@@ -214,19 +214,21 @@ class Junction(JunctionBase):
             # There are four possibilities:
             # 1. An input of a module is assigned to an output of the same -> insert into the parent scope
             if self.get_parent_module() is source.get_parent_module():
-                scope = self.get_parent_module()
+                my_scope = self.get_parent_module()
             # 2. Two ports feed one another on the same hierarchy level -> insert into enclosing scope
             elif self.get_parent_module()._impl.parent is source.get_parent_module()._impl.parent:
-                scope = self.get_parent_module()._impl.parent
+                my_scope = self.get_parent_module()._impl.parent
             # 3. Outer input feeds inner input -> insert into outer scope
             elif self.get_parent_module() is source.get_parent_module()._impl.parent:
-                scope = source.get_parent_module()._impl.parent
+                my_scope = source.get_parent_module()._impl.parent
             # 4. Inner output feeds outer output -> insert into outer scope
             elif self.get_parent_module()._impl.parent is source.get_parent_module():
-                scope = self.get_parent_module()._impl.parent
+                my_scope = self.get_parent_module()._impl.parent
             else:
                 raise SyntaxErrorException(f"Can't set {source} as the source of {self}. Most likely reason is that they skip hierarchy levels.")
-            assert scope is not None
+            if scope is not my_scope:
+                from sys import stderr
+                print(f"************ WARNING **************** SCOPE CHANGE FROM OLD LOGIC!!!!!!!!!!", file=stderr)
             assert is_module(scope)
             from .module import Module
             with Module._parent_modules.push(scope):
