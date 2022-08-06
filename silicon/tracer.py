@@ -90,6 +90,8 @@ class Tracer(object):
                         sub_level = junction_parent_module._impl.parent is parent_module
                         is_unused_local_wire = is_wire(junction) and junction.source is None and len(junction.sinks) == 0
                         if (same_level and not is_unused_local_wire) or (sub_level and not is_wire(junction)):
+                            # We need to name the net. We do that by adding a wire with a name attached to it, which matches
+                            # the local variables' name.
                             wire = Wire(parent_module=parent_module)
                             wire.local_name = local_name
                             if Tracer.debug_print_level > 1:

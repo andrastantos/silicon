@@ -141,9 +141,7 @@ class Junction(JunctionBase):
                 return cls
 
     def set_net_type(self, net_type: Optional[NetType]) -> None:
-        # Only allow the net_type to be set if it's not set yet, or if it's an abstract type (that is to allow specialization of a port)
-        # TODO: For now we also allow the net_type to be set from one abstract type to another one, but that can probably be tightened later
-        #       For example, we could say that the new prot type must be an instance of the old port type...
+        # Only allow the net_type to be set if it's not yet set.
         if self._net_type is net_type:
             return
         assert not self.is_specialized()
@@ -159,14 +157,10 @@ class Junction(JunctionBase):
                 extra_dict = None
             self.__class__ = create_junction_type(self.get_junction_type(), net_type, extra_bases, extra_dict)
             net_type.setup_junction(self)
-        # We need to ensure port type compatibility with all sinks/source
-        if self.is_specialized():
-            for sink, scope in tuple(self._sinks.items()): # set_source can modify the list, so make an immutable copy
-                if sink.is_specialized():
-                    # Insert adaptor if needed (through set_source)
-                    sink.set_source(self, scope)
-            if self._source is not None and self._source.far_end is not None and self._source.far_end.is_specialized():
-                self.set_source(self._source.far_end, self._source.scope)
+            self.connect_composite_members()
+            # If we got a type, our sinks might be able to connect their members too...
+            for sink in self._sinks.keys():
+                sink.connect_composite_members()
 
     def has_driver(self, allow_non_auto_inputs: bool = False) -> bool:
         """
@@ -193,6 +187,52 @@ class Junction(JunctionBase):
             return False
         return self._net_type is not None
 
+    def connect_composite_members(self):
+        # If called on an untyped port or on an edge with not yet resolved type incompatibilities, bail out
+        if not self.is_specialized():
+            return
+        source = self.source
+        if source is None:
+            return
+        scope = self._source.scope
+        if self.is_composite():
+            if not source.is_specialized():
+                return
+                assert False
+                # It's possible that the source doesn't quite yet have a type (for example the result of a Select on a Struct).
+                # In that case, we back-propagate the sinks' type to the source.
+                sinks = source.get_all_sinks()
+                for sink in sinks:
+                    if sink.is_specialized() and self.get_net_type() != sink.get_net_type():
+                        raise SyntaxErrorException(f"A sink of junction {source} ({sink}) is of the wrong type. All sinks should have type {source.get_net_type()}.")
+                source.set_net_type(self.get_net_type())
+            if self.get_net_type() is not source.get_net_type():
+                return
+            for member_name, (member_junction, reversed) in self.get_member_junctions().items():
+                if reversed:
+                    source.get_member_junctions()[member_name][0].set_source(member_junction, scope=scope)
+                else:
+                    member_junction.set_source(source.get_member_junctions()[member_name][0], scope=scope)
+
+    def _del_source(self) -> None:
+        """
+        Removes the potentially existing binding between this port and its source
+        """
+        if self._source is not None:
+            source = self._source.far_end
+            if self.is_composite() and source is not None:
+                for member_name, (member_junction, reversed) in self.get_member_junctions().items():
+                    if reversed:
+                        # It's possible that the source doesn't have a type, in which case this will fail. That's fine
+                        try:
+                            source.get_member_junctions()[member_name][0]._del_source()
+                        except KeyError:
+                            pass
+                    else:
+                        member_junction._del_source()
+            del source._sinks[self]
+        self._source = None
+
     def set_source(self, source: Any, scope: 'Module') -> None:
         passed_in_source = source
         if source is not None:
@@ -204,76 +244,12 @@ class Junction(JunctionBase):
             assert isinstance(source, Junction)
 
         old_source = f"{id(self.source):x}" if self.source is not None else "--NONE--"
-        def del_source() -> None:
-            """
-            Removes the potentially existing binding between this port and its source
-            """
-            #assert not self.is_composite() <-- we call this on composites now as well, but only after all the members are patched up. So it's OK to only deal with the top-level.
-            if self._source is not None:
-                source = self._source.far_end
-                del source._sinks[self]
-            self._source = None
-
-        # If both ports have types, make sure they're compatible.
-        if source.is_specialized() and self.is_specialized():
-            # Insert adaptor if needed
-            old_junction = source
-            # ... but first figure out into which context the adaptor should be inserted (if any).
-            # There are four possibilities:
-            # 1. An input of a module is assigned to an output of the same -> insert into the parent scope
-            if self.get_parent_module() is source.get_parent_module():
-                my_scope = self.get_parent_module()
-            # 2. Two ports feed one another on the same hierarchy level -> insert into enclosing scope
-            elif self.get_parent_module()._impl.parent is source.get_parent_module()._impl.parent:
-                my_scope = self.get_parent_module()._impl.parent
-            # 3. Outer input feeds inner input -> insert into outer scope
-            elif self.get_parent_module() is source.get_parent_module()._impl.parent:
-                my_scope = source.get_parent_module()._impl.parent
-            # 4. Inner output feeds outer output -> insert into outer scope
-            elif self.get_parent_module()._impl.parent is source.get_parent_module():
-                my_scope = self.get_parent_module()._impl.parent
-            else:
-                raise SyntaxErrorException(f"Can't set {source} as the source of {self}. Most likely reason is that they skip hierarchy levels.")
-            if scope is not my_scope:
-                from sys import stderr
-                print(f"************ WARNING **************** SCOPE CHANGE FROM OLD LOGIC!!!!!!!!!!", file=stderr)
-            assert is_module(scope)
-            from .module import Module
-            with Module._parent_modules.push(scope):
-                with ContextMarker(Context.elaboration):
-                    source = implicit_adapt(source, self.get_net_type())
-                # If an adaptor was created, we'll have to make sure it's properly registered.
-                if Context.current() != Context.elaboration:
-                    if source is not old_junction:
-                        adaptor = source.get_parent_module()
-                        adaptor._impl.freeze_interface()
-                        adaptor._impl._body(trace=False)
-            if source is not old_junction and old_junction.get_parent_module()._impl.has_explicit_name:
-                with scope._impl._inside:
-                    scope = source.get_parent_module()._impl.parent
-                    naming_wire = Wire(source.get_net_type(), scope)
-                    naming_wire.local_name = old_junction.interface_name # This creates duplicates of course, but that will be resolved later on
-                    naming_wire.set_source(source, scope=scope)
-        # At this point source is compatible with us. The actual binding however will have to be done port-wise for composite types and recursively
-        if self.is_composite():
-            if not source.is_specialized():
-                # It's possible that the source doesn't quite yet have a type (for example the result of a Select on a Struct).
-                # In that case, we back-propagate the sinks' type to the source.
-                sinks = source.get_all_sinks()
-                for sink in sinks:
-                    if sink.is_specialized() and self.get_net_type() != sink.get_net_type():
-                        raise SyntaxErrorException(f"A sink of junction {source} ({sink}) is of the wrong type. All sinks should have type {source.get_net_type()}.")
-                source.set_net_type(self.get_net_type())
-            for member_name, (member_junction, reversed) in self.get_member_junctions().items():
-                if reversed:
-                    source.get_member_junctions()[member_name][0].set_source(member_junction, scope=scope)
-                else:
-                    member_junction.set_source(source.get_member_junctions()[member_name][0], scope=scope)
-
-        del_source()
+        self._del_source()
         self._source = Junction.NetEdge(source, scope)
         assert self not in source._sinks.keys()
         source._sinks[self] = scope
+        self.connect_composite_members()
+
         # TODO: deal with this through inheritance instead of type-check!
         if is_output_port(source):
             parent_module = source.get_parent_module()
@@ -864,6 +840,13 @@ class InputPort(Port):
         return True
     junction_kind: str = "input"
 
+    def set_source(self, source: Any, scope: 'Module') -> None:
+        """
+        We don't allow assignment from 'inside'
+        """
+        if self.get_parent_module() is scope:
+            raise SyntaxErrorException(f"Can't assign to input port {self} from within its module")
+        super().set_source(source, scope)
 
 
 
@@ -896,6 +879,14 @@ class OutputPort(Port):
         Returns True if the port (an optional auto-port with no driver) got deleted from the interface
         """
         return False
+
+    def set_source(self, source: Any, scope: 'Module') -> None:
+        """
+        We don't allow assignment from 'outside'
+        """
+        if self.get_parent_module() is not scope:
+            raise SyntaxErrorException(f"Can't assign to output port {self} from outside its module")
+        super().set_source(source, scope)
 
     '''
     class OutputSliceGetter(object):

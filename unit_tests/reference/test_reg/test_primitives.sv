@@ -30,9 +30,9 @@ module top (
 	always_ff @(posedge clk1) reset_reg <= uin2[1] ? 2'h3 : uin1;
 	always_ff @(posedge clk1) reset_reg2 <= reset ? 2'h2 : uin1;
 	assign sout1 = u_output_port;
+	assign uout1 = registered;
 	assign uout2 = u5_output_port;
 	assign uout3 = u6_output_port;
-	assign uout1 = registered;
 
 	assign uout4 = 5'hx;
 	assign clk = clk1;

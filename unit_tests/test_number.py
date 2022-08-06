@@ -135,11 +135,11 @@ def test_assign():
             self.out1 = self.in1
             self.uout1 = 42
             self.sout1 = 43
-            with ExpectError(SyntaxErrorException):
-                self.uout2 = -44
+            self.uout2 = -44 # This should blow up (eventually)
             self.sout2 = -45
 
-    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+    with ExpectError(SyntaxErrorException):
+        test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_concatenate():
     class top(Module):
@@ -746,13 +746,13 @@ def test_float_convert():
 if __name__ == "__main__":
     #test_sim_value_fract()
     #test_sim_value_int()
-    test_mix1()
+    #test_mix1()
     #test_binary_ops()
     #test_closure()
     #test_closure1()
     #test_closure2()
     #test_slices()
-    #test_assign()
+    test_assign()
     #test_concatenate()
     #test_slice_new()
     #test_slice_with()

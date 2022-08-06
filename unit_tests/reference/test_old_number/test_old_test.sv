@@ -16,25 +16,25 @@ module top (
 	logic a0;
 	logic b0;
 	logic c0;
-	logic u9_out_a;
+	logic u8_out_a;
 
 	assign a0 = in_a[0];
 	assign b0 = in_b[0];
 	assign out_num = in_b & in_c;
-	assign out_num_b = 5'h1f;
-	assign out_b = {6'(1'h0), u9_out_a, in_a[3:1], c0};
+	assign out_b = {6'(1'h0), u8_out_a, in_a[3:1], c0};
 	assign out_d = {7'(1'h0), 4'({c0, b0, in_a[4]})};
+	assign out_num_b = 5'h1f;
 
-	test_old_test_test_old_number__locals__and_gate u7 (
+	test_old_test_test_old_number__locals__and_gate u6 (
 		.in_a(a0),
 		.in_b(b0),
 		.out_a(c0)
 	);
 
-	test_old_test_test_old_number__locals__and_gate u9 (
+	test_old_test_test_old_number__locals__and_gate u8 (
 		.in_a(in_a[3]),
 		.in_b(in_a[4]),
-		.out_a(u9_out_a)
+		.out_a(u8_out_a)
 	);
 
 	assign out_a = 1'hx;

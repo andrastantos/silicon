@@ -14,7 +14,7 @@ from .ordered_set import OrderedSet
 from .exceptions import SimulationException, SyntaxErrorException
 from threading import RLock
 from itertools import chain, zip_longest
-from .utils import is_port, is_input_port, is_output_port, is_wire, is_junction_member, is_module, fill_arg_names, is_junction_or_member, is_junction, is_iterable, MEMBER_DELIMITER, first
+from .utils import is_port, is_input_port, is_output_port, is_wire, is_junction_member, is_module, fill_arg_names, is_junction_or_member, is_junction, is_iterable, MEMBER_DELIMITER, first, implicit_adapt
 from .state_stack import StateStackElement
 import inspect
 
@@ -911,6 +911,7 @@ class Module(object):
             # Go through each sub-module in a loop, and finalize their interface until everything is frozen
 
             def propagate_net_types():
+                # First set net types on junctions where the source has a type, but the sink doesn't
                 incomplete_junctions = OrderedSet(junction for junction in chain(self.get_junctions().values(), self._local_wires) if not junction.is_specialized() and junction.source is not None)
                 changes = True
                 while len(incomplete_junctions) > 0 and changes:
@@ -920,7 +921,30 @@ class Module(object):
                             junction.set_net_type(junction.source.get_net_type())
                             changes = True
                             incomplete_junctions.remove(junction)
-                return
+                # Look through all junctions for incompatible source-sink types and insert adaptors as needed
+                for junction in tuple(chain(self.get_junctions().values(), self._local_wires)):
+                    old_source = junction.source
+                    if junction.is_specialized() and old_source is not None and old_source.is_specialized():
+                        if junction.get_net_type() is not old_source.get_net_type():
+                            # Inserting an adaptor
+                            scope = junction._source.scope
+                            with Module._parent_modules.push(scope):
+                                with ContextMarker(Context.elaboration):
+                                    source = implicit_adapt(old_source, junction.get_net_type())
+                                # If an adaptor was created, we'll have to make sure it's properly registered.
+                                if source is not old_source:
+                                    if Context.current() != Context.elaboration:
+                                        adaptor = source.get_parent_module()
+                                        adaptor._impl.freeze_interface()
+                                        adaptor._impl._body(trace=False)
+                                    if old_source.get_parent_module()._impl.has_explicit_name:
+                                        with scope._impl._inside:
+                                            naming_wire = Wire(source.get_net_type(), scope)
+                                            naming_wire.local_name = old_source.interface_name # This creates duplicates of course, but that will be resolved later on
+                                            naming_wire.set_source(source, scope=scope)
+                                            junction.set_source(naming_wire, scope)
+                                    else:
+                                        junction.set_source(source, scope)
 
             incomplete_sub_modules = OrderedSet(self._sub_modules)
             changes = True
