@@ -26,6 +26,242 @@ class JunctionBase(object):
         # type instance. 
         return super().__new__(cls)
 
+    def __getitem__(self, key: Any) -> Any:
+        if Context.current() == Context.simulation:
+            return self.get_net_type().get_slice(key, self)
+        else:
+            from .member_access import MemberGetter
+            return MemberGetter(self, [(key, KeyKind.Index)])
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        if is_junction_member(value) and value.get_parent_junction() is self:
+            return
+        if hasattr(self.get_net_type(), "set_member_access"):
+            return self.get_net_type().set_member_access([(key, KeyKind.Index)], value, self)
+        raise TypeError()
+
+    def __delitem__(self, key: Any) -> None:
+        # I'm not sure what this even means in this context
+        raise TypeError()
+
+    def _binary_op(self, other: Any, gate: 'Module', name: str) -> Any:
+        context = Context.current()
+        if context == Context.simulation:
+            my_val = self.sim_value
+            return Port._safe_call_by_name(my_val, name, other)
+        elif context == Context.elaboration:
+            return gate(self, other)
+        else:
+            sup = super()
+            return getattr(sup, name)(other)
+
+    def _rbinary_op(self, other: Any, gate: 'Module', name: str) -> Any:
+        context = Context.current()
+        if context == Context.simulation:
+            my_val = self.sim_value
+            return Port._safe_call_by_name(my_val, name, other)
+        elif context == Context.elaboration:
+            return gate(other, self)
+        else:
+            sup = super()
+            return getattr(sup, name)(other)
+
+    def _unary_op(self, gate: 'Module', name: str) -> Any:
+        context = Context.current()
+        if context == Context.simulation:
+            my_val = self.sim_value
+            return Port._safe_call_by_name(my_val, name)
+        elif context == Context.elaboration:
+            return gate(self)
+        else:
+            sup = super()
+            return getattr(sup, name)()
+
+    def _ninput_op(self, other: Any, gate: 'Module', name: str) -> Any:
+        context = Context.current()
+        if context == Context.simulation:
+            my_val = self.sim_value
+            if my_val is None: return None
+            return Port._safe_call_by_name(my_val, name, other)
+        elif context == Context.elaboration:
+            return gate(self, other)
+        else:
+            sup = super()
+            return getattr(sup, name)(other)
+
+    def _rninput_op(self, other, gate: 'Module', name: str) -> Any:
+        context = Context.current()
+        if context == Context.simulation:
+            my_val = self.sim_value
+            return Port._safe_call_by_name(my_val, name, other)
+        elif context == Context.elaboration:
+            return gate(other, self)
+        else:
+            sup = super()
+            return getattr(sup, name)(other)
+
+
+    def __add__(self, other: Any) -> Any:
+        from .gates import sum_gate as gate
+        return self._ninput_op(other, gate, "__add__")
+
+    def __sub__(self, other: Any) -> Any:
+        from .gates import sub_gate as gate
+        return self._binary_op(other, gate, "__sub__")
+
+    def __mul__(self, other: Any) -> Any:
+        from .gates import prod_gate as gate
+        return self._ninput_op(other, gate, "__mul__")
+
+    #def __floordiv__(self, other: Any) -> Any:
+    #def __mod__(self, other: Any) -> Any:
+    #def __divmod__(self, other: Any) -> Any:
+    #def __pow__(self, other: Any, modulo = None) -> Any:
+    #def __truediv__(self, other: Any) -> Any:
+
+    def __lshift__(self, other: Any) -> Any:
+        from .gates import lshift_gate as gate
+        return self._binary_op(other, gate, "__lshift__")
+
+    def __rshift__(self, other: Any) -> Any:
+        from .gates import rshift_gate as gate
+        return self._binary_op(other, gate, "__rshift__")
+
+    def __and__(self, other: Any) -> Any:
+        from .gates import and_gate as gate
+        return self._ninput_op(other, gate, "__and__")
+
+    def __xor__(self, other: Any) -> Any:
+        from .gates import xor_gate as gate
+        return self._ninput_op(other, gate, "__xor__")
+
+    def __or__(self, other: Any) -> Any:
+        from .gates import or_gate as gate
+        return self._ninput_op(other, gate, "__or__")
+
+
+
+    def __radd__(self, other: Any) -> Any:
+        from .gates import sum_gate as gate
+        return self._rninput_op(other, gate, "__radd__")
+
+    def __rsub__(self, other: Any) -> Any:
+        from .gates import sub_gate as gate
+        return self._rbinary_op(other, gate, "__rsub__")
+
+    def __rmul__(self, other: Any) -> Any:
+        from .gates import prod_gate as gate
+        return self._rninput_op(other, gate, "__rmul__")
+
+    #def __rtruediv__(self, other: Any) -> Any:
+    #def __rfloordiv__(self, other: Any) -> Any:
+    #def __rmod__(self, other: Any) -> Any:
+    #def __rdivmod__(self, other: Any) -> Any:
+    #def __rpow__(self, other: Any) -> Any:
+
+    def __rlshift__(self, other: Any) -> Any:
+        from .gates import lshift_gate as gate
+        return self._rbinary_op(other, gate, "__rlshift__")
+
+    def __rrshift__(self, other: Any) -> Any:
+        from .gates import rshift_gate as gate
+        return self._rbinary_op(other, gate, "__rrshift__")
+
+    def __rand__(self, other: Any) -> Any:
+        from .gates import and_gate as gate
+        return self._rninput_op(other, gate, "__rand__")
+
+    def __rxor__(self, other: Any) -> Any:
+        from .gates import xor_gate as gate
+        return self._rninput_op(other, gate, "__rxor__")
+
+    def __ror__(self, other: Any) -> Any:
+        from .gates import or_gate as gate
+        return self._rninput_op(other, gate, "__ror__")
+
+
+    #def __iadd__(self, other: Any) -> Any:
+    #def __isub__(self, other: Any) -> Any:
+    #def __imul__(self, other: Any) -> Any:
+    #def __idiv__(self, other: Any) -> Any:
+    #def __itruediv__(self, other: Any) -> Any:
+    #def __ifloordiv__(self, other: Any) -> Any:
+    #def __imod__(self, other: Any) -> Any:
+    #def __ipow__(self, other: Any, modulo = None) -> Any:
+    #def __ilshift__(self, other: Any) -> Any:
+    #def __irshift__(self, other: Any) -> Any:
+    #def __iand__(self, other: Any) -> Any:
+    #def __ixor__(self, other: Any) -> Any:
+    #def __ior__(self, other: Any) -> Any:
+
+    def __neg__(self) -> Any:
+        from .gates import neg_gate as gate
+        return self._unary_op(gate, "__neg__")
+
+    def __pos__(self) -> Any:
+        return self
+
+    def __abs__(self) -> Any:
+        from .gates import abs_gate as gate
+        return self._unary_op(gate, "__abs__")
+
+    def __invert__(self) -> Any:
+        from .gates import not_gate as gate
+        context = Context.current()
+        if context == Context.simulation:
+            my_val = self.sim_value
+            try:
+                return my_val.invert(self.get_num_bits())
+            except AttributeError:
+                return self._unary_op(gate, "__invert__")
+        else:
+            return self._unary_op(gate, "__invert__")
+
+
+    #def __complex__(self) -> Any:
+    #def __int__(self) -> Any:
+    #def __long__(self) -> Any:
+    #def __float__(self) -> Any:
+    #def __oct__(self) -> Any:
+    #def __hex__(self) -> Any:
+    #def __index__(self) -> Any:
+
+
+    def __bool__(self) -> bool:
+        from .gates import bool_gate as gate
+        return self._unary_op(gate, "__bool__")
+
+    def __lt__(self, other: Any) -> bool:
+        from .gates import lt_gate as gate
+        return self._binary_op(other, gate, "__lt__")
+
+    def __le__(self, other: Any) -> bool:
+        from .gates import le_gate as gate
+        return self._binary_op(other, gate, "__le__")
+
+    def __eq__(self, other: Any) -> bool:
+        from .gates import eq_gate as gate
+        return self._binary_op(other, gate, "__eq__")
+
+    def __ne__(self, other: Any) -> bool:
+        from .gates import ne_gate as gate
+        return self._binary_op(other, gate, "__ne__")
+
+    def __gt__(self, other: Any) -> bool:
+        from .gates import gt_gate as gate
+        return self._binary_op(other, gate, "__gt__")
+
+    def __ge__(self, other: Any) -> bool:
+        from .gates import ge_gate as gate
+        return self._binary_op(other, gate, "__ge__")
+
+
+
+
+
+
+
+
 class EdgeType(Enum):
     NoEdge = 0
     Positive = 1
@@ -282,26 +518,6 @@ class Junction(JunctionBase):
             raise SyntaxErrorException(f"Net {self} of type {net_type} doesn't support 'len'")
         return net_type.get_length()
 
-
-    def __getitem__(self, key: Any) -> Any:
-        if Context.current() == Context.simulation:
-            return self.get_net_type().get_slice(key, self)
-        else:
-            from .member_access import MemberGetter
-            return MemberGetter(self, [(key, KeyKind.Index)])
-
-    def __setitem__(self, key: Any, value: Any) -> None:
-        if is_junction_member(value) and value.get_parent_junction() is self:
-            return
-        if hasattr(self.get_net_type(), "set_member_access"):
-            return self.get_net_type().set_member_access([(key, KeyKind.Index)], value, self)
-        raise TypeError()
-
-    def __delitem__(self, key: Any) -> None:
-        # I'm not sure what this even means in this context
-        raise TypeError()
-
-
     def allow_bind(self) -> bool:
         """
         Determines if binding to this junction is allowed.
@@ -427,155 +643,6 @@ class Junction(JunctionBase):
             return None
         return getattr(type(obj), name)(obj, *kargs, **kwargs)
 
-    def _binary_op(self, other: Any, gate: 'Module', name: str) -> Any:
-        context = Context.current()
-        if context == Context.simulation:
-            my_val = self.sim_value
-            return Port._safe_call_by_name(my_val, name, other)
-        elif context == Context.elaboration:
-            return gate(self, other)
-        else:
-            sup = super()
-            return getattr(sup, name)(other)
-
-    def _rbinary_op(self, other: Any, gate: 'Module', name: str) -> Any:
-        context = Context.current()
-        if context == Context.simulation:
-            my_val = self.sim_value
-            return Port._safe_call_by_name(my_val, name, other)
-        elif context == Context.elaboration:
-            return gate(other, self)
-        else:
-            sup = super()
-            return getattr(sup, name)(other)
-
-    def _unary_op(self, gate: 'Module', name: str) -> Any:
-        context = Context.current()
-        if context == Context.simulation:
-            my_val = self.sim_value
-            return Port._safe_call_by_name(my_val, name)
-        elif context == Context.elaboration:
-            return gate(self)
-        else:
-            sup = super()
-            return getattr(sup, name)()
-
-    def _ninput_op(self, other: Any, gate: 'Module', name: str) -> Any:
-        context = Context.current()
-        if context == Context.simulation:
-            my_val = self.sim_value
-            if my_val is None: return None
-            return Port._safe_call_by_name(my_val, name, other)
-        elif context == Context.elaboration:
-            return gate(self, other)
-        else:
-            sup = super()
-            return getattr(sup, name)(other)
-
-    def _rninput_op(self, other, gate: 'Module', name: str) -> Any:
-        context = Context.current()
-        if context == Context.simulation:
-            my_val = self.sim_value
-            return Port._safe_call_by_name(my_val, name, other)
-        elif context == Context.elaboration:
-            return gate(other, self)
-        else:
-            sup = super()
-            return getattr(sup, name)(other)
-
-
-    def __add__(self, other: Any) -> Any:
-        from .gates import sum_gate as gate
-        return self._ninput_op(other, gate, "__add__")
-
-    def __sub__(self, other: Any) -> Any:
-        from .gates import sub_gate as gate
-        return self._binary_op(other, gate, "__sub__")
-
-    def __mul__(self, other: Any) -> Any:
-        from .gates import prod_gate as gate
-        return self._ninput_op(other, gate, "__mul__")
-
-    #def __floordiv__(self, other: Any) -> Any:
-    #def __mod__(self, other: Any) -> Any:
-    #def __divmod__(self, other: Any) -> Any:
-    #def __pow__(self, other: Any, modulo = None) -> Any:
-    #def __truediv__(self, other: Any) -> Any:
-
-    def __lshift__(self, other: Any) -> Any:
-        from .gates import lshift_gate as gate
-        return self._binary_op(other, gate, "__lshift__")
-
-    def __rshift__(self, other: Any) -> Any:
-        from .gates import rshift_gate as gate
-        return self._binary_op(other, gate, "__rshift__")
-
-    def __and__(self, other: Any) -> Any:
-        from .gates import and_gate as gate
-        return self._ninput_op(other, gate, "__and__")
-
-    def __xor__(self, other: Any) -> Any:
-        from .gates import xor_gate as gate
-        return self._ninput_op(other, gate, "__xor__")
-
-    def __or__(self, other: Any) -> Any:
-        from .gates import or_gate as gate
-        return self._ninput_op(other, gate, "__or__")
-
-
-
-    def __radd__(self, other: Any) -> Any:
-        from .gates import sum_gate as gate
-        return self._rninput_op(other, gate, "__radd__")
-
-    def __rsub__(self, other: Any) -> Any:
-        from .gates import sub_gate as gate
-        return self._rbinary_op(other, gate, "__rsub__")
-
-    def __rmul__(self, other: Any) -> Any:
-        from .gates import prod_gate as gate
-        return self._rninput_op(other, gate, "__rmul__")
-
-    #def __rtruediv__(self, other: Any) -> Any:
-    #def __rfloordiv__(self, other: Any) -> Any:
-    #def __rmod__(self, other: Any) -> Any:
-    #def __rdivmod__(self, other: Any) -> Any:
-    #def __rpow__(self, other: Any) -> Any:
-
-    def __rlshift__(self, other: Any) -> Any:
-        from .gates import lshift_gate as gate
-        return self._rbinary_op(other, gate, "__rlshift__")
-
-    def __rrshift__(self, other: Any) -> Any:
-        from .gates import rshift_gate as gate
-        return self._rbinary_op(other, gate, "__rrshift__")
-
-    def __rand__(self, other: Any) -> Any:
-        from .gates import and_gate as gate
-        return self._rninput_op(other, gate, "__rand__")
-
-    def __rxor__(self, other: Any) -> Any:
-        from .gates import xor_gate as gate
-        return self._rninput_op(other, gate, "__rxor__")
-
-    def __ror__(self, other: Any) -> Any:
-        from .gates import or_gate as gate
-        return self._rninput_op(other, gate, "__ror__")
-
-
-    #def __iadd__(self, other: Any) -> Any:
-    #def __isub__(self, other: Any) -> Any:
-    #def __imul__(self, other: Any) -> Any:
-    #def __idiv__(self, other: Any) -> Any:
-    #def __itruediv__(self, other: Any) -> Any:
-    #def __ifloordiv__(self, other: Any) -> Any:
-    #def __imod__(self, other: Any) -> Any:
-    #def __ipow__(self, other: Any, modulo = None) -> Any:
-    #def __ilshift__(self, other: Any) -> Any:
-    #def __irshift__(self, other: Any) -> Any:
-    #def __iand__(self, other: Any) -> Any:
-    #def __ixor__(self, other: Any) -> Any:
-    #def __ior__(self, other: Any) -> Any:
 
 
     def __ilshift__elab(self, other: Any) -> 'Junction':
@@ -647,67 +714,6 @@ class Junction(JunctionBase):
             self._xnet.sim_state.sim_context.schedule_value_change(self._xnet, new_sim_value, when)
 
 
-    def __neg__(self) -> Any:
-        from .gates import neg_gate as gate
-        return self._unary_op(gate, "__neg__")
-
-    def __pos__(self) -> Any:
-        return self
-
-    def __abs__(self) -> Any:
-        from .gates import abs_gate as gate
-        return self._unary_op(gate, "__abs__")
-
-    def __invert__(self) -> Any:
-        from .gates import not_gate as gate
-        context = Context.current()
-        if context == Context.simulation:
-            my_val = self.sim_value
-            try:
-                return my_val.invert(self.get_num_bits())
-            except AttributeError:
-                return self._unary_op(gate, "__invert__")
-        else:
-            return self._unary_op(gate, "__invert__")
-
-
-    #def __complex__(self) -> Any:
-    #def __int__(self) -> Any:
-    #def __long__(self) -> Any:
-    #def __float__(self) -> Any:
-    #def __oct__(self) -> Any:
-    #def __hex__(self) -> Any:
-    #def __index__(self) -> Any:
-
-
-    def __bool__(self) -> bool:
-        from .gates import bool_gate as gate
-        return self._unary_op(gate, "__bool__")
-
-    def __lt__(self, other: Any) -> bool:
-        from .gates import lt_gate as gate
-        return self._binary_op(other, gate, "__lt__")
-
-    def __le__(self, other: Any) -> bool:
-        from .gates import le_gate as gate
-        return self._binary_op(other, gate, "__le__")
-
-    def __eq__(self, other: Any) -> bool:
-        from .gates import eq_gate as gate
-        return self._binary_op(other, gate, "__eq__")
-
-    def __ne__(self, other: Any) -> bool:
-        from .gates import ne_gate as gate
-        return self._binary_op(other, gate, "__ne__")
-
-    def __gt__(self, other: Any) -> bool:
-        from .gates import gt_gate as gate
-        return self._binary_op(other, gate, "__gt__")
-
-    def __ge__(self, other: Any) -> bool:
-        from .gates import ge_gate as gate
-        return self._binary_op(other, gate, "__ge__")
-
     def __hash__(self):
         return id(self)
 
@@ -720,9 +726,6 @@ class Junction(JunctionBase):
             self.__ilshift__impl = self.__ilshift__elab
         else:
             assert False
-
-    def active_context(self) -> str:
-        return self._context
 
     def set_interface_name(self, name: str) -> None:
         self.interface_name = name

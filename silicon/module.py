@@ -497,7 +497,6 @@ class Module(object):
                     del current_frame
 
                 #print(f"================= module init called from: {self._filename}:{self._lineno} for module {type(self)}")
-                self._context = None
                 self.setattr__impl = self.__setattr__normal
                 self._in_generate = BoolMarker()
                 self._in_create_port = BoolMarker()
@@ -742,8 +741,6 @@ class Module(object):
         def register_wire(self, wire: Wire) -> None:
             wire.set_parent_module(self._true_module)
             self._local_wires.append(wire)
-        def active_context(self) -> str:
-            return self._context
 
         def __setattr__sim(self, name, value, super_setter: Callable) -> None:
             if name in self.__dict__ and self.__dict__[name] is value:
