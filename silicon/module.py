@@ -499,7 +499,6 @@ class Module(object):
                 #print(f"================= module init called from: {self._filename}:{self._lineno} for module {type(self)}")
                 self._context = None
                 self.setattr__impl = self.__setattr__normal
-                self._inside = BoolMarker()
                 self._in_generate = BoolMarker()
                 self._in_create_port = BoolMarker()
                 self._in_construct = BoolMarker()
@@ -532,56 +531,55 @@ class Module(object):
 
         def _init_phase2(self, *args, **kwargs):
             with self._no_junction_bind:
-                with self._inside:
-                    from copy import deepcopy
+                from copy import deepcopy
 
-                    def ports(m: Union['Module', type]) -> Tuple[Tuple[Union[str, Port]]]:
-                        ret_val = []
-                        #for name in dir(m):
-                        #    val = getattr(m,name)
-                        from inspect import getmro
-                        classes = getmro(m)
-                        for cls in classes:
-                            for name, val in cls.__dict__.items():
-                                if is_port(val):
-                                    ret_val.append((name, val))
-                        return tuple(ret_val)
+                def ports(m: Union['Module', type]) -> Tuple[Tuple[Union[str, Port]]]:
+                    ret_val = []
+                    #for name in dir(m):
+                    #    val = getattr(m,name)
+                    from inspect import getmro
+                    classes = getmro(m)
+                    for cls in classes:
+                        for name, val in cls.__dict__.items():
+                            if is_port(val):
+                                ret_val.append((name, val))
+                    return tuple(ret_val)
 
-                    from .back_end import get_reserved_names
-                    for (port_name, port_object) in ports(type(self._true_module)):
-                        if port_name in get_reserved_names():
-                            raise SyntaxErrorException(f"Class {self} uses reserved name as port definition {port_name}")
-                        if port_object.source is not None:
-                            raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with source already bound")
-                        if len(port_object.sinks) != 0:
-                            raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with sinks already bound")
-                        if port_object.get_parent_module() is not None:
-                            raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with parent module already assigned")
-                        instance_port: Port = deepcopy(port_object)
-                        # We need to use deepcopy to get all the important
-                        # members, such as source/sinks/BoolMarker objects
-                        # de-duplicated. However we don't want to create
-                        # a bunch of duplicate types, so override the reference
-                        # to the newly created net_type
-                        del instance_port._net_type
-                        instance_port._net_type = port_object._net_type
-                        instance_port.set_parent_module(self._true_module)
-                        setattr(self._true_module, port_name, instance_port)
-                        # Since we didn't actually create a new Port object - we've copied it, it's __init__ didn't get called.
-                        # As such, the new port didn't get registered for context changes. Let's fix that
-                        Context.register(instance_port._context_change)
-                        #print("Creating instance port with name: {} and type {}".format(port_name, port_object))
-                    #print("module {} is created".format(type(self)))
-                    # Store construct arguments locally so we can compare them later for is_equivalent
-                    (self._construct_args, self._construct_kwargs) = fill_arg_names(self._true_module.construct, args, kwargs)
-                    with self._in_construct:
-                        with Module._parent_modules.push(self._true_module):
-                            with Module.Context(self):
-                                with Trace():
-                                    self._true_module.construct(*self._construct_args, **self._construct_kwargs)
-                        for port in self.get_ports().values():
-                            if port._auto:
-                                port.find_cadidates()
+                from .back_end import get_reserved_names
+                for (port_name, port_object) in ports(type(self._true_module)):
+                    if port_name in get_reserved_names():
+                        raise SyntaxErrorException(f"Class {self} uses reserved name as port definition {port_name}")
+                    if port_object.source is not None:
+                        raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with source already bound")
+                    if len(port_object.sinks) != 0:
+                        raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with sinks already bound")
+                    if port_object.get_parent_module() is not None:
+                        raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with parent module already assigned")
+                    instance_port: Port = deepcopy(port_object)
+                    # We need to use deepcopy to get all the important
+                    # members, such as source/sinks/BoolMarker objects
+                    # de-duplicated. However we don't want to create
+                    # a bunch of duplicate types, so override the reference
+                    # to the newly created net_type
+                    del instance_port._net_type
+                    instance_port._net_type = port_object._net_type
+                    instance_port.set_parent_module(self._true_module)
+                    setattr(self._true_module, port_name, instance_port)
+                    # Since we didn't actually create a new Port object - we've copied it, it's __init__ didn't get called.
+                    # As such, the new port didn't get registered for context changes. Let's fix that
+                    Context.register(instance_port._context_change)
+                    #print("Creating instance port with name: {} and type {}".format(port_name, port_object))
+                #print("module {} is created".format(type(self)))
+                # Store construct arguments locally so we can compare them later for is_equivalent
+                (self._construct_args, self._construct_kwargs) = fill_arg_names(self._true_module.construct, args, kwargs)
+                with self._in_construct:
+                    with Module._parent_modules.push(self._true_module):
+                        with Module.Context(self):
+                            with Trace():
+                                self._true_module.construct(*self._construct_args, **self._construct_kwargs)
+                    for port in self.get_ports().values():
+                        if port._auto:
+                            port.find_cadidates()
 
                 # Get rid of references to parent locals: that's really a cheezy way to extend the lifetime of those objects.
                 # This class member is only used during the 'construct' call above, if at all. The only function using this
@@ -851,8 +849,6 @@ class Module(object):
                 with self._no_junction_bind:
                     setattr(self._true_module, name_and_port[0], name_and_port[1])
                 name_and_port[1].set_net_type(net_type)
-        def is_inside(self):
-            return self._inside
         def freeze_interface(self) -> None:
             with self._no_junction_bind:
                 self._frozen_port_list = True
@@ -938,11 +934,10 @@ class Module(object):
                                         adaptor._impl.freeze_interface()
                                         adaptor._impl._body(trace=False)
                                     if old_source.get_parent_module()._impl.has_explicit_name:
-                                        with scope._impl._inside:
-                                            naming_wire = Wire(source.get_net_type(), scope)
-                                            naming_wire.local_name = old_source.interface_name # This creates duplicates of course, but that will be resolved later on
-                                            naming_wire.set_source(source, scope=scope)
-                                            junction.set_source(naming_wire, scope)
+                                        naming_wire = Wire(source.get_net_type(), scope)
+                                        naming_wire.local_name = old_source.interface_name # This creates duplicates of course, but that will be resolved later on
+                                        naming_wire.set_source(source, scope=scope)
+                                        junction.set_source(naming_wire, scope)
                                     else:
                                         junction.set_source(source, scope)
 
@@ -1015,39 +1010,38 @@ class Module(object):
             """
             Called from the framework as a wrapper for the per-module (class) body method
             """
-            with self._inside:
-                with Module._parent_modules.push(self._true_module):
-                    assert self.is_interface_frozen()
-                    with Module.Context(self):
-                        if trace:
-                            with Tracer():
-                                self._true_module.body()
-                        else:
+            with Module._parent_modules.push(self._true_module):
+                assert self.is_interface_frozen()
+                with Module.Context(self):
+                    if trace:
+                        with Tracer():
                             self._true_module.body()
+                    else:
+                        self._true_module.body()
 
-                    # Finish ordering sub-modules:
-                    for sub_module in self._unordered_sub_modules:
-                        self._sub_modules.append(sub_module)
-                    self._unordered_sub_modules.clear()
+                # Finish ordering sub-modules:
+                for sub_module in self._unordered_sub_modules:
+                    self._sub_modules.append(sub_module)
+                self._unordered_sub_modules.clear()
 
-                    def finalize_slices(junction):
-                        if junction.is_composite():
-                            for member, _ in junction.get_member_junctions().values():
-                                finalize_slices(member)
-                        else:
-                            junction.finalize_slices()
+                def finalize_slices(junction):
+                    if junction.is_composite():
+                        for member, _ in junction.get_member_junctions().values():
+                            finalize_slices(member)
+                    else:
+                        junction.finalize_slices()
 
-                    # Go through each junction and make sure their Concatenators are created if needed
-                    for junction in self.get_junctions().values():
-                        finalize_slices(junction)
-                    for junction in self._local_wires:
-                        finalize_slices(junction)
+                # Go through each junction and make sure their Concatenators are created if needed
+                for junction in self.get_junctions().values():
+                    finalize_slices(junction)
+                for junction in self._local_wires:
+                    finalize_slices(junction)
 
-                    # The above code might have added some modules into _unordered_sub_modules, so let's clear them once again
-                    for sub_module in self._unordered_sub_modules:
-                        self._sub_modules.append(sub_module)
+                # The above code might have added some modules into _unordered_sub_modules, so let's clear them once again
+                for sub_module in self._unordered_sub_modules:
+                    self._sub_modules.append(sub_module)
 
-                    del self._unordered_sub_modules # This will force all subsequent module instantiations (during type-propagation) to directly go to _sub_modules
+                del self._unordered_sub_modules # This will force all subsequent module instantiations (during type-propagation) to directly go to _sub_modules
 
 
         def is_equivalent(self, other: 'module', netlist: 'NetList') -> bool:
@@ -1293,8 +1287,7 @@ class Module(object):
             if not self._generate_needed:
                 return None
             with self._in_generate:
-                with self._inside:
-                    return self._true_module.generate(netlist, back_end)
+                return self._true_module.generate(netlist, back_end)
 
 
 class GenericModule(Module):

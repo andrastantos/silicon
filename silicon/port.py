@@ -348,9 +348,6 @@ class Junction(JunctionBase):
         del junctions_after_scope
         del self._junctions_before_scope
 
-    def is_inside(self) -> bool:
-        return self.get_parent_module()._impl.is_inside()
-
     @property
     def junction_kind(self) -> str:
         raise NotImplementedError

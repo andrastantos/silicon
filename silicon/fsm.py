@@ -135,15 +135,13 @@ class FSM(GenericModule):
         new_state_net_type = get_net_type_for_const(new_state)
         self._state_net_type = self._state_net_type.result_type((self._state_net_type, current_state_net_type, new_state_net_type), "SELECT")
 
-        with self._impl._inside:
-            logic_input, port_name = self.fsm_logic.create_transition(current_state, new_state)
+        logic_input, port_name = self.fsm_logic.create_transition(current_state, new_state)
 
         input = Input()
         setattr(self, port_name, input)
         input <<= condition
 
-        with self._impl._inside:
-            logic_input <<= input
+        logic_input <<= input
 
     def body(self) -> None:
         # Create a wire containing the current state (since outputs can't be read within the body)
