@@ -4,7 +4,7 @@ from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta
 from .module import GenericModule, Module, InlineBlock, InlineExpression, has_port
 from .port import Input, JunctionBase, Output, Junction, Port
 from .tracer import no_trace
-from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, NetValue, is_junction
+from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, NetValue, is_junction_base
 from collections import OrderedDict
 import re
 try:
@@ -1038,7 +1038,7 @@ class Number(NetTypeFactory):
             if context == Context.simulation:
                 if input is None:
                     return None
-                if is_junction(input):
+                if is_junction_base(input):
                     input = input.sim_value
                 elif isinstance(input, Number.NetValue):
                     pass

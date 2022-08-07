@@ -272,6 +272,10 @@ class MemberGetter(object):
         return MemberGetter(self._parent_junction, self._keys + [(key, KeyKind.Index)])
 
     def __getattr__(self, name:str) -> Any:
+        if name in ('convert_to_junction', 'get_underlying_junction'):
+            # Ugly hack to get around issues where we try to see if we can convert something to a junction.
+            # This is temporary, until the right slicing infrastructure is in place.
+            raise AttributeError
         return MemberGetter(self._parent_junction, self._keys + [(name, KeyKind.Member)])
 
     def __setitem__(self, key: Any, value: Any) -> None:

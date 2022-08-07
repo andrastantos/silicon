@@ -5,7 +5,7 @@ from .net_type import NetType, KeyKind, NetTypeMeta
 from .tracer import no_trace, NoTrace
 from .ordered_set import OrderedSet
 from .exceptions import SyntaxErrorException, SimulationException
-from .utils import convert_to_junction, is_iterable, is_junction, is_input_port, is_output_port, is_wire, get_caller_local_junctions, is_junction_member, BoolMarker, is_module, implicit_adapt, MEMBER_DELIMITER, Context, ContextMarker, is_net_type
+from .utils import convert_to_junction, is_iterable, is_junction_base, is_input_port, is_output_port, is_wire, get_caller_local_junctions, is_junction_member, BoolMarker, is_module, implicit_adapt, MEMBER_DELIMITER, Context, ContextMarker, is_net_type
 from .port import KeyKind
 from collections import OrderedDict
 from enum import Enum
@@ -306,7 +306,9 @@ class JunctionBase(object):
         else:
             assert False
 
-
+    @abstractmethod
+    def set_source(self, source: Any, scope: 'Module') -> None:
+        raise NotImplementedError()
 
 
 
@@ -526,7 +528,6 @@ class Junction(JunctionBase):
             if source is None:
                 # We couldn't create a port out of the value:
                 raise SyntaxErrorException(f"couldn't convert '{passed_in_source}' to Junction.")
-            source = source.get_underlying_junction()
             assert isinstance(source, Junction)
 
         old_source = f"{id(self.source):x}" if self.source is not None else "--NONE--"
@@ -695,7 +696,7 @@ class Junction(JunctionBase):
             if other is None:
                 for self_member in self.get_all_member_junctions(add_self=False):
                     self_member._set_sim_val(None)
-            elif is_junction(other):
+            elif is_junction_base(other):
                 # If something is connected to an otherwise unconnected port, we should support that.
                 if other.source is None:
                     for self_member in self.get_all_member_junctions(add_self=False):
@@ -726,7 +727,7 @@ class Junction(JunctionBase):
 
     def _set_sim_val(self, value: Any, when: Optional[int] = None) -> None:
         assert not self.is_composite(), "Simulator should never set the value of compound types"
-        # using hasattr instead of is_junction to speed up simulation. It also catches PortSlices not just Ports
+        # using hasattr instead of is_junction_base to speed up simulation. It also catches PortSlices not just Ports
         if hasattr(value, "sim_value"):
             new_sim_value = value.sim_value
         else:

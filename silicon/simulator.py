@@ -104,7 +104,7 @@ class Simulator(object):
             for port in yielded_value:
                 if is_junction_member(port):
                     raise SimulationException(f"Simulator currently doesn't support slices in sensitivity lists. Please use the whole value instead of a slice", port)
-                if not is_junction(port):
+                if not is_junction_base(port):
                     raise SimulationException(f"The simulate method can only yield an integer, a Port or a sequence of Port objects", port)
                 port._xnet.sim_state.add_listener(generator)
             '''

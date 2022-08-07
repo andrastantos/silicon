@@ -14,7 +14,7 @@ from .ordered_set import OrderedSet
 from .exceptions import SimulationException, SyntaxErrorException
 from threading import RLock
 from itertools import chain, zip_longest
-from .utils import is_port, is_input_port, is_output_port, is_wire, is_junction_member, is_module, fill_arg_names, is_junction_or_member, is_junction, is_iterable, MEMBER_DELIMITER, first, implicit_adapt
+from .utils import is_port, is_input_port, is_output_port, is_wire, is_junction_member, is_module, fill_arg_names, is_junction_or_member, is_junction_base, is_iterable, MEMBER_DELIMITER, first, implicit_adapt
 from .state_stack import StateStackElement
 import inspect
 
@@ -689,7 +689,7 @@ class Module(object):
                 # If we happen to override an existing Junction object, make sure it gets removed from port lists as well
                 if name in self._true_module.__dict__:
                     old_attr = self._true_module.__dict__[name]
-                    if is_junction(old_attr):
+                    if is_junction_base(old_attr):
                         if not is_wire(old_attr):
                             del self._ports[name]
                         if name in self._inputs:
@@ -707,7 +707,7 @@ class Module(object):
                         elif name in self._positional_outputs:
                             del self._positional_outputs[name]
                 # If we insert a new Junction object, update the port lists as well
-                if is_junction(value):
+                if is_junction_base(value):
                     from .back_end import get_reserved_names
                     if name in get_reserved_names():
                         raise SyntaxErrorException(f"Class {self} uses reserved name as wire definition {name}")
@@ -746,7 +746,7 @@ class Module(object):
             if name in self.__dict__ and self.__dict__[name] is value:
                 return
             else:
-                # For speedup reasons, removed is_junction calls, replaced tests with exceptions
+                # For speedup reasons, removed is_junction_base calls, replaced tests with exceptions
                 try:
                     junction = self._true_module.__dict__[name]
                 except KeyError:
@@ -757,7 +757,7 @@ class Module(object):
                 except AttributeError:
                     return self.__set_no_bind_attr__(name, value, super_setter)
                 '''
-                if name in self._true_module.__dict__ and is_junction(self._true_module.__dict__[name]):
+                if name in self._true_module.__dict__ and is_junction_base(self._true_module.__dict__[name]):
                     if port is not value:
                         port._set_sim_val(value)
                 else:
@@ -771,8 +771,8 @@ class Module(object):
                     return
                 if name in ("_no_junction_bind"):
                     return self.__set_no_bind_attr__(name, value, super_setter)
-                if (hasattr(self, "_no_junction_bind") and self._no_junction_bind) or (is_junction(value) and self._in_create_port):
-                    if is_junction(value):
+                if (hasattr(self, "_no_junction_bind") and self._no_junction_bind) or (is_junction_base(value) and self._in_create_port):
+                    if is_junction_base(value):
                         assert value.get_parent_module() is self._true_module or value.get_parent_module() is None
                         value.set_parent_module(self._true_module)
                     return self.__set_no_bind_attr__(name, value, super_setter)
@@ -780,7 +780,7 @@ class Module(object):
                 if context is None:
                     return self.__set_no_bind_attr__(name, value, super_setter)
                 elif context == Context.elaboration:
-                    if is_junction(value):
+                    if is_junction_base(value):
                         if value.get_parent_module() is None:
                             # If the attribute doesn't exist and we do a direct-assign to a free-standing port, assume that this is a port-creation request
                             if hasattr(self._true_module, name):
@@ -789,7 +789,7 @@ class Module(object):
                         elif (value.get_parent_module() is self._true_module and is_input_port(value)) or (value.get_parent_module()._impl.parent is self._true_module and is_output_port(value)):
                             # We assign a port of a submodule to a new attribute. Create a Wire for it, if it doesn't exist already
                             if hasattr(self._true_module, name):
-                                if not is_junction(getattr(self._true_module,name)):
+                                if not is_junction_base(getattr(self._true_module,name)):
                                     raise SyntaxErrorException(f"Can't create new wire {name} as that attribute allready exists")
                             else:
                                 self.__set_no_bind_attr__(name, Wire(), super_setter)
@@ -801,7 +801,7 @@ class Module(object):
                     if not hasattr(self._true_module, name):
                         return self.__set_no_bind_attr__(name, value, super_setter)
                     # At this point, the attribute exists, either because we've created as a junction just now or because it already was there. See if it's a junction...
-                    if is_junction(getattr(self._true_module, name)):
+                    if is_junction_base(getattr(self._true_module, name)):
                         junction_inst = getattr(self._true_module, name)
                         if value is junction_inst:
                             # This happens with self.port <<= something constructors: we do the <<= operator, which returns the RHS, then assign it to the old property.

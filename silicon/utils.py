@@ -70,10 +70,15 @@ def is_iterable(thing: Any) -> bool:
 def is_subscriptable(thing: Any) -> bool:
     return hasattr(thing, "__getitem__")
 
-def is_junction(thing: Any) -> bool:
+def is_junction_base(thing: Any) -> bool:
     #return hasattr(thing, "junction_kind")
     from .port import JunctionBase
     return isinstance(thing, JunctionBase)
+
+def is_junction(thing: Any) -> bool:
+    #return hasattr(thing, "junction_kind")
+    from .port import Junction
+    return isinstance(thing, Junction)
 
 def is_port(thing: Any) -> bool:
     from .port import Port
@@ -84,7 +89,7 @@ def is_junction_member(thing: Any) -> bool:
     return isinstance(thing, MemberGetter)
 
 def is_junction_or_member(thing: Any) -> bool:
-    return is_junction_member(thing) or is_junction(thing)
+    return is_junction_member(thing) or is_junction_base(thing)
 
 def is_output_port(thing: Any) -> bool:
     return hasattr(thing, "junction_kind") and thing.junction_kind == "output"
@@ -123,6 +128,8 @@ def convert_to_junction(thing: Any, type_hint: Optional['NetType']=None) -> Opti
         return thing
     context = Context.current()
     if context == Context.elaboration:
+        if hasattr(thing, "convert_to_junction"):
+            thing = thing.convert_to_junction(type_hint)
         if hasattr(thing, "get_underlying_junction"):
             return thing.get_underlying_junction()
     elif context == Context.simulation:
