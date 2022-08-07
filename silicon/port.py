@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import Tuple, Dict, Optional, Set, Any, Type, Sequence, Union, Callable
 import inspect
 from .net_type import NetType, KeyKind, NetTypeMeta
@@ -26,6 +27,17 @@ class JunctionBase(object):
         # type instance. 
         return super().__new__(cls)
 
+    def __init__(self):
+        # !!!!! SUPER IMPORTANT !!!!!
+        # In most cases, Ports of a Module are set on the cls level, not inside __init__() (or construct()).
+        # There is a generic 'deepcopy' call in _init_phase2 that creates the instance-level copies for all the ports.
+        # This means that __init__ for those ports is not getting called, the instance-level port is not a brand new
+        # object, it's a copy of an already live one. This means, that none of this code gets executed for instance-level
+        # ports. Right now, the most important thing here is that 'Context.register' doesn't get executed, but every time
+        # we put stuff in here, that needs to be checked against the copy functionality in '_init_phase2' of 'Module.
+        super().__init__()
+        Context.register(self._context_change)
+
     def __getitem__(self, key: Any) -> Any:
         if Context.current() == Context.simulation:
             return self.get_net_type().get_slice(key, self)
@@ -44,11 +56,17 @@ class JunctionBase(object):
         # I'm not sure what this even means in this context
         raise TypeError()
 
+    @staticmethod
+    def _safe_call_by_name(obj, name, *kargs, **kwargs):
+        if obj is None:
+            return None
+        return getattr(type(obj), name)(obj, *kargs, **kwargs)
+
     def _binary_op(self, other: Any, gate: 'Module', name: str) -> Any:
         context = Context.current()
         if context == Context.simulation:
             my_val = self.sim_value
-            return Port._safe_call_by_name(my_val, name, other)
+            return JunctionBase._safe_call_by_name(my_val, name, other)
         elif context == Context.elaboration:
             return gate(self, other)
         else:
@@ -59,7 +77,7 @@ class JunctionBase(object):
         context = Context.current()
         if context == Context.simulation:
             my_val = self.sim_value
-            return Port._safe_call_by_name(my_val, name, other)
+            return JunctionBase._safe_call_by_name(my_val, name, other)
         elif context == Context.elaboration:
             return gate(other, self)
         else:
@@ -70,7 +88,7 @@ class JunctionBase(object):
         context = Context.current()
         if context == Context.simulation:
             my_val = self.sim_value
-            return Port._safe_call_by_name(my_val, name)
+            return JunctionBase._safe_call_by_name(my_val, name)
         elif context == Context.elaboration:
             return gate(self)
         else:
@@ -82,7 +100,7 @@ class JunctionBase(object):
         if context == Context.simulation:
             my_val = self.sim_value
             if my_val is None: return None
-            return Port._safe_call_by_name(my_val, name, other)
+            return JunctionBase._safe_call_by_name(my_val, name, other)
         elif context == Context.elaboration:
             return gate(self, other)
         else:
@@ -93,7 +111,7 @@ class JunctionBase(object):
         context = Context.current()
         if context == Context.simulation:
             my_val = self.sim_value
-            return Port._safe_call_by_name(my_val, name, other)
+            return JunctionBase._safe_call_by_name(my_val, name, other)
         elif context == Context.elaboration:
             return gate(other, self)
         else:
@@ -255,6 +273,39 @@ class JunctionBase(object):
         from .gates import ge_gate as gate
         return self._binary_op(other, gate, "__ge__")
 
+    def ilshift__elab(self, other: Any) -> 'Junction':
+        if self.source is not None:
+            raise SyntaxErrorException(f"{self} is already bound to {self.source}.")
+        from .module import Module
+        scope = Module._parent_modules.top()
+        self.set_source(other, scope)
+        return self
+
+    def ilshift__none(self, other: Any) -> 'Junction':
+        assert False, "We shouldn't ever be here!!!"
+        return super().__ilshift__(other)
+
+    def ilshift__impl(self, other: Any) -> 'Junction':
+        assert False, "We shouldn't ever be here!!!"
+        return self.__ilshift__none(other)
+
+    def __ilshift__(self, other: Any) -> 'Junction':
+        return self.__ilshift__impl(other)
+
+    @abstractmethod
+    def ilshift__sim(self, other: Any) -> 'Junction':
+        raise NotImplementedError()
+
+    def _context_change(self, context: Context) -> None:
+        if context is None:
+            self.__ilshift__impl = self.ilshift__none
+        elif context == Context.simulation:
+            self.__ilshift__impl = self.ilshift__sim
+        elif context == Context.elaboration:
+            self.__ilshift__impl = self.ilshift__elab
+        else:
+            assert False
+
 
 
 
@@ -283,7 +334,6 @@ class Junction(JunctionBase):
         # ports. Right now, the most important thing here is that 'Context.register' doesn't get executed, but every time
         # we put stuff in here, that needs to be checked against the copy functionality in '_init_phase2' of 'Module.
         super().__init__()
-        Context.register(self._context_change)
         assert parent_module is None or is_module(parent_module)
         from .module import Module
         self._source: Optional['Junction.NetEdge'] = None
@@ -637,23 +687,10 @@ class Junction(JunctionBase):
             name += self.get_parent_module()._impl.get_diagnostic_location(" at ")
         return name
 
-    @staticmethod
-    def _safe_call_by_name(obj, name, *kargs, **kwargs):
-        if obj is None:
-            return None
-        return getattr(type(obj), name)(obj, *kargs, **kwargs)
 
 
 
-    def __ilshift__elab(self, other: Any) -> 'Junction':
-        if self.source is not None:
-            raise SyntaxErrorException(f"{self} is already bound to {self.source}.")
-        from .module import Module
-        scope = Module._parent_modules.top()
-        self.set_source(other, scope)
-        return self
-
-    def __ilshift__sim(self, other: Any) -> 'Junction':
+    def ilshift__sim(self, other: Any) -> 'Junction':
         if self.is_composite():
             if other is None:
                 for self_member in self.get_all_member_junctions(add_self=False):
@@ -687,15 +724,6 @@ class Junction(JunctionBase):
             self._set_sim_val(other)
         return self
 
-    def __ilshift__none(self, other: Any) -> 'Junction':
-        return super().__ilshift__(other)
-
-    def __ilshift__impl(self, other: Any) -> 'Junction':
-        return self.__ilshift__none(other)
-
-    def __ilshift__(self, other: Any) -> 'Junction':
-        return self.__ilshift__impl(other)
-
     def _set_sim_val(self, value: Any, when: Optional[int] = None) -> None:
         assert not self.is_composite(), "Simulator should never set the value of compound types"
         # using hasattr instead of is_junction to speed up simulation. It also catches PortSlices not just Ports
@@ -716,16 +744,6 @@ class Junction(JunctionBase):
 
     def __hash__(self):
         return id(self)
-
-    def _context_change(self, context: Context) -> None:
-        if context is None:
-            self.__ilshift__impl = self.__ilshift__none
-        elif context == Context.simulation:
-            self.__ilshift__impl = self.__ilshift__sim
-        elif context == Context.elaboration:
-            self.__ilshift__impl = self.__ilshift__elab
-        else:
-            assert False
 
     def set_interface_name(self, name: str) -> None:
         self.interface_name = name
