@@ -307,10 +307,10 @@ class NetType(object, metaclass=NetTypeMeta):
 
         raise SyntaxErrorException(f"No result type can be found for the specified set of NetTypes: {all_net_type_names}")
 
-    @classmethod
-    def create_member_setter(cls) -> 'Module':
+    @staticmethod
+    def get_lhs_slicer(key_chains) -> 'Module':
         """
-        Create and return a Module that's capable of collecting individual member-assignments to a type.
+        Create and return a Module that's capable of resolving individual partial assignments to a type.
 
         Used in (ex.) the following instances:
 
@@ -319,7 +319,7 @@ class NetType(object, metaclass=NetTypeMeta):
 
         where the generated RTL should become:
 
-        a = {1, b}
+        a = {1'(1), 3'(b)}
         """
         raise NotImplementedError
 

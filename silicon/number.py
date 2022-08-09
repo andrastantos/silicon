@@ -548,8 +548,10 @@ class Number(NetTypeFactory):
             if input_type.length == 1:
                 if start != 0 or end != 0:
                     raise SyntaxErrorException("Can't access sections of single-bit number outside bit 0")
+                # Apparently Verilog really doesn't like cascaded [] expressions. So we explicitly disallow it
                 return self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), allow_expression = False)
             op_precedence = back_end.get_operator_precedence("[]")
+            # Apparently Verilog really doesn't like cascaded [] expressions. So we explicitly disallow it
             rhs_name, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence, allow_expression = False)
             if self.key.start > self.input_port.get_net_type().length:
                 raise FixmeException("Accessing slices of a Number outside it's length is not yet supported!!")
@@ -595,128 +597,6 @@ class Number(NetTypeFactory):
             Returns True if the module is purely combinational, False otherwise
             """
             return True
-
-
-    class MemberSetter(Module):
-        """
-        This class handles the case of member-wise assignment to Numbers. Things, like:
-
-        a[3:0] <<= b
-        a[3:0][1] <<= c
-
-        and things like that.
-
-        MemberSetters are type-specific and have different guts for ex. interfaces.
-
-        For Numbers, they are collecting *all* the assignments to a given junction and generate
-        a single assignment Verilog statement. This is needed because Verilog doesn't support
-        multiple-assignment to (sections of) vectors.
-        """
-        output_port = Output()
-
-        def construct(self):
-            self.raw_input_map = []
-            self.input_map = None
-        def add_input(self, key: 'Key', junction: Junction) -> None:
-            name = f"input_port_{len(self.raw_input_map)}"
-            if has_port(self, name):
-                raise SyntaxErrorException(f"Can't add input as port. Name '{name}' already exists")
-            port = self._impl._create_named_port(name)
-            port <<= junction
-            self.raw_input_map.append((key,  getattr(self, name)))
-        def create_named_port(self, name: str) -> Optional[Port]:
-            if name.startswith("input_port_"):
-                return Input()
-            else:
-                return None
-        def create_positional_port(self, idx: int) -> Optional[Union[str, Port]]:
-            return None
-
-        def finalize_input_map(self, common_net_type: object):
-            if self.input_map is not None:
-                return
-            self.input_map = OrderedDict()
-            keyed_inputs = set()
-            for (raw_key, input) in self.raw_input_map:
-                _, final_key = common_net_type.resolve_key_sequence_for_set(raw_key)
-                key = common_net_type.Key(final_key) # Convert the raw key into something that the common type understands
-                if key in self.input_map:
-                    raise SyntaxErrorException(f"Input key {raw_key} is not unique for concatenator output type {common_net_type}")
-                self.input_map[key] = input
-                keyed_inputs.add(input)
-            for input in self.get_inputs().values():
-                assert input in keyed_inputs, f"Strange: MemberSetter has an input {input} without an asscoated key"
-
-        def generate_output_type(self) -> Optional['NumberMeta']:
-            # This is one of the few cases where we do care about what port we're driving.
-            # The reason for that is partial assignments, that are not allowed.
-            # Let's say we have something, like this:
-            #     w = Wire(Unsigned(8))
-            #     w[0] = 1
-            # This piece of code should not elaborate. However, if MemberSetter
-            # auto-determines its output type, it'll think it's a 1-bit output.
-            # Then auto-type-conversion simply zero-extends that to the rest of the bits.
-            # To make things even more confusing for the user, this is an error:
-            #     w = Wire(Unsigned(8))
-            #     w[1] = 1
-            # So, to remedy that, we'll look at the transitive closure of all sinks
-            # of our output and use the smallest output range from them.
-            # Why the smallest? Because if there are multiple sources,
-            # those should participate in auto-extension. If it so happens
-            # that our direct output is not the most restritive, that would
-            # mean that somewhere in the assignment chain, there was a narrowing,
-            # which will eventually blow up.
-            #
-            # Precision auto-extends the other way: we need to make sure the least precise sink
-            # is still good enough. It's always OK to append a bunch of 0-s to make the Number more 'precise'.
-            common_net_type = get_common_net_type(self.get_inputs().values())
-            if common_net_type is None:
-                raise SyntaxErrorException(f"Can't figure out output port type for MemberSetter {self}")
-            if not is_number(common_net_type):
-                raise SyntaxErrorException(f"MemberSetter result type is {common_net_type}. It should be a Number")
-            self.finalize_input_map(common_net_type)
-            sinks = self.output_port.get_all_sinks()
-            min_val = None
-            max_val = None
-            precision = None
-            for sink in sinks:
-                if is_number(sink.get_net_type()):
-                    min_val = max_none(min_val, sink.get_net_type().min_val)
-                    max_val = min_none(max_val, sink.get_net_type().max_val)
-                    precision = min_none(precision, sink.get_net_type().precision)
-            if min_val is not None:
-                assert max_val is not None
-                assert precision is not None
-                output_type = Number(min_val=min_val, max_val=max_val, precision=precision)
-            else:
-                output_type = common_net_type.concatenated_type(self.input_map)
-            return output_type
-
-
-        def body(self) -> None:
-            new_net_type = self.generate_output_type()
-            if new_net_type is None:
-                raise SyntaxErrorException(f"Can't figure out output port type for MemberSetter {self}")
-            assert not self.output_port.is_specialized()
-            self.output_port.set_net_type(new_net_type)
-
-        def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
-            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
-        def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
-            return self.output_port.get_net_type().compose_concatenated_expression(back_end, self.input_map, target_namespace)
-        def simulate(self) -> TSimEvent:
-            net_type = self.output_port.get_net_type()
-            cache = net_type.prep_simulate_concatenated_expression(self.input_map)
-            while True:
-                yield self.get_inputs().values()
-                self.output_port <<= net_type.simulate_concatenated_expression(cache)
-
-        def is_combinational(self) -> bool:
-            """
-            Returns True if the module is purely combinational, False otherwise
-            """
-            return True
-
 
     class Iterator(object):
         def __init__(self, net_type: 'NumberMeta', junction: Junction):
@@ -877,6 +757,133 @@ class Number(NetTypeFactory):
         #
         #def __repr__(self) -> str:
         #    return self.__str__()
+
+        def get_rhs_slicer(self, key: Any, key_kind: KeyKind) -> 'Module':
+            if key_kind != KeyKind.Index:
+                raise SyntaxErrorException("Number only support array-style member access.")
+            return Number.Accessor(key, self.get_net_type())
+
+        @staticmethod
+        def get_lhs_slicer(key_chains: Sequence[Sequence[Tuple[Any, KeyKind]]]) -> 'Module':
+            return Number.Instance.PhiSlice(key_chains)
+            
+        class PhiSlice(GenericModule):
+            """
+            This class handles the case of member-wise assignment to Numbers. Things, like:
+
+            a[3:0] <<= b
+            a[3:0][1] <<= c
+
+            and things like that.
+
+            PhiSlices are type-specific and have different guts for ex. interfaces.
+
+            For Numbers, they are collecting *all* the assignments to a given junction and generate
+            a single assignment Verilog statement. This is needed because Verilog doesn't support
+            multiple-assignment to (sections of) vectors.
+            """
+            output_port = Output()
+
+            def construct(self, key_chains: Sequence[Sequence[Tuple[Any, KeyKind]]]):
+                self.key_chains = key_chains
+                self.input_map = None
+            def create_positional_port(self, idx: int) -> Optional[Union[str, Port]]:
+                # Create the associated input to the key. We don't support named ports, only positional ones.
+                if idx >= len(self.key_chains):
+                    return None
+                name = f"slice_{idx}"
+                ret_val = Input()
+                return (name, ret_val)
+
+            def finalize_input_map(self, common_net_type: object):
+                if self.input_map is not None:
+                    return
+                self.input_map = OrderedDict()
+                keyed_inputs = set()
+                for raw_key, input in zip(self.key_chains, self.get_inputs().values()):
+                    remaining_keys, final_key = common_net_type.resolve_key_sequence_for_set(raw_key)
+                    if remaining_keys is not None:
+                        raise FixmeException("Can't resolve all keys in a LHS context. THIS COULD BE FIXED!!!!")
+                    key = common_net_type.Key(final_key) # Convert the raw key into something that the common type understands
+                    if key in self.input_map:
+                        raise SyntaxErrorException(f"Input key {raw_key} is not unique for concatenator output type {common_net_type}")
+                    self.input_map[key] = input
+                    keyed_inputs.add(input)
+                for input in self.get_inputs().values():
+                    assert input in keyed_inputs, f"Strange: PhiSlice has an input {input} without an associated key"
+
+            def generate_output_type(self) -> Optional['NumberMeta']:
+                # This is one of the few cases where we do care about what port we're driving.
+                # The reason for that is partial assignments, that are not allowed.
+                # Let's say we have something, like this:
+                #     w = Wire(Unsigned(8))
+                #     w[0] = 1
+                # This piece of code should not elaborate. However, if PhiSlice
+                # auto-determines its output type, it'll think it's a 1-bit output.
+                # Then auto-type-conversion simply zero-extends that to the rest of the bits.
+                # To make things even more confusing for the user, this is an error:
+                #     w = Wire(Unsigned(8))
+                #     w[1] = 1
+                # So, to remedy that, we'll look at the transitive closure of all sinks
+                # of our output and use the smallest output range from them.
+                # Why the smallest? Because if there are multiple sources,
+                # those should participate in auto-extension. If it so happens
+                # that our direct output is not the most restritive, that would
+                # mean that somewhere in the assignment chain, there was a narrowing,
+                # which will eventually blow up.
+                #
+                # Precision auto-extends the other way: we need to make sure the least precise sink
+                # is still good enough. It's always OK to append a bunch of 0-s to make the Number more 'precise'.
+                common_net_type = get_common_net_type(self.get_inputs().values())
+                if common_net_type is None:
+                    raise SyntaxErrorException(f"Can't figure out output port type for PhiSlice {self}")
+                if not is_number(common_net_type):
+                    raise SyntaxErrorException(f"PhiSlice result type is {common_net_type}. It should be a Number")
+                self.finalize_input_map(common_net_type)
+                sinks = self.output_port.get_all_sinks()
+                min_val = None
+                max_val = None
+                precision = None
+                for sink in sinks:
+                    if is_number(sink.get_net_type()):
+                        min_val = max_none(min_val, sink.get_net_type().min_val)
+                        max_val = min_none(max_val, sink.get_net_type().max_val)
+                        precision = min_none(precision, sink.get_net_type().precision)
+                if min_val is not None:
+                    assert max_val is not None
+                    assert precision is not None
+                    output_type = Number(min_val=min_val, max_val=max_val, precision=precision)
+                else:
+                    output_type = common_net_type.concatenated_type(self.input_map)
+                return output_type
+
+            def body(self) -> None:
+                new_net_type = self.generate_output_type()
+                if new_net_type is None:
+                    raise SyntaxErrorException(f"Can't figure out output port type for PhiSlice {self}")
+                self.output_port.set_net_type(new_net_type)
+
+            def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
+                yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+            def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
+                return self.output_port.get_net_type().compose_concatenated_expression(back_end, self.input_map, target_namespace)
+            def simulate(self) -> TSimEvent:
+                net_type = self.output_port.get_net_type()
+                cache = net_type.prep_simulate_concatenated_expression(self.input_map)
+                while True:
+                    yield self.get_inputs().values()
+                    self.output_port <<= net_type.simulate_concatenated_expression(cache)
+
+            def is_combinational(self) -> bool:
+                """
+                Returns True if the module is purely combinational, False otherwise
+                """
+                return True
+
+
+
+
+
 
         @classmethod
         def get_lhs_name(cls, for_junction: Junction, back_end: 'BackEnd', target_namespace: Module, allow_implicit: bool=True) -> Optional[str]:
@@ -1071,193 +1078,6 @@ class Number(NetTypeFactory):
                 #output.get_parent_module()._impl._elaborate(hier_level=0, trace=False)
                 return output
 
-        """
-        ============================================================================================
-        Concatenator and MemberSetter support
-        ============================================================================================
-        """
-        @classmethod
-        def create_member_setter(cls) -> Module:
-            return Number.MemberSetter()
-
-        @classmethod
-        def _overlap(cls, range1 : 'Number.Instance.Key', range2: 'Number.Instance.Key') -> bool:
-            assert not range1.is_sequential and not range2.is_sequential
-            assert range1.start >= range1.end
-            assert range2.start >= range2.end
-            if range1.end > range2.start:
-                return False
-            if range2.end > range1.start:
-                return False
-            return True
-        @classmethod
-        def validate_input_map(cls, input_map: Dict['Number.Instance.Key', Junction]) -> bool:
-            """
-            Returns True if the supplied input map is valid, False otherwise
-
-            input_map can contain:
-            - One more more inputs with a sequential key. In that case, the inputs are simply concatenated
-            (in MSB->LSB order) in the order they were inserted into the map. This is the SV {a,b,c}
-            concatenation behavior.
-            - One more more inputs with a slice or integer-based keys. In that case the inputs are assigned
-            (potentially sign- or zero-extended) to the range specified by the key.
-            - The map must contain at least one input.
-            It is invalid to have both None-keyed and range-keyed elements in the map.
-            """
-            if len(input_map) == 0:
-                return False
-            found_seq= False
-            all_seq= True
-            for key in input_map.keys():
-                if not key.is_sequential:
-                    all_seq = False
-                else:
-                    found_seq = True
-                if not all_seq and found_seq:
-                    return False
-            if all_seq:
-                return True
-            assert not found_seq
-            from itertools import combinations
-            for (range1, range2) in combinations(input_map.keys(), 2):
-                if cls._overlap(range1, range2):
-                    return False
-            return True
-        @classmethod
-        def is_sequential_map(cls, input_map: Dict['Number.Instance.Key', Junction]) -> bool:
-            """
-            Returns true if the provided input_map is all sequential
-
-            input_map can contain:
-            - One more more inputs with a sequential key. In that case, the inputs are simply concatenated
-            (in MSB->LSB order) in the order they were inserted into the map. This is the SV {a,b,c}
-            concatenation behavior.
-            - One more more inputs with a slice or integer-based keys. In that case the inputs are assigned
-            (potentially sign- or zero-extended) to the range specified by the key.
-            - The map must contain at least one input.
-            It is invalid to have both None-keyed and range-keyed elements in the map.
-            """
-            assert len(input_map) > 0
-            for key in input_map.keys():
-                if not key.is_sequential:
-                    return False
-            return True
-        @classmethod
-        def sort_source_keys(cls, input_map: Dict['Number.Instance.Key', Junction], back_end: Optional['BackEnd']) -> Tuple['Number.Instance.Key']:
-            """
-            Sort the set of blobs as required by the back-end or for simulation of back_end is None
-            """
-            assert back_end is None or back_end.language == "SystemVerilog"
-            from operator import attrgetter
-            if len(input_map) == 1 or cls.is_sequential_map(input_map):
-                return tuple(input_map.keys())
-            sorted_keys = tuple(sorted(input_map.keys(), key=attrgetter('start'), reverse=True))
-            return sorted_keys
-
-        @classmethod
-        def concatenated_type(cls, input_map: Dict['Number.Instance.Key', Junction]) -> Optional['NetType']:
-            """
-            Returns the combined type for the given inputs for the keys
-
-            The combined type is always an integer: there's not fractional part to a concatenation.
-            """
-            assert len(input_map) > 0
-            if not cls.validate_input_map(input_map):
-                raise SyntaxErrorException("Can only determine concatenated type if the input map is invalid")
-            for junction in input_map.values():
-                if not is_number(junction.get_net_type()):
-                    raise SyntaxErrorException("Can only determine concatenated type if all constituents are Numbers")
-            # Simple assignment: return the input, but converted into an integer
-            if len(input_map) == 1 and first(input_map.keys()).is_sequential:
-                input_type = first(input_map.values()).get_net_type()
-                return Number(length=input_type.length, signed=input_type.signed)
-            # Either multiple sources or the single source has a range assigned to it.
-            sorted_keys = cls.sort_source_keys(input_map, back_end = None)
-            top_key = first(sorted_keys)
-            signed=input_map[top_key].signed # The top-most entry determines the signed-ness of the result
-            if not top_key.is_sequential:
-                # If the top entry is not sequential, then none of them are: the length of the result is determined by the top position of the top entry
-                return Number(length=top_key.start+1, signed=signed)
-            # If all entries are sequential, we simply need to add up the lengths of the constituents
-            length = 0
-            for input in input_map.values():
-                length += input.length
-            return Number(length=length, signed=signed)
-
-        @classmethod
-        def compose_concatenated_expression(cls, back_end: 'BackEnd', input_map: Dict['Number.Instance.Key', Junction], target_namespace: Module) -> Tuple[str, int]:
-            def compose_sub_source_expression(sub_port: Junction, section_length: int) -> Tuple[str, int]:
-                raw_expr, precedence = sub_port.get_rhs_expression(back_end, target_namespace)
-                if sub_port.get_net_type().length == section_length or section_length == cls.length:
-                    # If the request source is of the right length or it covers the whole junction, return it as-is
-                    return raw_expr, precedence
-                elif sub_port.get_net_type().length > section_length:
-                    raise SyntaxErrorException("Can't assign section of a Number form another, longer Number")
-                    # Well, in fact we could, but do we want to? That's too close to a coding error to allow it...
-                    #return f"({raw_expr})[section_length-1:0]"
-                else:
-                    return f"{section_length}'({raw_expr})", 0
-
-            # No source: return a X-assignment
-            assert back_end.language == "SystemVerilog"
-            if len(input_map) == 0:
-                return f"{cls.length}'bX", 0
-
-            sorted_keys = cls.sort_source_keys(input_map, back_end)
-            last_top_idx = cls.length
-            rtl_parts = []
-            for sub_port_key in sorted_keys:
-                current_top_idx = sub_port_key.start if not sub_port_key.is_sequential else last_top_idx - 1
-                assert current_top_idx < last_top_idx
-                if current_top_idx < last_top_idx - 1:
-                    raise SyntaxErrorException("Not all bits in Number have sources")
-                sub_port = input_map[sub_port_key]
-                last_top_idx = sub_port_key.end if not sub_port_key.is_sequential else last_top_idx - sub_port.length
-                slice_length = sub_port_key.length if not sub_port_key.is_sequential else sub_port.length
-                rtl_parts.append(compose_sub_source_expression(sub_port, slice_length))
-            if last_top_idx > 0:
-                raise SyntaxErrorException("Not all bits in Number have sources")
-            if len(rtl_parts) == 1:
-                return rtl_parts[0]
-            # For now we're assuming that concatenation returns an UNSIGNED vector independent of the SIGNED-ness of the sources.
-            # This is indeed true according to https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.449.1578&rep=rep1&type=pdf
-            ret_val = "{" + ", ".join(rtl_part[0] for rtl_part in rtl_parts) + "}"
-            if cls.signed:
-                return back_end.signed_cast(ret_val), 0
-            else:
-                return ret_val, back_end.get_operator_precedence("{}")
-
-        @classmethod
-        def prep_simulate_concatenated_expression(cls, input_map: Dict['Number.Instance.Key', Junction]) -> Any:
-            """
-            Returns whatever cached values are needed for quick simulation of concatenation.
-            This cached value is stored in the caller (Concatenator) object and is passed in to
-            simulate_concatenated_expression below.
-            """
-            concat_map = []
-            sorted_keys = cls.sort_source_keys(input_map, None)
-            last_top_idx = cls.length
-            value = 0
-            for sub_port_key in sorted_keys:
-                current_top_idx = sub_port_key.start + cls.precision if not sub_port_key.is_sequential else last_top_idx - 1
-                assert current_top_idx < last_top_idx
-                if current_top_idx < last_top_idx - 1:
-                    raise SyntaxErrorException("Not all bits in Number have sources")
-                sub_port = input_map[sub_port_key]
-                last_top_idx = sub_port_key.end + cls.precision if not sub_port_key.is_sequential else last_top_idx - sub_port.length
-                concat_map.append((sub_port, last_top_idx))
-            return concat_map
-
-        @classmethod
-        def simulate_concatenated_expression(cls, prep_cache: Any) -> int:
-            value = 0
-            for sub_port, last_top_idx in prep_cache:
-                sub_source_value = sub_port.sim_value
-                if sub_source_value is None:
-                    return None
-                value |= sub_source_value << last_top_idx
-            return value
-
         @classmethod
         def result_type(cls, net_types: Sequence[Optional['NetType']], operation: str) -> 'NetType':
             """
@@ -1419,6 +1239,194 @@ class Number(NetTypeFactory):
                 return Number(min_val=min_val, max_val=max_val, precision=net_types[0].precision)
             else:
                 return super().result_type(net_types, operation) # Will raise an exception.
+
+        """
+        ============================================================================================
+        Concatenator support
+        ============================================================================================
+        """
+        @classmethod
+        def _overlap(cls, range1 : 'Number.Instance.Key', range2: 'Number.Instance.Key') -> bool:
+            # Local method, not called from outside
+            assert not range1.is_sequential and not range2.is_sequential
+            assert range1.start >= range1.end
+            assert range2.start >= range2.end
+            if range1.end > range2.start:
+                return False
+            if range2.end > range1.start:
+                return False
+            return True
+        @classmethod
+        def validate_input_map(cls, input_map: Dict['Number.Instance.Key', Junction]) -> bool:
+            """
+            Returns True if the supplied input map is valid, False otherwise
+
+            input_map can contain:
+            - One more more inputs with a sequential key. In that case, the inputs are simply concatenated
+            (in MSB->LSB order) in the order they were inserted into the map. This is the SV {a,b,c}
+            concatenation behavior.
+            - One more more inputs with a slice or integer-based keys. In that case the inputs are assigned
+            (potentially sign- or zero-extended) to the range specified by the key.
+            - The map must contain at least one input.
+            It is invalid to have both None-keyed and range-keyed elements in the map.
+            """
+            # Local method, not called from outside
+            if len(input_map) == 0:
+                return False
+            found_seq= False
+            all_seq= True
+            for key in input_map.keys():
+                if not key.is_sequential:
+                    all_seq = False
+                else:
+                    found_seq = True
+                if not all_seq and found_seq:
+                    return False
+            if all_seq:
+                return True
+            assert not found_seq
+            from itertools import combinations
+            for (range1, range2) in combinations(input_map.keys(), 2):
+                if cls._overlap(range1, range2):
+                    return False
+            return True
+        @classmethod
+        def is_sequential_map(cls, input_map: Dict['Number.Instance.Key', Junction]) -> bool:
+            """
+            Returns true if the provided input_map is all sequential
+
+            input_map can contain:
+            - One more more inputs with a sequential key. In that case, the inputs are simply concatenated
+            (in MSB->LSB order) in the order they were inserted into the map. This is the SV {a,b,c}
+            concatenation behavior.
+            - One more more inputs with a slice or integer-based keys. In that case the inputs are assigned
+            (potentially sign- or zero-extended) to the range specified by the key.
+            - The map must contain at least one input.
+            It is invalid to have both None-keyed and range-keyed elements in the map.
+            """
+            # Local method, not called from outside
+            assert len(input_map) > 0
+            for key in input_map.keys():
+                if not key.is_sequential:
+                    return False
+            return True
+        @classmethod
+        def sort_source_keys(cls, input_map: Dict['Number.Instance.Key', Junction], back_end: Optional['BackEnd']) -> Tuple['Number.Instance.Key']:
+            """
+            Sort the set of blobs as required by the back-end or for simulation of back_end is None
+            """
+            # Local method, not called from outside
+            assert back_end is None or back_end.language == "SystemVerilog"
+            from operator import attrgetter
+            if len(input_map) == 1 or cls.is_sequential_map(input_map):
+                return tuple(input_map.keys())
+            sorted_keys = tuple(sorted(input_map.keys(), key=attrgetter('start'), reverse=True))
+            return sorted_keys
+
+        @classmethod
+        def concatenated_type(cls, input_map: Dict['Number.Instance.Key', Junction]) -> Optional['NetType']:
+            """
+            Returns the combined type for the given inputs for the keys
+
+            The combined type is always an integer: there's not fractional part to a concatenation.
+            """
+            assert len(input_map) > 0
+            if not cls.validate_input_map(input_map):
+                raise SyntaxErrorException("Can only determine concatenated type if the input map is invalid")
+            for junction in input_map.values():
+                if not is_number(junction.get_net_type()):
+                    raise SyntaxErrorException("Can only determine concatenated type if all constituents are Numbers")
+            # Simple assignment: return the input, but converted into an integer
+            if len(input_map) == 1 and first(input_map.keys()).is_sequential:
+                input_type = first(input_map.values()).get_net_type()
+                return Number(length=input_type.length, signed=input_type.signed)
+            # Either multiple sources or the single source has a range assigned to it.
+            sorted_keys = cls.sort_source_keys(input_map, back_end = None)
+            top_key = first(sorted_keys)
+            signed=input_map[top_key].signed # The top-most entry determines the signed-ness of the result
+            if not top_key.is_sequential:
+                # If the top entry is not sequential, then none of them are: the length of the result is determined by the top position of the top entry
+                return Number(length=top_key.start+1, signed=signed)
+            # If all entries are sequential, we simply need to add up the lengths of the constituents
+            length = 0
+            for input in input_map.values():
+                length += input.length
+            return Number(length=length, signed=signed)
+
+        @classmethod
+        def compose_concatenated_expression(cls, back_end: 'BackEnd', input_map: Dict['Number.Instance.Key', Junction], target_namespace: Module) -> Tuple[str, int]:
+            def compose_sub_source_expression(sub_port: Junction, section_length: int) -> Tuple[str, int]:
+                raw_expr, precedence = sub_port.get_rhs_expression(back_end, target_namespace)
+                if sub_port.get_net_type().length == section_length or section_length == cls.length:
+                    # If the request source is of the right length or it covers the whole junction, return it as-is
+                    return raw_expr, precedence
+                elif sub_port.get_net_type().length > section_length:
+                    raise SyntaxErrorException("Can't assign section of a Number form another, longer Number")
+                    # Well, in fact we could, but do we want to? That's too close to a coding error to allow it...
+                    #return f"({raw_expr})[section_length-1:0]"
+                else:
+                    return f"{section_length}'({raw_expr})", 0
+
+            # No source: return a X-assignment
+            assert back_end.language == "SystemVerilog"
+            if len(input_map) == 0:
+                return f"{cls.length}'bX", 0
+
+            sorted_keys = cls.sort_source_keys(input_map, back_end)
+            last_top_idx = cls.length
+            rtl_parts = []
+            for sub_port_key in sorted_keys:
+                current_top_idx = sub_port_key.start if not sub_port_key.is_sequential else last_top_idx - 1
+                assert current_top_idx < last_top_idx
+                if current_top_idx < last_top_idx - 1:
+                    raise SyntaxErrorException("Not all bits in Number have sources")
+                sub_port = input_map[sub_port_key]
+                last_top_idx = sub_port_key.end if not sub_port_key.is_sequential else last_top_idx - sub_port.length
+                slice_length = sub_port_key.length if not sub_port_key.is_sequential else sub_port.length
+                rtl_parts.append(compose_sub_source_expression(sub_port, slice_length))
+            if last_top_idx > 0:
+                raise SyntaxErrorException("Not all bits in Number have sources")
+            if len(rtl_parts) == 1:
+                return rtl_parts[0]
+            # For now we're assuming that concatenation returns an UNSIGNED vector independent of the SIGNED-ness of the sources.
+            # This is indeed true according to https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.449.1578&rep=rep1&type=pdf
+            ret_val = "{" + ", ".join(rtl_part[0] for rtl_part in rtl_parts) + "}"
+            if cls.signed:
+                return back_end.signed_cast(ret_val), 0
+            else:
+                return ret_val, back_end.get_operator_precedence("{}")
+
+        @classmethod
+        def prep_simulate_concatenated_expression(cls, input_map: Dict['Number.Instance.Key', Junction]) -> Any:
+            """
+            Returns whatever cached values are needed for quick simulation of concatenation.
+            This cached value is stored in the caller (Concatenator) object and is passed in to
+            simulate_concatenated_expression below.
+            """
+            concat_map = []
+            sorted_keys = cls.sort_source_keys(input_map, None)
+            last_top_idx = cls.length
+            value = 0
+            for sub_port_key in sorted_keys:
+                current_top_idx = sub_port_key.start + cls.precision if not sub_port_key.is_sequential else last_top_idx - 1
+                assert current_top_idx < last_top_idx
+                if current_top_idx < last_top_idx - 1:
+                    raise SyntaxErrorException("Not all bits in Number have sources")
+                sub_port = input_map[sub_port_key]
+                last_top_idx = sub_port_key.end + cls.precision if not sub_port_key.is_sequential else last_top_idx - sub_port.length
+                concat_map.append((sub_port, last_top_idx))
+            return concat_map
+
+        @classmethod
+        def simulate_concatenated_expression(cls, prep_cache: Any) -> int:
+            value = 0
+            for sub_port, last_top_idx in prep_cache:
+                sub_source_value = sub_port.sim_value
+                if sub_source_value is None:
+                    return None
+                value |= sub_source_value << last_top_idx
+            return value
+
 
     net_type = Instance
 

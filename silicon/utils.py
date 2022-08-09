@@ -3,6 +3,8 @@ from .tracer import no_trace
 from .exceptions import SyntaxErrorException, AdaptTypeError
 from collections import deque
 from threading import RLock
+import sys
+
 TSimEvent = Generator[Union[int, Sequence['Port']], int, int]
 
 # Only purpose to provide an easy way to check if something is a NetValue in convert_to_junction
@@ -470,3 +472,27 @@ def first_bit_set(x):
     least significant set bit in `x`.
     """
     return (x&-x).bit_length()-1
+
+class VerbosityLevels(object):
+    none=-1
+    instantiation=0
+
+    _verbosity_level: int = -1
+
+def set_verbosity_level(verbosity_level: int) -> None:
+    VerbosityLevels._verbosity_level = verbosity_level
+
+def verbose_enough(verbosity_level: int) -> bool:
+    return get_verbosity_level() >= verbosity_level
+
+
+def get_verbosity_level() -> int:
+    return VerbosityLevels._verbosity_level
+
+def vprint(verbosity_level: int, *args, **kwargs):
+    """
+    Same as 'print', except it is printing only at certain verbosity levels, and always targets STDERR 
+    """
+    if verbose_enough(verbosity_level):
+        print(*args, **kwargs, file=sys.stderr)
+

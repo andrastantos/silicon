@@ -80,12 +80,21 @@ class Tracer(object):
                 from .utils import is_junction_or_member, is_module, is_input_port, is_output_port, is_wire, first
                 if is_junction_or_member(local_value):
                     header_printed = print_header()
-                    junction = local_value.get_underlying_junction()
+                    if hasattr(local_value, "convert_to_junction"):
+                        junction = local_value.convert_to_junction()
+                    else:
+                        junction = local_value
+                    if hasattr(junction, "get_underlying_junction"):
+                        junction = junction.get_underlying_junction())
                     if junction is not None:
                         from .module import Module
                         from .port import Wire
                         junction_parent_module = junction.get_parent_module()
-                        parent_module = Module._parent_modules.top()
+                        parent_module = Module.get_current_scope()
+                        # We can't really assert in tracer, I don't think. So we simply terminate with a nasty message
+                        if parent_module is None:
+                            print(f"Traces is enabled outside of module bodies. THIS IS REALLY BAD!!!", file=sys.stderr)
+                            sys.exit(-1)
                         same_level = junction_parent_module is parent_module
                         sub_level = junction_parent_module._impl.parent is parent_module
                         is_unused_local_wire = is_wire(junction) and junction.source is None and len(junction.sinks) == 0
@@ -139,8 +148,7 @@ class Tracer(object):
                         else:
                             if Tracer.debug_print_level > 0:
                                 print(f"\tNON_LOCAL JUNCTION {local_name} {id(junction):x} SKIPPED for {func_name}")
-
-                if is_module(local_value):
+                elif is_module(local_value):
                     header_printed = print_header()
                     if Tracer.debug_print_level > 1:
                         print(f"\tModule {local_name} = {local_value}")

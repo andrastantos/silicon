@@ -1,6 +1,8 @@
 #!pytest
 import sys
 from pathlib import Path
+
+from silicon.utils import VerbosityLevels
 sys.path.append(str(Path(__file__).parent / ".."))
 import silicon as si
 import test_utils as t
@@ -52,9 +54,9 @@ def test_pass_through():
         in_b = si.Input(si.Signed(1))
 
         def body(self):
-            self.out_a[1:0] = 0
-            self.out_a[3:2] = 1
-            self.out_a[4] = self.in_a & self.in_b
+            self.out_a[1:0] <<= 0
+            self.out_a[3:2] <<= 1
+            self.out_a[4] <<= self.in_a & self.in_b
 
     t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -92,7 +94,26 @@ def test_wire_array3():
                 bits.append(si.Wire())
                 bits[-1] <<= inp
             for idx, bit in enumerate(bits):
-                self.out_a[idx] = bit
+                self.out_a[idx] <<= bit
+
+
+    t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+def test_wire_array2():
+    class top(si.Module):
+        out_a = si.Output(si.Unsigned(length=8))
+        in_a = si.Input(si.Unsigned(length=8))
+
+        def body(self):
+            bits = []
+            but = si.Wire()
+            for inp in self.in_a:
+                bits.append(si.Wire())
+                bits[-1] <<= inp
+            for idx, bit in enumerate(bits):
+                self.out_a[idx] <<= bit
+            but <<= inp
+
 
     t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -235,6 +256,55 @@ def test_loop_finder(mode="rtl"):
 
 
 
+def test_rhs_slice(mode="rtl"):
+    class Top(si.Module):
+        a = si.Input(si.Unsigned(8))
+        o = si.Output(si.Unsigned(8))
+        p = si.Output(si.Unsigned(8))
+        q = si.Output(si.Unsigned(8))
+
+        def body(self):
+            self.o <<= self.a[2]
+            self.p <<= self.a[5:0][2]
+            self.q <<= self.a[8:0][7:0][6:0]
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+def test_lhs_slice(mode="rtl"):
+    class Top(si.Module):
+        a = si.Input(si.Unsigned(2))
+        b = si.Input(si.Unsigned(3))
+        c = si.Input(si.Unsigned(4))
+        d = si.Input(si.Unsigned(5))
+        o = si.Output(si.Unsigned(8))
+        #p = si.Output(si.Unsigned(8))
+        #q = si.Output(si.Unsigned(8))
+        #r = si.Output(si.Unsigned(8))
+
+        def body(self):
+            self.o[3:0][2:0] <<= self.a
+            self.o[3:0][3] <<= self.a[0]
+            self.o[6:4] <<= self.b
+            self.o[7] <<= self.c[3]
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+
+
+
+
+
+
 
 
 
@@ -249,9 +319,12 @@ if __name__ == "__main__":
     #test_module_with_io()
     #test_module_with_assigned_io()
     #test_pass_through()
-    test_wire_names()
+    #test_wire_names()
     #test_wire_array3()
+    test_wire_array2()
     #test_slice_bind()
     #test_double_port_assign()
     #test_full_adder()
     #test_loop_finder("rtl")
+    #test_rhs_slice("rtl")
+    #test_lhs_slice("rtl")

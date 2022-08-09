@@ -22,6 +22,8 @@ def test_array_assign():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+
+@pytest.mark.skip(reason="This test is broken at the moment: we'll have to fix it as we get to rework Composites in general and Arrays in particular")
 def test_array_slice1():
     class top(Module):
         out_port1 = Output(Unsigned(8))

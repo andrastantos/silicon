@@ -1,4 +1,4 @@
-# We will be able to rework generic modules when https://www.python.org/dev/peps/pep-0637/ becomes reality (currently targetting python 3.10)
+# We will be able to rework generic modules when https://www.python.org/dev/peps/pep-0637/ becomes reality (currently targeting python 3.10)
 # Well, that PEP got rejected, so I guess there goes that...
 from typing import Union, Set, Tuple, Dict, Any, Optional, List, Iterable, Generator, Sequence, Callable
 import typing
@@ -14,7 +14,8 @@ from .ordered_set import OrderedSet
 from .exceptions import SimulationException, SyntaxErrorException
 from threading import RLock
 from itertools import chain, zip_longest
-from .utils import is_port, is_input_port, is_output_port, is_wire, is_junction_member, is_module, fill_arg_names, is_junction_or_member, is_junction_base, is_iterable, MEMBER_DELIMITER, first, implicit_adapt
+from .utils import is_port, is_input_port, is_output_port, is_wire, is_junction_member, is_module, fill_arg_names, is_junction_or_member, is_junction_base, is_iterable, MEMBER_DELIMITER, first, implicit_adapt, convert_to_junction
+from .utils import vprint, verbose_enough, VerbosityLevels
 from .state_stack import StateStackElement
 import inspect
 
@@ -93,6 +94,11 @@ class Module(object):
     # Since we don't want to muddy the RTL description with explicit parentage passing, we need to pass this information from parents' body() to childs __init__ over a global.
     # Not the most elegant, but I had no better idea. This however prevents true multi-threaded behavior
     _parent_modules = Stack()
+    @staticmethod
+    def get_current_scope() -> Optional['Module']:
+        if Module._parent_modules.is_empty():
+            return None
+        return Module._parent_modules.top()
 
     ignore_caller_filenames = ["tracer.py", "module.py", "number.py", "port.py", "utils.py"]
     ignore_caller_libs= ["silicon"]
@@ -519,14 +525,13 @@ class Module(object):
                 #self._sub_modules = OrderedSet()
                 self._sub_modules = []
                 self._unordered_sub_modules = [] # Sub-modules first get inserted into this list. Once an output of a sub-module is accessed, it is moved into _sub_modules. Finally, when all is done, the rest of the sub-modules are moved over as well.
-                if not Module._parent_modules.is_empty():
-                    parent = Module._parent_modules.top()
+                parent = Module.get_current_scope()
+                if parent is None:
+                    self.netlist = Netlist(self._true_module)
+                else:
                     parent._impl.register_sub_module(self._true_module)
                     self.netlist = parent._impl.netlist
-                    self.parent = parent
-                else:
-                    self.netlist = Netlist(self._true_module)
-                    self.parent = None
+                self.parent = parent
 
         def _init_phase2(self, *args, **kwargs):
             with self._no_junction_bind:
@@ -664,18 +669,21 @@ class Module(object):
                 node = node.parent._impl
                 name = node.__get_instance_name() + FQN_DELIMITER + name
             return name
-        def get_diagnostic_name(self, add_location: bool = True) -> str:
+        def get_diagnostic_name(self, add_location: bool = True, add_type: bool = True, add_hierarchy: bool = True) -> str:
             from .utils import FQN_DELIMITER
             node = self
-            if self.name is None:
+            if self.name is None and not add_type:
                 name = f"<unnamed:{type(self).__name__}>"
             else:
                 name = self.name
-            while node.parent is not None:
-                node = node.parent._impl
-                name = node.get_diagnostic_name(False) + FQN_DELIMITER + name
+            if add_hierarchy:
+                while node.parent is not None:
+                    node = node.parent._impl
+                    name = node.get_diagnostic_name(False, False, False) + (FQN_DELIMITER + name if name is not None else "")
             if add_location:
                 name += self.get_diagnostic_location(" at ")
+            if add_type:
+                name = type(self._true_module).__name__ + " instance " + name
             return name
 
         def get_diagnostic_location(self, prefix: str = "") -> str:
@@ -807,7 +815,7 @@ class Module(object):
                             # This happens with self.port <<= something constructors: we do the <<= operator, which returns the RHS, then assign it to the old property.
                             pass
                         else:
-                            scope = Module._parent_modules.top()
+                            scope = Module.get_current_scope()
                             if scope is self._true_module:
                                 junction_inst.set_source(value, self._true_module)
                             else:
@@ -859,16 +867,16 @@ class Module(object):
 
             for name in port_name_list:
                 if name in self._parent_local_junctions:
-                    return self._parent_local_junctions[name].get_underlying_junction()
+                    return convert_to_junction(self._parent_local_junctions[name])
             if self.parent is not None:
                 parent_ports = self.parent.get_ports()
                 for name in port_name_list:
                     if name in parent_ports:
-                        return parent_ports[name].get_underlying_junction()
+                        return convert_to_junction(parent_ports[name])
                 parent_wires = self.parent.get_wires()
                 for name in port_name_list:
                     if name in parent_wires:
-                        return parent_wires[name].get_underlying_junction()
+                        return convert_to_junction(parent_wires[name])
             return None
 
         def _elaborate(self, hier_level, trace: bool) -> None:
@@ -938,27 +946,28 @@ class Module(object):
                                     else:
                                         junction.set_source(source, scope)
 
-            incomplete_sub_modules = OrderedSet(self._sub_modules)
-            changes = True
-            while len(incomplete_sub_modules) > 0 and changes:
+            with Module._parent_modules.push(self._true_module):
+                incomplete_sub_modules = OrderedSet(self._sub_modules)
                 changes = True
-                # Propagate types from submodule ports to wires. Keep propagating until we can't do anything more.
+                while len(incomplete_sub_modules) > 0 and changes:
+                    changes = True
+                    # Propagate types from submodule ports to wires. Keep propagating until we can't do anything more.
+                    propagate_net_types()
+
+                    changes = False
+                    for sub_module in tuple(incomplete_sub_modules):
+                        # propagate all newly assigned ports
+                        for input in sub_module.get_inputs().values():
+                            if not input.is_specialized() and input.source is not None and input.source.is_specialized():
+                                input.set_net_type(input.source.get_net_type())
+                        all_inputs_specialized = all(tuple(input.is_specialized() or not input.has_driver() for input in sub_module.get_inputs().values()))
+                        if all_inputs_specialized:
+                            with Module.Context(sub_module._impl):
+                                sub_module._impl._elaborate(hier_level + 1, trace)
+                            changes = True
+                            incomplete_sub_modules.remove(sub_module)
+
                 propagate_net_types()
-
-                changes = False
-                for sub_module in tuple(incomplete_sub_modules):
-                    # propagate all newly assigned ports
-                    for input in sub_module.get_inputs().values():
-                        if not input.is_specialized() and input.source is not None and input.source.is_specialized():
-                            input.set_net_type(input.source.get_net_type())
-                    all_inputs_specialized = all(tuple(input.is_specialized() or not input.has_driver() for input in sub_module.get_inputs().values()))
-                    if all_inputs_specialized:
-                        with Module.Context(sub_module._impl):
-                            sub_module._impl._elaborate(hier_level + 1, trace)
-                        changes = True
-                        incomplete_sub_modules.remove(sub_module)
-
-            propagate_net_types()
             if len(incomplete_sub_modules) != 0:
                 # Collect all nets that don't have a type, but must to continue
                 input_list = []
@@ -1001,6 +1010,14 @@ class Module(object):
                     raise SyntaxErrorException(f"Top level module must have all its inputs specialized before it can be elaborated")
                 self._elaborate(hier_level=0, trace=True)
             self.netlist._post_elaborate(add_unnamed_scopes)
+
+            def print_submodules(module: 'Module', level: int = 0) -> None:
+                if verbose_enough(VerbosityLevels.instantiation):
+                    vprint(VerbosityLevels.instantiation, f"  {'  '*level}{module._impl.get_diagnostic_name()}")
+                    for sub_module in module._impl._sub_modules:
+                        print_submodules(sub_module, level+1)
+            vprint(VerbosityLevels.instantiation, "Module hierarchy:")
+            print_submodules(self._true_module)
             return self.netlist
 
         def _body(self, trace: bool = True) -> None:
@@ -1026,9 +1043,9 @@ class Module(object):
                         for member, _ in junction.get_member_junctions().values():
                             finalize_slices(member)
                     else:
-                        junction.finalize_slices()
+                        junction.finalize_slices(self._true_module)
 
-                # Go through each junction and make sure their Concatenators are created if needed
+                # Go through each junction and make sure their PhiSlices are created if needed
                 for junction in self.get_junctions().values():
                     finalize_slices(junction)
                 for junction in self._local_wires:

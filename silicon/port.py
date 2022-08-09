@@ -11,6 +11,8 @@ from collections import OrderedDict
 from enum import Enum
 
 
+class IgnoreMeAfterIlShift(object):
+    pass
 
 class JunctionBase(object):
     """
@@ -27,7 +29,7 @@ class JunctionBase(object):
         # type instance. 
         return super().__new__(cls)
 
-    def __init__(self):
+    def __init__(self, parent_module: Optional['Module'] = None):
         # !!!!! SUPER IMPORTANT !!!!!
         # In most cases, Ports of a Module are set on the cls level, not inside __init__() (or construct()).
         # There is a generic 'deepcopy' call in _init_phase2 that creates the instance-level copies for all the ports.
@@ -35,26 +37,60 @@ class JunctionBase(object):
         # object, it's a copy of an already live one. This means, that none of this code gets executed for instance-level
         # ports. Right now, the most important thing here is that 'Context.register' doesn't get executed, but every time
         # we put stuff in here, that needs to be checked against the copy functionality in '_init_phase2' of 'Module.
+        assert parent_module is None or is_module(parent_module)
+
         super().__init__()
         Context.register(self._context_change)
+        self._allow_auto_bind = True
+        self._parent_module = parent_module
+        self._in_with_block = False
 
     def __getitem__(self, key: Any) -> Any:
         if Context.current() == Context.simulation:
             return self.get_net_type().get_slice(key, self)
         else:
-            from .member_access import MemberGetter
-            return MemberGetter(self, [(key, KeyKind.Index)])
+            from .member_access import UniSlicer
+            return UniSlicer(self, key, KeyKind.Index, self.get_parent_module())
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        if is_junction_member(value) and value.get_parent_junction() is self:
+        if value is IgnoreMeAfterIlShift:
             return
-        if hasattr(self.get_net_type(), "set_member_access"):
-            return self.get_net_type().set_member_access([(key, KeyKind.Index)], value, self)
-        raise TypeError()
+        raise SyntaxErrorException("Assignment to slices is not supported. Use the '<<=' operator instead")
 
     def __delitem__(self, key: Any) -> None:
         # I'm not sure what this even means in this context
         raise TypeError()
+
+    def __enter__(self) -> 'Junction':
+        assert not self._in_with_block
+        self._in_with_block = True
+        self._allow_auto_bind = True
+        self._scoped_port = ScopedPort(convert_to_junction(self))
+        self._junctions_before_scope = get_caller_local_junctions(3)
+        return self._scoped_port
+
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        assert self._in_with_block
+        self._in_with_block = False
+        self._allow_auto_bind = False
+        # TODO: This can be perf optimized: we iterate twice, once in get_caller_local_junctions and once here...
+        junctions_after_scope = get_caller_local_junctions(3)
+        found = False
+        for name, junction in junctions_after_scope.items():
+            if junction is self._scoped_port:
+                old_junction = self._junctions_before_scope.get(name, None)
+                if old_junction is not None and found:
+                    raise SyntaxErrorException(f"This is not supported: scoped port {self} got assigned to multiple already existing local net references. Can't restore originals.")
+                self._scoped_port._update_real_port(old_junction)
+                found = True
+        junction = None
+        del junctions_after_scope
+        del self._junctions_before_scope
+        del self._scoped_port
+
+    def get_parent_module(self) -> Optional['Module']:
+        return self._parent_module
 
     @staticmethod
     def _safe_call_by_name(obj, name, *kargs, **kwargs):
@@ -277,8 +313,7 @@ class JunctionBase(object):
         if self.source is not None:
             raise SyntaxErrorException(f"{self} is already bound to {self.source}.")
         from .module import Module
-        scope = Module._parent_modules.top()
-        self.set_source(other, scope)
+        self.set_source(other, Module.get_current_scope())
         return self
 
     def ilshift__none(self, other: Any) -> 'Junction':
@@ -310,6 +345,14 @@ class JunctionBase(object):
     def set_source(self, source: Any, scope: 'Module') -> None:
         raise NotImplementedError()
 
+    def allow_auto_bind(self) -> bool:
+        """
+        Determines if auto-binding to this junction is allowed.
+        Defaults to True, but for scoped ports, get set to False
+        upon __exit__
+        """
+        return self._allow_auto_bind
+
 
 
 
@@ -335,18 +378,14 @@ class Junction(JunctionBase):
         # object, it's a copy of an already live one. This means, that none of this code gets executed for instance-level
         # ports. Right now, the most important thing here is that 'Context.register' doesn't get executed, but every time
         # we put stuff in here, that needs to be checked against the copy functionality in '_init_phase2' of 'Module.
-        super().__init__()
-        assert parent_module is None or is_module(parent_module)
+        super().__init__(parent_module)
         from .module import Module
         self._source: Optional['Junction.NetEdge'] = None
+        self._partial_sources: Sequence[Tuple[Sequence[Tuple[Any, KeyKind]], 'Junction.NetEdge']] = [] # contains slice/member assignments
         self._sinks: Dict['Junction', 'Module'] = {}
-        self._parent_module = parent_module
         self._in_attr_access = False
         self.interface_name = None # set to a string showing the interface name when the port/wire is assigned to a Module attribute (in Module.__setattr__)
         self.keyword_only = keyword_only
-        self.raw_input_map = [] # contains section inputs before Concatenator or MemberSetter can be created.
-        self._allow_auto_bind = True
-        self._in_with_block = False
         self._member_junctions = OrderedDict() # Contains members for struct/interfaces/vectors
         self._parent_junction = None # Reverences back to the container for struct/interface/vector members
         self._net_type = None
@@ -354,6 +393,7 @@ class Junction(JunctionBase):
             if not is_net_type(net_type):
                 raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType.")
             self.set_net_type(net_type)
+
 
     @property
     def sinks(self):
@@ -402,24 +442,16 @@ class Junction(JunctionBase):
         for member_junction, _ in self.get_member_junctions().values():
             member_junction.set_parent_module(parent_module)
 
-    def get_parent_module(self) -> Optional['Module']:
-        return self._parent_module
+    def finalize_slices(self, scope) -> None:
+        if len(self._partial_sources) > 0:
+            from silicon.member_access import PhiSlice
 
-    def finalize_slices(self) -> None:
-        if len(self.raw_input_map) > 0:
-            assert not self.is_composite() # We can only generate slices of non-compound types (TODO: what about vectors???)
-            self.concatenator = self.get_net_type().create_member_setter()
-            self.set_source(self.concatenator.output_port, self.concatenator._impl.parent)
-            from .module import Module
-            for (key, real_junction) in self.raw_input_map:
-                self.concatenator.add_input(key, real_junction)
-            self.raw_input_map = [] # Prevent re-creation of Concatenator
-            # If the concatenator was created outside the normal body context (during type determination)
-            # We'll have to make sure it's properly registered
-            if Context.current() is None:
-                assert False, "I DONT THINK THIS SHOULD HAPPEN!!!!!"
-                self.concatenator.freeze_interface()
-                self.concatenator._body()
+            key_chains = tuple(partial_source[0] for partial_source in self._partial_sources)
+            sources = tuple(partial_source[1].far_end for partial_source in self._partial_sources)
+            scopes = tuple(partial_source[1].scope for partial_source in self._partial_sources)
+            self.phi_slice = PhiSlice(key_chains)
+            self.set_source(self.phi_slice(*sources), scope)
+            self._partial_sources = [] # Prevent re-creation of Concatenator
 
     def get_junction_type(self) -> type:
         if type(self) is Junction:
@@ -546,6 +578,28 @@ class Junction(JunctionBase):
                     # It is OK to call this multiple times for the same sub_module. After the first one, it's a no-op.
                     parent_parent_module._impl.order_sub_module(parent_module)
 
+    def set_partial_source(self, key_chain: Sequence[Tuple[Any, KeyKind]], source: Any, scope: 'Module') -> None:
+        passed_in_source = source
+        if source is not None:
+            source = convert_to_junction(source, type_hint=None)
+            if source is None:
+                # We couldn't create a port out of the value:
+                raise SyntaxErrorException(f"couldn't convert '{passed_in_source}' to Junction.")
+            assert isinstance(source, Junction)
+
+        self._partial_sources.append(
+            (key_chain, Junction.NetEdge(source, scope))
+        )
+
+        # TODO: deal with this through inheritance instead of type-check!
+        if is_output_port(source):
+            parent_module = source.get_parent_module()
+            if parent_module is not None:
+                parent_parent_module = parent_module._impl.parent
+                if parent_parent_module is not None:
+                    # It is OK to call this multiple times for the same sub_module. After the first one, it's a no-op.
+                    parent_parent_module._impl.order_sub_module(parent_module)
+
     def generate_interface(self, back_end: 'BackEnd', port_name: str) -> Sequence[str]:
         assert back_end.language == "SystemVerilog"
         if not self.is_composite():
@@ -579,41 +633,6 @@ class Junction(JunctionBase):
         """
         return True
 
-    def allow_auto_bind(self) -> bool:
-        """
-        Determines if auto-binding to this junction is allowed.
-        Defaults to True, but for scoped ports, get set to False
-        upon __exit__
-        """
-        return self._allow_auto_bind
-
-
-    def __enter__(self) -> 'Junction':
-        assert not self._in_with_block
-        self._in_with_block = True
-        self._allow_auto_bind = True
-        self._scoped_port = ScopedPort(self)
-        self._junctions_before_scope = get_caller_local_junctions(3)
-        return self._scoped_port
-
-
-    def __exit__(self, exception_type, exception_value, traceback):
-        assert self._in_with_block
-        self._in_with_block = False
-        self._allow_auto_bind = False
-        # TODO: This can be perf optimized: we iterate twice, once in get_caller_local_junctions and once here...
-        junctions_after_scope = get_caller_local_junctions(3)
-        found = False
-        for name, junction in junctions_after_scope.items():
-            if junction is self._scoped_port:
-                old_junction = self._junctions_before_scope.get(name, None)
-                if old_junction is not None and found:
-                    raise SyntaxErrorException(f"This is not supported: scoped port {self} got assigned to multiple already existing local net references. Can't restore originals.")
-                self._scoped_port._update_real_port(old_junction)
-                found = True
-        junction = None
-        del junctions_after_scope
-        del self._junctions_before_scope
 
     @property
     def junction_kind(self) -> str:
@@ -925,8 +944,7 @@ class WireJunction(Junction):
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None):
         from .module import Module
         if parent_module is None:
-            if not Module._parent_modules.is_empty():
-                parent_module = Module._parent_modules.top()
+            parent_module = Module.get_current_scope()
         super().__init__(net_type, parent_module)
         if parent_module is not None:
             parent_module._impl.register_wire(self)

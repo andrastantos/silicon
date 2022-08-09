@@ -299,16 +299,16 @@ def test_old_number():
             c0 = and_gate(a0, b0)
             self.out_num = self.in_b & self.in_c
             self.out_num_b = 31
-            self.out_b[0] = c0
-            self.out_b[4] = and_gate(self.in_a[3], self.in_a[4])
-            self.out_b[3:1] = self.in_a[3:1]
-            self.out_b[10:5] = 0
+            self.out_b[0] <<= c0
+            self.out_b[4] <<= and_gate(self.in_a[3], self.in_a[4])
+            self.out_b[3:1] <<= self.in_a[3:1]
+            self.out_b[10:5] <<= 0
             #self.out_c = [a0, b0, c0]
             # There's a strange artifact in the generation of this code. It outputs:
             #   assign out_d = {{7{1'bX}}, {in_a[4], in_b[0], u1_out}};
             # This is probably not a big deal, but maybe at some point we should optimize away the extra {} braces to improve readability.
-            self.out_d[3:0] = concat(c0, b0, self.in_a[4])
-            self.out_d[10:4] = 0
+            self.out_d[3:0] <<= concat(c0, b0, self.in_a[4])
+            self.out_d[10:4] <<= 0
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 

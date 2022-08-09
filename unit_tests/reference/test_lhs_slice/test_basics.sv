@@ -2,11 +2,14 @@
 // Top
 ////////////////////////////////////////////////////////////////////////////////
 module Top (
-	output logic [4:0] out_a,
-	input logic in_c
+	input logic [1:0] a,
+	input logic [2:0] b,
+	input logic [3:0] c,
+	input logic [4:0] d,
+	output logic [7:0] o
 );
 
-	assign out_a = {1'h1, 4'(in_c)};
+	assign o = {c[3], b, a[0], 3'(a)};
 
 endmodule
 

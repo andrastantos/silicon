@@ -35,7 +35,7 @@ def test_wire_array2():
             for i in range(2):
                 self.pen_colors[i] <<= (and_gate, or_gate)[i](*self.data_in)
             for i in range(2):
-                self.out1[i] = self.pen_colors[i]
+                self.out1[i] <<= self.pen_colors[i]
 
     test.rtl_generation(test_module, "test_wire_array2")
 

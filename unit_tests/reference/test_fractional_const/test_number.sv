@@ -2,11 +2,11 @@
 // Top
 ////////////////////////////////////////////////////////////////////////////////
 module Top (
-	output logic [4:0] out_a,
-	input logic in_c
+	input logic [7:0] in1,
+	output logic [9:0] outp
 );
 
-	assign out_a = {1'h1, 4'(in_c)};
+	assign outp = { in1 + 8'h9, 1'b0 };
 
 endmodule
 

@@ -428,7 +428,7 @@ class Concatenator(Module):
     Generic concatenator object, used (mostly) for RHS concatenations, using the concat function below.
 
     This module is NOT used for LHS concatenations (a[4:1] = b; a[0] = c).
-    Those are handled by type-specific MemberSetter modules.
+    Those are handled by type-specific PhiSlice modules.
     """
     output_port = Output()
 

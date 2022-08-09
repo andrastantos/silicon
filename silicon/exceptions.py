@@ -3,10 +3,13 @@ from typing import Optional
 
 class SyntaxErrorException(Exception):
     def __init__(self, message, context = None):
+        from .utils import is_module
+        if is_module(context):
+            context = context._impl
         if context is None:
             from .module import Module
             try:
-                context = Module.Context.top().context
+                context = Module.get_current_scope()._impl
             except Exception:
                 pass
         loc = None

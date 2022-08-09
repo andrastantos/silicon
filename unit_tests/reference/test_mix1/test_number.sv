@@ -16,26 +16,26 @@ module top (
 	logic a0;
 	logic b0;
 	logic c0;
-	logic u9_out_a;
+	logic u7_out_a;
 
 	assign a0 = in_a[0];
 	assign b0 = in_b[0];
 	assign out_num = in_b & in_c;
 	assign out_c = {a0, b0, c0, c0, b0};
-	assign out_b = {6'(1'h0), u9_out_a, in_a[2:0], c0};
+	assign out_b = {6'(1'h0), u7_out_a, in_a[2:0], c0};
 	assign out_d = {7'(1'h1), 4'({c0, b0, in_a[4]})};
 	assign out_num_b = 5'h1f;
 
-	test_number_and_gate u6 (
+	test_number_and_gate u4 (
 		.in_a(a0),
 		.in_b(b0),
 		.out_a(c0)
 	);
 
-	test_number_and_gate u9 (
+	test_number_and_gate u7 (
 		.in_a(in_a[3]),
 		.in_b(in_a[4]),
-		.out_a(u9_out_a)
+		.out_a(u7_out_a)
 	);
 
 	assign out_a = 1'hx;

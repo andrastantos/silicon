@@ -106,18 +106,18 @@ def test_mix1():
             b0 = self.in_b[0]
             c0 = and_gate(a0, b0)
             #in_a_alias = c0.get_parent_module().in_a
-            self.out_num = self.in_b & self.in_c
-            self.out_num_b = 31
-            self.out_b[0] = c0
-            self.out_b[4] = and_gate(self.in_a[3], self.in_a[4])
-            self.out_b[3:1] = self.in_a[2:0]
-            self.out_b[10:5] = 0
+            self.out_num <<= self.in_b & self.in_c
+            self.out_num_b <<= 31
+            self.out_b[0] <<= c0
+            self.out_b[4] <<= and_gate(self.in_a[3], self.in_a[4])
+            self.out_b[3:1] <<= self.in_a[2:0]
+            self.out_b[10:5] <<= 0
             self.out_c = concat(a0, b0, c0, c0, b0)
             # There's a strange artifact in the generation of this code. It outputs:
             #   assign out_d = {{7{1'bX}}, {in_a[4], in_b[0], u1_out}};
             # This is probably not a big deal, but maybe at some point we should optimize away the extra {} braces to improve readability.
-            self.out_d[3:0] = concat(c0, b0, self.in_a[4])
-            self.out_d[10:4] = 1
+            self.out_d[3:0] <<= concat(c0, b0, self.in_a[4])
+            self.out_d[10:4] <<= 1
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -195,35 +195,35 @@ def test_binary_ops():
         ursh_out = Output(Unsigned(length=4+2<<4))
 
         def body(self):
-            self.uout1 = self.uin1 & self.uin2
-            self.sout1 = self.sin1 & self.sin1
-            self.uout2 = self.uin1 & self.uin2 & self.uin3
-            self.uout3 = self.uin1 & self.uin2 | self.uin1 & self.uin3
-            self.uout4 = self.uin1 | self.uin2 & self.uin3 | self.uin4
-            self.sout4 = (self.sin1 & self.sin3) | self.sin1
-            self.sout5 = (self.sin1 | self.sin3) & self.sin1
-            self.uout7 = self.uin1 & (self.uin2 | self.uin3)
-            self.uout8 = self.uin1 | (self.uin2 & self.uin3)
+            self.uout1 <<= self.uin1 & self.uin2
+            self.sout1 <<= self.sin1 & self.sin1
+            self.uout2 <<= self.uin1 & self.uin2 & self.uin3
+            self.uout3 <<= self.uin1 & self.uin2 | self.uin1 & self.uin3
+            self.uout4 <<= self.uin1 | self.uin2 & self.uin3 | self.uin4
+            self.sout4 <<= (self.sin1 & self.sin3) | self.sin1
+            self.sout5 <<= (self.sin1 | self.sin3) & self.sin1
+            self.uout7 <<= self.uin1 & (self.uin2 | self.uin3)
+            self.uout8 <<= self.uin1 | (self.uin2 & self.uin3)
             for i in range(0,4):
-                self.uout9[i] = self.uin1[i] & (self.uin2[3-i] | self.uin5[i])
-                self.uout10[i] = (self.uin1 & (self.uin2 | self.uin5))[i]
-                self.uout11[3-i] = (self.uin1 & (self.uin2 | self.uin5))[i]
+                self.uout9[i] <<= self.uin1[i] & (self.uin2[3-i] | self.uin5[i])
+                self.uout10[i] <<= (self.uin1 & (self.uin2 | self.uin5))[i]
+                self.uout11[3-i] <<= (self.uin1 & (self.uin2 | self.uin5))[i]
                 #if i >= 2:
                     #self.uout10[i] = (self.uin1 & (self.uin2 | self.sin1))[i]
                     #self.uout11[3-i] = (self.uin1 & (self.uin2 | self.sin1))[i]
                     #self.uout12[(3-i)*2] = (self.uin1 & (self.uin2 | self.sin1))[i]
-            self.sout2 = self.sin1 + self.sin2
-            self.sout3 = self.sin1 - self.sin2
-            self.lt_out = self.sin1 < self.sin2
-            self.le_out = self.sin1 <= self.sin2
-            self.eq_out = self.sin1 == self.sin2
-            self.ne_out = self.sin1 != self.sin2
-            self.gt_out = self.sin1 > self.sin2
-            self.ge_out = self.sin1 >= self.sin2
-            self.slsh_out = self.sin1 << self.uin1
-            self.ulsh_out = self.uin1 << self.uin1
-            self.srsh_out = self.sin1 >> self.uin1
-            self.ursh_out = self.uin1 >> self.uin1
+            self.sout2 <<= self.sin1 + self.sin2
+            self.sout3 <<= self.sin1 - self.sin2
+            self.lt_out <<= self.sin1 < self.sin2
+            self.le_out <<= self.sin1 <= self.sin2
+            self.eq_out <<= self.sin1 == self.sin2
+            self.ne_out <<= self.sin1 != self.sin2
+            self.gt_out <<= self.sin1 > self.sin2
+            self.ge_out <<= self.sin1 >= self.sin2
+            self.slsh_out <<= self.sin1 << self.uin1
+            self.ulsh_out <<= self.uin1 << self.uin1
+            self.srsh_out <<= self.sin1 >> self.uin1
+            self.ursh_out <<= self.uin1 >> self.uin1
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_closure():
@@ -233,7 +233,7 @@ def test_closure():
         uin2 = Input(Unsigned(length=1))
 
         def body(self):
-            self.uout11[0] = (self.uin1 & self.uin2)[0]
+            self.uout11[0] <<= (self.uin1 & self.uin2)[0]
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -255,7 +255,7 @@ def test_closure2():
         uin2 = Input(Unsigned(length=1))
 
         def body(self):
-            self.uout11[0] = (self.uin1 | self.uin2)[0]
+            self.uout11[0] <<= (self.uin1 | self.uin2)[0]
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -277,10 +277,10 @@ def test_slices():
         sin5 = Input(Signed(length=5))
 
         def body(self):
-            self.uout1[0] = self.uin1
-            self.uout2[1] = self.uin1
-            self.uout2[0] = self.uin1
-            self.sout1 = self.sin1[0]
+            self.uout1[0] <<= self.uin1
+            self.uout2[1] <<= self.uin1
+            self.uout2[0] <<= self.uin1
+            self.sout1 <<= self.sin1[0]
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -293,7 +293,7 @@ def test_slice_new():
 
         def body(self):
             self.uout1[0] <<= self.uin1[0]
-            self.uout1[1] = self.uin1[1]
+            self.uout1[1] <<= self.uin1[1]
             #x = self.uout2[0]
             #x <<= self.uin1[0]
             #self.uout2[1] = self.uin1[1]
@@ -323,11 +323,20 @@ def test_slice_slice():
         uin2 = Input(logic)
 
         def body(self):
-            self.uout1 = self.uin1[5:2][1]
-            self.uout2 = self.uin1[9:3][6:1][5:1]
-            self.uout3[4:1][1] = self.uin1[0]
+            # Here a bunch of intermediate wires are generated.
+            # The reason is that Verilog doesn't like concatenated slices like this.
+            # Theoretically (and there was a time when that was the case) we could collapse
+            # these ranges, but that arguably is such an edge-case, it's not really worth it.
+            # The reason BTW we don't collapse it anymore is that we don't know if there's
+            # a type-change in the middle. Now, we *could* know that by looking at the keys,
+            # as type-change can only happen when a single element is selected, in fact, it
+            # must happen in that case, if the slice-change is to continue, but that's for
+            # later, maybe, when Arrays come back to life. 
+            self.uout1 <<= self.uin1[5:2][1]
+            self.uout2 <<= self.uin1[9:3][6:1][5:1]
+            self.uout3[4:1][1] <<= self.uin1[0]
             self.uout3[4:1][3:2] <<= self.uin2
-            self.uout3[1:0] = self.uin1[2]
+            self.uout3[1:0] <<= self.uin1[2]
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -337,8 +346,8 @@ def test_partial_assign():
         uin = Input(Unsigned(length=10))
 
         def body(self):
-            self.uout[1] = self.uin[0]
-            self.uout[0] = self.uin[1]
+            self.uout[1] <<= self.uin[0]
+            self.uout[0] <<= self.uin[1]
             #self.uout3[4:1][3:2] <<= self.uin1[1]
             #self.uout3[1:0] = self.uin1[2]
 
@@ -360,8 +369,8 @@ def test_decorator_slice():
         in_b = Input(Unsigned(3))
 
         def body(self):
-            self.out_a = return_slice(self.in_a)
-            self.out_b = get_slice(self.in_a[2:0], self.in_b[1])
+            self.out_a <<= return_slice(self.in_a)
+            self.out_b <<= get_slice(self.in_a[2:0], self.in_b[1])
 
     test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
@@ -387,8 +396,8 @@ def test_slice_as_return():
             daa_step_1_carry, daa_digit_1 = daa_correct_digit(self.in_a, self.in_c)
             daa_step_2_carry, daa_digit_2 = daa_correct_digit(self.in_a, self.in_c)
             daa_res = concat(daa_digit_2, daa_digit_1)
-            self.out_a = self.in_b + daa_step_1_carry + daa_step_2_carry
-            self.out_b = daa_res
+            self.out_a <<= self.in_b + daa_step_1_carry + daa_step_2_carry
+            self.out_b <<= daa_res
 
     test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
@@ -401,7 +410,7 @@ def test_local_slice():
         def body(self):
             x = self.out_a[3:0]
             x <<= self.in_c
-            self.out_a[4] = 1
+            self.out_a[4] <<= 1
 
     test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
@@ -752,11 +761,11 @@ if __name__ == "__main__":
     #test_closure1()
     #test_closure2()
     #test_slices()
-    test_assign()
+    #test_assign()
     #test_concatenate()
     #test_slice_new()
     #test_slice_with()
-    #test_slice_slice()
+    test_slice_slice()
     #test_decorator_slice()
     #test_slice_as_return()
     #test_local_slice()
@@ -768,6 +777,7 @@ if __name__ == "__main__":
     #test_fractional1_sim()
     #test_fractional_const()
     #test_float_convert()
+    #test_binary_ops()
     pass
 
 '''

@@ -21,8 +21,8 @@ def test_select():
         sel_in = Input(Unsigned(2))
 
         def body(self):
-            #self.sout1 = Select(self.sel_in, self.uin1, self.uin2, self.sin1, default=self.sin2)
-            self.sout1 = Select(self.sel_in, self.uin1, self.uin2, self.sin1, self.sin2)
+            #self.sout1 <<= Select(self.sel_in, self.uin1, self.uin2, self.sin1, default=self.sin2)
+            self.sout1 <<= Select(self.sel_in, self.uin1, self.uin2, self.sin1, self.sin2)
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -36,8 +36,8 @@ def test_select_with_none():
         sel_in = Input(Unsigned(2))
 
         def body(self):
-            #self.sout1 = Select(self.sel_in, self.uin1, self.uin2, self.sin1, default=self.sin2)
-            self.sout1 = Select(self.sel_in, self.uin1, self.uin2, self.sin1, self.sin2, None)
+            #self.sout1 <<= Select(self.sel_in, self.uin1, self.uin2, self.sin1, default=self.sin2)
+            self.sout1 <<= Select(self.sel_in, self.uin1, self.uin2, self.sin1, self.sin2, None)
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -49,7 +49,7 @@ def test_mux():
         out1 = Output(Unsigned(length=4))
 
         def body(self):
-            self.out1 = Select(self.sel, self.in1, self.in2)
+            self.out1 <<= Select(self.sel, self.in1, self.in2)
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -71,11 +71,11 @@ def test_select_one_first():
         sel_in4 = Input(Signed(length=1))
 
         def body(self):
-            self.sout1 = SelectOne(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, self.sel_in4, self.val_in4, default_port=self.default_port)
-            self.sout2 = SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, self.sel_in4, self.val_in4, default_port=self.default_port)
-            self.sout3 = SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, selector_3=self.sel_in4, value_3=self.val_in4, default_port=self.default_port)
-            self.sout4 = SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, value_3=self.val_in4, selector_3=self.sel_in4, default_port=self.default_port)
-            self.sout5 = SelectFirst(
+            self.sout1 <<= SelectOne(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, self.sel_in4, self.val_in4, default_port=self.default_port)
+            self.sout2 <<= SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, self.sel_in4, self.val_in4, default_port=self.default_port)
+            self.sout3 <<= SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, selector_3=self.sel_in4, value_3=self.val_in4, default_port=self.default_port)
+            self.sout4 <<= SelectFirst(self.sel_in1, self.val_in1, self.sel_in2, self.val_in2, self.sel_in3, self.val_in3, value_3=self.val_in4, selector_3=self.sel_in4, default_port=self.default_port)
+            self.sout5 <<= SelectFirst(
                 selector_2=self.sel_in3, value_2=self.val_in3,
                 selector_1=self.sel_in2, value_1=self.val_in2,
                 selector_3=self.sel_in4, value_3=self.val_in4,
@@ -99,17 +99,17 @@ def test_reg():
 
         def body(self):
             clk = self.clk1
-            self.sout1 = Reg(self.uin1, clock_port=self.clk1)
+            self.sout1 <<= Reg(self.uin1, clock_port=self.clk1)
             registered = Reg(self.uin2)
-            self.uout1 = registered
+            self.uout1 <<= registered
             reset_reg = Reg(self.uin1, reset_value_port=3, reset_port=self.uin2[1])
             reset = self.uin2[0]
             reset_reg2 = Reg(self.uin1, reset_value_port=2)
             with self.clk2 as clk:
-                self.uout2 = Reg(self.uin2)
+                self.uout2 <<= Reg(self.uin2)
             #self.uout3 = Reg(self.uin1)
             clk = self.clk1
-            self.uout3 = Reg(self.uin1)
+            self.uout3 <<= Reg(self.uin1)
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -143,12 +143,39 @@ def test_reg3():
             registered = Reg(self.uin2)
             self.uout1 = registered
             reset_reg = Reg(self.uin1, reset_value_port=3, reset_port=self.uin2[1])
-            reset = self.uin2[0]
+            reset = Wire()
+            reset <<= self.uin2[0]
             reset_reg2 = Reg(self.uin1, reset_value_port=2)
             with self.clk2 as clk:
                 self.uout2 = Reg(self.uin2)
             self.uout3 = Reg(self.uin1)
 
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+def test_reg3b():
+    class top(Module):
+        uout3 = Output(Signed(length=5))
+        uin1 = Input(Unsigned(length=2))
+        clk = ClkPort()
+
+        def body(self):
+            # The code below will - unintuitively create two slice instances and some ugliness in the RTL.
+            # The reason for it is that the local variable, `reset`, is a reference to a UniSlice instance.
+            # So the binding of it to the reset port of `Reg` ends up calling convert_to_junction. Then,
+            # when the tracer gets its turn, it'll do it again for `reset`. This means however that at this
+            # point `reset` is not actually the input to the reset port of Reg. In fact, it doesn't even have
+            # anything to do with the fact that it's an autoport. It happens with even and `&` gate.
+            # It's just more visible here because of the ugly intermediate wire name that gets generated.
+            # If the commented code is used, where we force `reset` to be a Junction, instead of a UniSlice,
+            # we 'fix' the problem, however that's not really pythonic...
+            """
+            reset = Wire()
+            reset <<= self.uin1[0]
+            """
+            reset = self.uin1[0]
+            self.uout3 = Reg(self.uin1)
+
+    set_verbosity_level(VerbosityLevels.instantiation)
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_reg4():
@@ -168,8 +195,8 @@ def test_partial_assign():
         in1 = Input(Unsigned(length=2))
 
         def body(self):
-            self.out1[2:0] = self.in1
-            self.out1[4:3] = self.in1
+            self.out1[2:0] <<= self.in1
+            self.out1[4:3] <<= self.in1
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -218,9 +245,10 @@ if __name__ == "__main__":
     #test_select()
     #test_select_one_first()
     #test_reg()
-    #test_reg3()
+    test_reg3()
+    #test_reg3b()
     #test_mux()
-    test_select_with_none()
+    #test_select_with_none()
     #test_reg4()
     #test_reg_with_adaptor()
     #test_partial_assign()
