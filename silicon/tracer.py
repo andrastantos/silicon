@@ -85,7 +85,7 @@ class Tracer(object):
                     else:
                         junction = local_value
                     if hasattr(junction, "get_underlying_junction"):
-                        junction = junction.get_underlying_junction())
+                        junction = junction.get_underlying_junction()
                     if junction is not None:
                         from .module import Module
                         from .port import Wire
