@@ -4,7 +4,7 @@ from vcd import VCDWriter
 from .netlist import Netlist, XNet
 from .ordered_set import OrderedSet
 from collections import OrderedDict
-from .utils import is_iterable, first, is_junction_member, is_output_port, Context
+from .utils import Context
 from .exceptions import SimulationException
 from pathlib import Path
 
@@ -115,10 +115,7 @@ class Simulator(object):
                     for port in yielded_value:
                         for member_port in port.get_all_member_junctions(add_self=True):
                             if not hasattr(member_port, "_xnet"):
-                                if is_junction_member(member_port):
-                                    raise SimulationException(f"Simulator currently doesn't support slices in sensitivity lists. Please use the whole value instead of a slice", member_port)
-                                else:
-                                    raise SimulationException(f"The simulate method can only yield an integer, a Port or a sequence of Port objects", member_port)
+                                raise SimulationException(f"The simulate method can only yield an integer, a Port (not a slice of a port) or a sequence of Port objects", member_port)
                             member_port._xnet.sim_state.add_listener(generator)
                 except TypeError:
                     raise SimulationException(f"The simulate method can only yield an integer, a Port or a sequence of Port objects. The type of the yielded value is {type(port)}", port)

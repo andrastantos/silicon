@@ -525,7 +525,9 @@ class Number(NetTypeFactory):
         b <<= a[3:0]
         b <<= a[3:0][2]
 
-        They are instantiated from Number.get_slice, which is called from Junction.__getitem__ and from MemberGetter.get_underlying_junction
+        They are instantiated from Number.get_slice and Number.get_rhs_slicer.
+
+        TODO: get_slice will need review
         """
         def construct(self, slice: Union[int, slice], number: 'NumberMeta') -> None:
             self.key = Number.Instance.Key(slice)
@@ -821,14 +823,15 @@ class Number(NetTypeFactory):
                 # This piece of code should not elaborate. However, if PhiSlice
                 # auto-determines its output type, it'll think it's a 1-bit output.
                 # Then auto-type-conversion simply zero-extends that to the rest of the bits.
-                # To make things even more confusing for the user, this is an error:
+                # Even if made that OK, the following would clearly be an error, 
+                # confusing for the user even further:
                 #     w = Wire(Unsigned(8))
                 #     w[1] = 1
                 # So, to remedy that, we'll look at the transitive closure of all sinks
                 # of our output and use the smallest output range from them.
                 # Why the smallest? Because if there are multiple sources,
                 # those should participate in auto-extension. If it so happens
-                # that our direct output is not the most restritive, that would
+                # that our direct output is not the most restrictive, that would
                 # mean that somewhere in the assignment chain, there was a narrowing,
                 # which will eventually blow up.
                 #
@@ -1313,7 +1316,7 @@ class Number(NetTypeFactory):
         @classmethod
         def sort_source_keys(cls, input_map: Dict['Number.Instance.Key', Junction], back_end: Optional['BackEnd']) -> Tuple['Number.Instance.Key']:
             """
-            Sort the set of blobs as required by the back-end or for simulation of back_end is None
+            Sort the set of blobs as required by the back-end or for simulation if back_end is None
             """
             # Local method, not called from outside
             assert back_end is None or back_end.language == "SystemVerilog"

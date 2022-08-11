@@ -86,13 +86,6 @@ def is_port(thing: Any) -> bool:
     from .port import Port
     return isinstance(thing, Port)
 
-def is_junction_member(thing: Any) -> bool:
-    from .member_access import MemberGetter
-    return isinstance(thing, MemberGetter)
-
-def is_junction_or_member(thing: Any) -> bool:
-    return is_junction_member(thing) or is_junction_base(thing)
-
 def is_output_port(thing: Any) -> bool:
     return hasattr(thing, "junction_kind") and thing.junction_kind == "output"
 
@@ -393,7 +386,7 @@ def get_caller_local_junctions(frame_cnt: int = 1) -> Dict[str, 'Junction']:
         frame_cnt-=1
     caller_local_junctions = {}
     for name, value in caller_frame.f_locals.items():
-        if (is_junction_or_member(value)) and value.allow_bind():
+        if (is_junction_base(value)) and value.allow_bind():
             caller_local_junctions[name] = value
     del value
     del caller_frame

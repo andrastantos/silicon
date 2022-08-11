@@ -8,7 +8,7 @@ from .port import Input, Output, Wire, Junction
 from .auto_input import ClkPort, RstPort, RstValPort
 from .primitives import SelectOne, Reg
 from .exceptions import SyntaxErrorException
-from .utils import is_junction_or_member
+from .utils import is_junction_base
 from .number import logic
 from .constant import get_net_type_for_const
 from .back_end import str_to_id
@@ -37,9 +37,9 @@ class FSMLogic(Module):
 
 
     def create_transition(self, current_state: Any, new_state: Any) -> Tuple[Junction, str]:
-        if is_junction_or_member(current_state):
+        if is_junction_base(current_state):
             raise SyntaxErrorException(f"Current state must be a constant, not a net.")
-        if is_junction_or_member(new_state):
+        if is_junction_base(new_state):
             raise SyntaxErrorException(f"New state must be a constant, not a net.")
         edge = (current_state, new_state)
         #if edge in self._state_transition_table:

@@ -5,7 +5,7 @@ from .net_type import NetType, KeyKind, NetTypeMeta
 from .tracer import no_trace, NoTrace
 from .ordered_set import OrderedSet
 from .exceptions import SyntaxErrorException, SimulationException
-from .utils import convert_to_junction, is_iterable, is_junction_base, is_input_port, is_output_port, is_wire, get_caller_local_junctions, is_junction_member, BoolMarker, is_module, implicit_adapt, MEMBER_DELIMITER, Context, ContextMarker, is_net_type
+from .utils import convert_to_junction, is_iterable, is_junction_base, is_input_port, is_output_port, get_caller_local_junctions, is_module, implicit_adapt, MEMBER_DELIMITER, Context, ContextMarker, is_net_type
 from .port import KeyKind
 from collections import OrderedDict
 from enum import Enum
@@ -66,7 +66,7 @@ class JunctionBase(object):
         self._in_with_block = True
         self._allow_auto_bind = True
         self._scoped_port = ScopedPort(convert_to_junction(self))
-        self._junctions_before_scope = get_caller_local_junctions(3)
+        self._junctions_before_scope = get_caller_local_junctions(2)
         return self._scoped_port
 
 
@@ -75,7 +75,7 @@ class JunctionBase(object):
         self._in_with_block = False
         self._allow_auto_bind = False
         # TODO: This can be perf optimized: we iterate twice, once in get_caller_local_junctions and once here...
-        junctions_after_scope = get_caller_local_junctions(3)
+        junctions_after_scope = get_caller_local_junctions(2)
         found = False
         for name, junction in junctions_after_scope.items():
             if junction is self._scoped_port:
@@ -353,6 +353,15 @@ class JunctionBase(object):
         """
         return self._allow_auto_bind
 
+    def allow_bind(self) -> bool:
+        """
+        Determines if binding to this junction is allowed.
+        Defaults to True, but for scoped junctions, get set to
+        False to disallow shananingans, like this:
+            with my_port as x:
+                x <<= 3
+        """
+        return True
 
 
 
@@ -622,17 +631,6 @@ class Junction(JunctionBase):
         if not hasattr(net_type, "get_length"):
             raise SyntaxErrorException(f"Net {self} of type {net_type} doesn't support 'len'")
         return net_type.get_length()
-
-    def allow_bind(self) -> bool:
-        """
-        Determines if binding to this junction is allowed.
-        Defaults to True, but for scoped junctions, get set to
-        False to disallow shananingans, like this:
-            with my_port as x:
-                x <<= 3
-        """
-        return True
-
 
     @property
     def junction_kind(self) -> str:
@@ -979,12 +977,11 @@ class ScopedPort(JunctionBase):
     ports anymore. 
     """
     attributes = ("_real_junction")
-    def __init__(self, real_junction: Union[Junction, 'MemberGetter']):
+    def __init__(self, real_junction: JunctionBase):
         self._real_junction = real_junction
-    def _update_real_port(self, real_junction: Optional[Union[Junction, 'MemberGetter']]):
+    def _update_real_port(self, real_junction: Optional[JunctionBase]):
         self._real_junction = real_junction
     def __setattr__(self, name, value):
-        from .utils import is_junction_member
         if name in ScopedPort.attributes:
             super().__setattr__(name, value)
         else:
@@ -1007,9 +1004,6 @@ class ScopedPort(JunctionBase):
         """
         if self._real_junction is None:
             return False
-        from .utils import is_junction_member
-        if is_junction_member(self._real_junction):
-            return self._real_junction.allow_auto_bind()
         return self.get_underlying_junction().allow_auto_bind()
     def allow_bind(self) -> bool:
         """

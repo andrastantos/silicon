@@ -77,8 +77,8 @@ class Tracer(object):
                 local_value = frame.f_locals[local_name]
                 if local_name == "self":
                     continue
-                from .utils import is_junction_or_member, is_module, is_input_port, is_output_port, is_wire, first
-                if is_junction_or_member(local_value):
+                from .utils import is_junction_base, is_module, is_input_port, is_output_port, is_wire, first
+                if is_junction_base(local_value):
                     header_printed = print_header()
                     if hasattr(local_value, "convert_to_junction"):
                         junction = local_value.convert_to_junction()

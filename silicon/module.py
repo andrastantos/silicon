@@ -14,7 +14,7 @@ from .ordered_set import OrderedSet
 from .exceptions import SimulationException, SyntaxErrorException
 from threading import RLock
 from itertools import chain, zip_longest
-from .utils import is_port, is_input_port, is_output_port, is_wire, is_junction_member, is_module, fill_arg_names, is_junction_or_member, is_junction_base, is_iterable, MEMBER_DELIMITER, first, implicit_adapt, convert_to_junction
+from .utils import is_port, is_input_port, is_output_port, is_wire, is_module, fill_arg_names, is_junction_base, is_iterable, MEMBER_DELIMITER, first, implicit_adapt, convert_to_junction
 from .utils import vprint, verbose_enough, VerbosityLevels
 from .state_stack import StateStackElement
 import inspect
@@ -492,7 +492,7 @@ class Module(object):
                         self._function = caller_code.co_name
                         if self._function not in Module.ignore_callers and filename not in Module.ignore_caller_filenames and lib not in Module.ignore_caller_libs:
                             for name, value in caller_frame.f_locals.items():
-                                if (is_junction_or_member(value)) and value.allow_auto_bind():
+                                if (is_junction_base(value)) and value.allow_auto_bind():
                                     self._parent_local_junctions[name] = value
                             break
                         new_caller_frame = caller_frame.f_back
@@ -1329,7 +1329,7 @@ class DecoratorModule(GenericModule):
     @no_trace
     def body(self) -> None:
         return_values = self._impl.function(*self._impl._args, **self._impl._kwargs)
-        if isinstance(return_values, str) or is_junction_or_member(return_values) or not is_iterable(return_values):
+        if isinstance(return_values, str) or is_junction_base(return_values) or not is_iterable(return_values):
             return_values = (return_values, )
         if len(return_values) != len(self._impl.get_outputs()):
             raise SyntaxErrorException(f"Modularized function returned {len(return_values)} values, where decorator declared {len(self._impl.get_outputs())} outputs. These two must match")
@@ -1350,7 +1350,7 @@ class DecoratorModule(GenericModule):
         for arg in args:
             if scope is None:
                 raise SyntaxErrorException("Can't instantiate top level module with call-syntax and port-bindings") 
-            if is_junction_or_member(arg):
+            if is_junction_base(arg):
                 my_arg = Input()
                 ports_needing_name[my_arg] = arg
             else:
@@ -1360,7 +1360,7 @@ class DecoratorModule(GenericModule):
         for name, arg in kwargs:
             if scope is None:
                 raise SyntaxErrorException("Can't instantiate top level module with call-syntax and port-bindings") 
-            if is_junction_or_member(arg):
+            if is_junction_base(arg):
                 my_arg = Input()
                 setattr(self, name, my_arg)
                 my_arg.set_source(arg, scope)
