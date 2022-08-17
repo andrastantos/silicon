@@ -13,7 +13,6 @@ module top (
 	input logic clk2
 );
 
-	logic clk_1;
 	logic [1:0] u_output_port;
 	logic [3:0] registered;
 	logic reset;
@@ -35,7 +34,6 @@ module top (
 	assign uout3 = u7_output_port;
 
 	assign uout4 = 5'hx;
-	assign clk_1 = clk2;
 endmodule
 
 

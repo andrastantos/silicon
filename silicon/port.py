@@ -42,8 +42,8 @@ class JunctionBase(object):
         Context.register(self._context_change)
         self._allow_auto_bind = True
         self._parent_module = parent_module
-        self._in_with_block = False
         self._no_rtl = False # If set to true, we'll try to not generate RTL code for this junction, by not registering it in Tracer or in _body
+        self._scoped_ports = []
 
     def __getitem__(self, key: Any) -> Any:
         if Context.current() == Context.simulation:
@@ -62,32 +62,32 @@ class JunctionBase(object):
         raise TypeError()
 
     def __enter__(self) -> 'Junction':
-        assert not self._in_with_block
-        self._in_with_block = True
         self._allow_auto_bind = True
-        self._scoped_port = ScopedPort(convert_to_junction(self))
-        self._junctions_before_scope = get_caller_local_junctions(2)
-        return self._scoped_port
+        scoped_port = ScopedPort(convert_to_junction(self))
+        self._scoped_ports.append((scoped_port, get_caller_local_junctions(2)))
+        return scoped_port
 
 
     def __exit__(self, exception_type, exception_value, traceback):
-        assert self._in_with_block
-        self._in_with_block = False
         self._allow_auto_bind = False
         # TODO: This can be perf optimized: we iterate twice, once in get_caller_local_junctions and once here...
         junctions_after_scope = get_caller_local_junctions(2)
         found = False
+        scoped_port, junctions_before_scope = self._scoped_ports[-1]
         for name, junction in junctions_after_scope.items():
-            if junction is self._scoped_port:
-                old_junction = self._junctions_before_scope.get(name, None)
+            try:
+                junction_scoped_port = junction.get_underlying_scoped_port()
+            except AttributeError:
+                continue
+            if junction_scoped_port is scoped_port:
+                old_junction = junctions_before_scope.get(name, None)
                 if old_junction is not None and found:
                     raise SyntaxErrorException(f"This is not supported: scoped port {self} got assigned to multiple already existing local net references. Can't restore originals.")
-                self._scoped_port._update_real_port(old_junction)
+                scoped_port._update_real_port(old_junction)
                 found = True
         junction = None
         del junctions_after_scope
-        del self._junctions_before_scope
-        del self._scoped_port
+        del self._scoped_ports[-1]
 
     def get_parent_module(self) -> Optional['Module']:
         return self._parent_module
@@ -421,7 +421,7 @@ class Junction(JunctionBase):
         ret_val += f" = {self._xnet.sim_state.value}"
         return ret_val
 
-    def get_underlying_junction(self) -> 'Junction':
+    def get_underlying_junction(self) -> Optional['Junction']:
         """
         Returns the underlying port object. For most ports, it's just 'self', but for scoped ports and JunctionRefs, it's the underlying port
         """
@@ -992,7 +992,15 @@ class ScopedPort(JunctionBase):
         if self._real_junction is None:
             raise AttributeError
         return self.get_underlying_junction().__getattribute__(name)
-    def get_underlying_junction(self) -> 'Junction':
+    def get_underlying_scoped_port(self) -> 'ScopedPort':
+        """
+        Recurses through the scoped port hierarchy and returns the bottom-most scoped port
+        """
+        try:
+            return self._real_junction.get_underlying_scoped_port()
+        except AttributeError:
+            return self
+    def get_underlying_junction(self) -> Optional['Junction']:
         if self._real_junction is None:
             return None
         return self._real_junction.get_underlying_junction()
@@ -1021,7 +1029,7 @@ class JunctionRef(object):
     """
     def __init__(self, junction: Junction):
         self.junction = junction
-    def get_underlying_junction(self) -> 'Junction':
+    def get_underlying_junction(self) -> Optional['Junction']:
         return self.junction.get_underlying_junction()
 
 def junction_ref(junction: Optional[Junction]) -> Optional[JunctionRef]:

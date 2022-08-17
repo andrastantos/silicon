@@ -123,6 +123,10 @@ def test_scoped_bind():
         out_b = si.Output(si.Unsigned(8))
         out_c = si.Output(si.Unsigned(8))
         out_d = si.Output(si.Unsigned(8))
+        out_e = si.Output(si.Unsigned(8))
+        out_f = si.Output(si.Unsigned(8))
+        out_g = si.Output(si.Unsigned(8))
+        out_h = si.Output(si.Unsigned(8))
         in_a = si.Input(si.Unsigned(8))
         in_b = si.Input(si.Unsigned(8))
         in_c = si.Input(si.Unsigned(8))
@@ -130,11 +134,18 @@ def test_scoped_bind():
     
         def body(self):
             a = self.in_a
-            #with self.in_a as a:
-            #    self.out_a <<= a
+            with self.in_a as a:
+                self.out_a <<= a
             self.out_b <<= a
             with self.in_c as a:
                 self.out_c <<= a
+                with self.in_b as a:
+                    self.out_e <<= a
+                self.out_f <<= a
+            with self.in_d as a:
+                with self.in_d as b:
+                    self.out_g <<= b
+                self.out_h <<= a
             self.out_d <<= a
 
     si.set_verbosity_level(VerbosityLevels.instantiation)

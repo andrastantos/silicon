@@ -7,12 +7,9 @@ module top (
 	input logic [1:0] uin1
 );
 
-	logic x;
-
-	assign x = uin1[0];
+	assign uout2 = uin1[0];
 	assign uout1 = uin1[1];
 
-	assign uout2 = x;
 endmodule
 
 

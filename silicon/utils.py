@@ -385,7 +385,7 @@ def get_caller_local_junctions(frame_cnt: int = 1) -> Dict[str, 'Junction']:
         frame_cnt-=1
     caller_local_junctions = {}
     for name, value in caller_frame.f_locals.items():
-        if (is_junction_base(value)) and value.allow_bind():
+        if is_junction_base(value):
             caller_local_junctions[name] = value
     del value
     del caller_frame
