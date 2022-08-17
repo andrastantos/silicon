@@ -10,6 +10,7 @@ module top (
 	output logic [7:0] out_f,
 	output logic [7:0] out_g,
 	output logic [7:0] out_h,
+	output logic [7:0] out_i,
 	input logic [7:0] in_a,
 	input logic [7:0] in_b,
 	input logic [7:0] in_c,
@@ -18,6 +19,7 @@ module top (
 
 	logic [7:0] a;
 
+	assign out_i = 8'hx;
 	assign out_a = in_a;
 	assign out_b = in_a;
 	assign out_d = in_a;

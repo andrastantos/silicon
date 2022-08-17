@@ -127,6 +127,7 @@ def test_scoped_bind():
         out_f = si.Output(si.Unsigned(8))
         out_g = si.Output(si.Unsigned(8))
         out_h = si.Output(si.Unsigned(8))
+        out_i = si.Output(si.Unsigned(8))
         in_a = si.Input(si.Unsigned(8))
         in_b = si.Input(si.Unsigned(8))
         in_c = si.Input(si.Unsigned(8))
@@ -146,6 +147,8 @@ def test_scoped_bind():
                 with self.in_d as b:
                     self.out_g <<= b
                 self.out_h <<= a
+                with t.ExpectError():
+                    self.out_i <<= b # should be an error
             self.out_d <<= a
 
     si.set_verbosity_level(VerbosityLevels.instantiation)
