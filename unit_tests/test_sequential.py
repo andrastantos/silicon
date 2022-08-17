@@ -32,23 +32,21 @@ class mc6845(Module):
 def test_sim():
     class mc6845_tb(mc6845):
         def simulate(self) -> TSimEvent:
-            self.pclk_cnt = 0
             def clk() -> int:
                 yield 10
-                self.clk = ~self.clk
+                self.clk <<= ~self.clk
                 yield 10
-                self.clk = ~self.clk
+                self.clk <<= ~self.clk
                 yield 0
 
             print("Simulation started")
-            self.rst = 0
-            self.clk = 1
+            self.rst <<= 0
+            self.clk <<= 1
             yield 10
             yield from clk()
-            self.bus_en = 0
-            self.n_cs = 1
+            self.n_cs <<= 1
             yield from clk()
-            self.n_cs = 0
+            self.n_cs <<= 0
             print(f"Done")
 
     test.simulation(mc6845_tb, "test_sequential")

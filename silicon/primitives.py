@@ -27,7 +27,7 @@ class Select(Module):
         return super().__call__(*args, **kwargs)
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         assert False
-    def create_named_port(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str) -> Optional[Port]:
         name_prefix = "value_"
         if name.startswith(name_prefix):
             ret_val = Input()
@@ -40,10 +40,10 @@ class Select(Module):
             return ret_val
         else:
             return None
-    def create_positional_port(self, idx: int) -> Optional[Union[str, Port]]:
+    def create_positional_port_callback(self, idx: int) -> Optional[Union[str, Port]]:
         assert idx > 0
         name = f"value_{idx-1}"
-        return (name, self.create_named_port(name))
+        return (name, self.create_named_port_callback(name))
 
     def generate_output_type(self) -> Optional['NumberMeta']:
         value_ports = list(self.value_ports.values())
@@ -216,7 +216,7 @@ class _SelectOneHot(Module):
         return self.default_port.has_driver()
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         assert False
-    def create_named_port(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str) -> Optional[Port]:
         for name_prefix in ("value_", "selector_"):
             if name.startswith(name_prefix):
                 ret_val = Input()
@@ -229,12 +229,12 @@ class _SelectOneHot(Module):
                 collection[selector_idx] = ret_val
                 return ret_val
         return None
-    def create_positional_port(self, idx: int) -> Optional[Union[str, Port]]:
+    def create_positional_port_callback(self, idx: int) -> Optional[Union[str, Port]]:
         if idx % 2 == 0:
             name = f"selector_{idx//2}"
         else:
             name = f"value_{idx//2}"
-        return (name, self.create_named_port(name))
+        return (name, self.create_named_port_callback(name))
 
 
 
@@ -442,18 +442,20 @@ class Concatenator(Module):
             raise SyntaxErrorException(f"Can't add input as port. Name '{name}' already exists")
         with self.allow_keyed_input:
             port = self._impl._create_named_port(name)
+            if port is None:
+                raise SyntaxErrorException("Can't add inputs to Concatenator at this point. Probably because its interface is already frozen.")
             port <<= junction
         self.raw_input_map.append((key,  getattr(self, name)))
-    def create_named_port(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str) -> Optional[Port]:
         if name.startswith("input_port_"):
             return Input()
         elif self.allow_keyed_input and name.startswith("keyed_input_port_"):
             return Input()
         else:
             return None
-    def create_positional_port(self, idx: int) -> Optional[Union[str, Port]]:
+    def create_positional_port_callback(self, idx: int) -> Optional[Union[str, Port]]:
         name = f"input_port_{idx}"
-        return (name, self.create_named_port(name))
+        return (name, self.create_named_port_callback(name))
 
     def finalize_input_map(self, common_net_type: object):
         if self.input_map is not None:

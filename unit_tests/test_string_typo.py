@@ -20,7 +20,7 @@ class Test(Module):
     __test__ = False
 
     def body(self):
-        self.out_1 = "8'b00001111"
+        self.out_1 <<= "8'b00001111"
         self.out_1b <<= "8'b00001111"
         try:
             self.out_2 <<= "something wrong"

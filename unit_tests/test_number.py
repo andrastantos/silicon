@@ -112,7 +112,7 @@ def test_mix1():
             self.out_b[4] <<= and_gate(self.in_a[3], self.in_a[4])
             self.out_b[3:1] <<= self.in_a[2:0]
             self.out_b[10:5] <<= 0
-            self.out_c = concat(a0, b0, c0, c0, b0)
+            self.out_c <<= concat(a0, b0, c0, c0, b0)
             # There's a strange artifact in the generation of this code. It outputs:
             #   assign out_d = {{7{1'bX}}, {in_a[4], in_b[0], u1_out}};
             # This is probably not a big deal, but maybe at some point we should optimize away the extra {} braces to improve readability.
@@ -151,8 +151,8 @@ def test_concatenate():
         sin2 = Input(Signed(length=4))
 
         def body(self):
-            self.uout1 = concat(self.uin1, self.uin2)
-            self.sout1 = concat(self.sin1, self.uin1)
+            self.uout1 <<= concat(self.uin1, self.uin2)
+            self.sout1 <<= concat(self.sin1, self.uin1)
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -244,7 +244,7 @@ def test_closure1():
         uin2 = Input(Unsigned(length=1))
 
         def body(self):
-            self.uout11 = (self.uin1 & self.uin2)[0]
+            self.uout11 <<= (self.uin1 & self.uin2)[0]
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -308,8 +308,8 @@ def test_slice_with():
 
         def body(self):
             with self.uin1[0] as x:
-                self.uout2 = x
-            self.uout1 = self.uin1[1]
+                self.uout2 <<= x
+            self.uout1 <<= self.uin1[1]
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -439,8 +439,8 @@ def test_precedence():
         def body(self):
             #pix1 = self.in1 * self.alpha
             pix2 = self.in2 * (255-self.alpha)
-            #self.outp = (pix1 + pix2)[15:8]
-            self.outp = pix2[15:8]
+            #self.outp <<= (pix1 + pix2)[15:8]
+            self.outp <<= pix2[15:8]
 
     test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
@@ -487,8 +487,8 @@ def test_fractional1_sim():
 
         def simulate(self) -> TSimEvent:
             print("Simulation started")
-            self.in1 = 1.1 # should get rounded to 1.125
-            self.in2 = 2
+            self.in1 <<= 1.1 # should get rounded to 1.125
+            self.in2 <<= 2
             now = yield 10
             assert self.outp.sim_value == 3.125
             print("Done")
@@ -765,7 +765,7 @@ if __name__ == "__main__":
     #test_concatenate()
     #test_slice_new()
     #test_slice_with()
-    test_slice_slice()
+    #test_slice_slice()
     #test_decorator_slice()
     #test_slice_as_return()
     #test_local_slice()
@@ -774,7 +774,7 @@ if __name__ == "__main__":
     #test_precedence()
     #test_fractional1()
     #test_fractional2()
-    #test_fractional1_sim()
+    test_fractional1_sim()
     #test_fractional_const()
     #test_float_convert()
     #test_binary_ops()

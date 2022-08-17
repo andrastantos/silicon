@@ -10,19 +10,19 @@ module top (
 	input logic in_b
 );
 
-	logic aa;
 	logic a;
-	logic bb;
+	logic aa;
 	logic b;
+	logic bb;
 
 	assign out_a = in_a;
 	assign out_aa = in_a;
-	assign aa = in_a;
 	assign a = in_a;
+	assign aa = in_a;
 	assign out_b = in_b;
 	assign out_bb = in_b;
-	assign bb = in_b;
 	assign b = in_b;
+	assign bb = in_b;
 endmodule
 
 

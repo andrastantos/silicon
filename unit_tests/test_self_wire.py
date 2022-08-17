@@ -40,44 +40,43 @@ def test_sim():
         def simulate(self) -> TSimEvent:
             def clk() -> int:
                 yield 10
-                self.clk = ~self.clk
+                self.clk <<= ~self.clk
                 yield 10
-                self.clk = ~self.clk
+                self.clk <<= ~self.clk
 
             print("Simulation started")
-            self.rst = 1
-            self.clk = 1
+            self.rst <<= 1
+            self.clk <<= 1
             yield 10
             for i in range(5):
                 yield from clk()
-            self.bus_en = 0
-            self.n_cs = 1
-            self.n_wr = None
-            self.data_in = None
+            self.n_cs <<= 1
+            self.n_wr <<= None
+            self.data_in <<= None
 
             yield from clk()
-            self.rst = 0
+            self.rst <<= 0
             for i in range(5):
                 yield from clk()
 
             def read() -> Optional[int]:
                 # Select register by writing to the index
-                self.n_cs = 0
-                self.n_wr = 1
-                self.data_in = None
+                self.n_cs <<= 0
+                self.n_wr <<= 1
+                self.data_in <<= None
                 yield from clk()
-                self.n_cs = 1
-                self.n_wr = None
+                self.n_cs <<= 1
+                self.n_wr <<= None
                 return self.data_out.sim_value
 
             def write(data:int) -> None:
                 # Write data into data register
-                self.n_cs = 0
-                self.n_wr = 0
-                self.data_in = data
+                self.n_cs <<= 0
+                self.n_wr <<= 0
+                self.data_in <<= data
                 yield from clk()
-                self.n_cs = 1
-                self.n_wr = None
+                self.n_cs <<= 1
+                self.n_wr <<= None
 
             yield from write(14)
             yield from write(5)
@@ -92,7 +91,7 @@ def test_sim():
 
 if __name__ == "__main__":
     test_verilog()
-    test_sim()
+    #test_sim()
 
 """
 An idea from PyRTL: use <<= as the 'bind' operator. Could re-use the same for simulation assignment, though that's ugly. (not that the current hack isn't either)

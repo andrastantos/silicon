@@ -789,7 +789,7 @@ class Number(NetTypeFactory):
             def construct(self, key_chains: Sequence[Sequence[Tuple[Any, KeyKind]]]):
                 self.key_chains = key_chains
                 self.input_map = None
-            def create_positional_port(self, idx: int) -> Optional[Union[str, Port]]:
+            def create_positional_port_callback(self, idx: int) -> Optional[Union[str, Port]]:
                 # Create the associated input to the key. We don't support named ports, only positional ones.
                 if idx >= len(self.key_chains):
                     return None

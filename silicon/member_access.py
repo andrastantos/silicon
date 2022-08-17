@@ -175,7 +175,7 @@ class PhiSlice(GenericModule):
         # punt the resolution later. Thus, each key is actually a chain of keys.
         self.key_chains = key_chains
 
-    def create_positional_port(self, idx: int) -> Optional[Tuple[str, Port]]:
+    def create_positional_port_callback(self, idx: int) -> Optional[Tuple[str, Port]]:
         # Create the associated input to the key. We don't support named ports, only positional ones.
         if idx >= len(self.key_chains):
             return None

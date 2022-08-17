@@ -22,28 +22,28 @@ def test_sim_gates():
             #self.out_1 = A.out
             #A.in_a = self.in_1
             #A.in_b = self.in_2
-            self.out_and = self.in_1 & self.in_2
-            self.out_or = self.in_1 | self.in_2
-            self.out_xor = self.in_1 ^ self.in_2
+            self.out_and <<= self.in_1 & self.in_2
+            self.out_or <<= self.in_1 | self.in_2
+            self.out_xor <<= self.in_1 ^ self.in_2
 
         def simulate(self) -> TSimEvent:
             print("Simulation started")
             now = yield 10
             print(f"now: {now}")
-            self.in_1 = 0
-            self.in_2 = 0
+            self.in_1 <<= 0
+            self.in_2 <<= 0
             yield 10
-            self.in_1 = 1
-            self.in_2 = 0
+            self.in_1 <<= 1
+            self.in_2 <<= 0
             yield 10
-            self.in_1 = 0
-            self.in_2 = 1
+            self.in_1 <<= 0
+            self.in_2 <<= 1
             yield 10
-            self.in_1 = 1
-            self.in_2 = 1
+            self.in_1 <<= 1
+            self.in_2 <<= 1
             yield 10
-            self.in_1 = None
-            self.in_2 = None
+            self.in_1 <<= None
+            self.in_2 <<= None
             now = yield 10
             print(f"Done at {now}")
 
@@ -63,13 +63,13 @@ def test_sim_select():
 
         def simulate(self) -> TSimEvent:
             print("Simulation started")
-            self.a = 3
-            self.b = 2
-            self.c = 1
+            self.a <<= 3
+            self.b <<= 2
+            self.c <<= 1
             for sel_val in range(15):
                 sel_one_val = (1 << sel_val) & 15
-                self.selectw = sel_val
-                self.select_one_hot = sel_one_val
+                self.selectw <<= sel_val
+                self.select_one_hot <<= sel_one_val
                 yield 10
 
                 if sel_val & 3 == 0:
@@ -109,31 +109,31 @@ def test_sim_counter():
             self.reset = Wire(logic)
             self.count = Wire(Unsigned(4))
 
-            self.count = Reg((self.count + 1)[3:0])
+            self.count <<= Reg((self.count + 1)[3:0])
 
         def simulate(self) -> TSimEvent:
             print("Simulation started")
             now = yield 10
             print(f"now: {now}")
-            self.clock = 0
-            self.reset = 1
+            self.clock <<= 0
+            self.reset <<= 1
             expected_count = 0
             for i in range(5):
-                self.clock = 0
+                self.clock <<= 0
                 now = yield 10
                 print(f"now: {now}")
-                self.clock = 1
+                self.clock <<= 1
                 now = yield 10
                 print(f"now: {now}")
-            self.reset = 0
+            self.reset <<= 0
             print(f"now: {now} --------")
             for i in range(50):
-                self.clock = 0
+                self.clock <<= 0
                 now = yield 10
                 print(f"now: {now}")
                 assert self.count.sim_value == expected_count
                 expected_count = (expected_count + 1) & 15
-                self.clock = 1
+                self.clock <<= 1
                 now = yield 10
                 print(f"now: {now}")
             print(f"Done at {now}")
@@ -152,18 +152,18 @@ def test_sim_concat():
             self.out3 = Wire()
 
             # This type of concatenation is not supported at the moment
-            #self.out1 = [self.uin1, self.uin2]
-            #self.out2 = [self.sin1, self.uin1, self.uin2]
-            self.out1 = concat(self.uin1, self.uin2)
-            self.out2 = concat(self.sin1, self.uin1, self.uin2)
-            self.out3 = concat(self.uin1, self.uin2, self.uin3)
+            #self.out1 <<= [self.uin1, self.uin2]
+            #self.out2 <<= [self.sin1, self.uin1, self.uin2]
+            self.out1 <<= concat(self.uin1, self.uin2)
+            self.out2 <<= concat(self.sin1, self.uin1, self.uin2)
+            self.out3 <<= concat(self.uin1, self.uin2, self.uin3)
 
         def simulate(self) -> TSimEvent:
             print("Simulation started")
-            self.uin1 = 1
-            self.uin2 = 2
-            self.uin3 = "4'h3"
-            self.sin1 = -1
+            self.uin1 <<= 1
+            self.uin2 <<= 2
+            self.uin3 <<= "4'h3"
+            self.sin1 <<= -1
             now = yield 10
             assert self.out1.sim_value == 0x12
             assert self.out2.sim_value == -238

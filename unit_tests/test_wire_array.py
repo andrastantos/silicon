@@ -40,7 +40,7 @@ def test_wire_array2():
     test.rtl_generation(test_module, "test_wire_array2")
 
 if __name__ == "__main__":
-    test_wire_array()
-    #test_wire_array2()
+    #test_wire_array()
+    test_wire_array2()
 
 

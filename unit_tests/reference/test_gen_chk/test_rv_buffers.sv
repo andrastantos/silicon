@@ -62,11 +62,8 @@ module Generator (
 	input logic reset_port
 );
 
-	logic [7:0] data_members_data;
-
 	assign output_port_valid = 1'hx;
 	assign output_port_data = 8'hx;
-	assign data_members_data = 8'hx;
 endmodule
 
 

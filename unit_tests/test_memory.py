@@ -49,7 +49,7 @@ def _test_single_port_ram(mode: str, registered_input: bool, registered_output: 
             mem.data_in <<= self.data_in
             self.data_out <<= mem.data_out
             mem.addr <<= self.addr
-            mem.write_en = self.write_en
+            mem.write_en <<= self.write_en
 
         def simulate(self) -> TSimEvent:
             def clk() -> int:
@@ -282,14 +282,14 @@ def _test_simple_dual_port_ram(mode: str, registered_input_a: bool, registered_o
                 self.data_out_a <<= mem.port1_data_out
             if port_a & WRITE != 0:
                 mem.port1_data_in <<= self.data_in_a
-                mem.port1_write_en = self.write_en_a
+                mem.port1_write_en <<= self.write_en_a
             mem.port1_addr <<= self.addr_a
 
             if port_b & READ != 0:
                 self.data_out_b <<= mem.port2_data_out
             if port_b & WRITE != 0:
                 mem.port2_data_in <<= self.data_in_b
-                mem.port2_write_en = self.write_en_b
+                mem.port2_write_en <<= self.write_en_b
             mem.port2_addr <<= self.addr_b
 
     if mode == "rtl":
@@ -395,12 +395,12 @@ def test_simple_dual_port_ram_sim():
             mem = Memory(config)
             self.data_out_a <<= mem.port1_data_out
             mem.port1_data_in <<= self.data_in_a
-            mem.port1_write_en = self.write_en_a
+            mem.port1_write_en <<= self.write_en_a
             mem.port1_addr <<= self.addr_a
 
             self.data_out_b <<= mem.port2_data_out
             mem.port2_data_in <<= self.data_in_b
-            mem.port2_write_en = self.write_en_b
+            mem.port2_write_en <<= self.write_en_b
             mem.port2_addr <<= self.addr_b
 
         def simulate(self) -> TSimEvent:
@@ -476,7 +476,7 @@ def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered
             mem.data_in <<= self.data_in
             self.data_out <<= mem.data_out
             mem.addr <<= self.addr
-            mem.write_en = self.write_en
+            mem.write_en <<= self.write_en
 
         def simulate(self) -> TSimEvent:
             def clk() -> int:
@@ -525,8 +525,8 @@ def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered
 if __name__ == "__main__":
     #test_single_port_ram_ff("rtl")
     #test_single_port_ram_ft("rtl")
-    test_single_port_ram_tf("rtl")
-    #test_single_port_ram_tt("rtl")
+    #test_single_port_ram_tf("rtl")
+    test_single_port_ram_tt("rtl")
     #test_single_port_rom("rtl")
     #test_single_port_rom2("rtl")
     #test_single_port_rom3("rtl")
@@ -540,3 +540,5 @@ if __name__ == "__main__":
     #test_simple_dual_port_ram_sim()
     #test_single_port_ram_tt("sim")
     #test_struct_ram("rtl")
+    #test_simple_dual_port_ram_tftf()
+    #test_simple_dual_port_ram_sim()

@@ -22,7 +22,7 @@ def test_enum1(mode = "rtl"):
         out_a = Output(EnumNet(E1))
 
         def body(self):
-            self.out_a = self.in_a
+            self.out_a <<= self.in_a
 
     class top_tb(top):
         def simulate(self):
@@ -50,7 +50,7 @@ def test_enum_const():
         out_a = Output(EnumNet(E1))
 
         def body(self):
-            self.out_a = E1.first
+            self.out_a <<= E1.first
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -65,7 +65,7 @@ def test_enum_add(mode = "rtl"):
         out_a = Output()
 
         def body(self):
-            self.out_a = E1.first + self.in_a
+            self.out_a <<= E1.first + self.in_a
 
     class top_tb(top):
         def simulate(self):
@@ -94,7 +94,7 @@ def test_enum_and1():
         out_a = Output(EnumNet(E1))
 
         def body(self):
-            self.out_a = E1.first & self.in_a
+            self.out_a <<= E1.first & self.in_a
 
     with ExpectError(SyntaxErrorException):
         test.rtl_generation(top, inspect.currentframe().f_code.co_name)
@@ -110,7 +110,7 @@ def test_enum_and2():
         out_a = Output()
 
         def body(self):
-            self.out_a = E1.first & self.in_a
+            self.out_a <<= E1.first & self.in_a
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -127,7 +127,7 @@ def test_enum_adapt():
         out_a = Output(EnumNet(E1))
 
         def body(self):
-            self.out_a = explicit_adapt(self.in_a, EnumNet(E1))
+            self.out_a <<= explicit_adapt(self.in_a, EnumNet(E1))
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -145,7 +145,7 @@ def test_enum_adapt2(mode = "rtl"):
         out_a = Output(EnumNet(E1))
 
         def body(self):
-            self.out_a = explicit_adapt(self.in_a, EnumNet(E1))
+            self.out_a <<= explicit_adapt(self.in_a, EnumNet(E1))
 
     class top_tb(top):
         def simulate(self):

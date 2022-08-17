@@ -191,7 +191,7 @@ def test_fifo(mode: str = "rtl"):
 
         def body(self):
             dut = Fifo(depth=10)
-            self.out1 = dut(self.in1)
+            self.out1 <<= dut(self.in1)
 
     class sim_top(Module):
         clk = ClkPort()
@@ -252,7 +252,7 @@ def test_delay_line(mode: str = "rtl"):
 
         def body(self):
             dut = DelayLine(depth=5)
-            self.out1 = dut(self.in1)
+            self.out1 <<= dut(self.in1)
 
     class sim_top(Module):
         clk = ClkPort()
@@ -315,7 +315,7 @@ def test_pacer(mode: str = "rtl"):
 
         def body(self):
             dut = Pacer(3)
-            self.out1 = dut(self.in1)
+            self.out1 <<= dut(self.in1)
 
     class sim_top(Module):
         clk = ClkPort()
@@ -391,9 +391,9 @@ if __name__ == "__main__":
     #test_reverse_buf("rtl")
     #test_fifo("rtl")
     #test_forward_buf("sim")
-    test_reverse_buf("sim")
+    #test_reverse_buf("sim")
     #test_fifo("sim")
-    #test_gen_chk("rtl")
+    test_gen_chk("rtl")
     #test_gen_chk("sim")
     #test_delay_line("sim")
     #test_pacer("sim")

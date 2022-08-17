@@ -121,7 +121,7 @@ def test_reg_with_adaptor():
 
         def body(self):
             registered = Reg(self.uin2)
-            self.uout1 = registered
+            self.uout1 <<= registered
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -139,16 +139,16 @@ def test_reg3():
 
         def body(self):
             clk = self.clk
-            self.sout1 = Reg(self.uin1, clock_port=self.clk)
+            self.sout1 <<= Reg(self.uin1, clock_port=self.clk)
             registered = Reg(self.uin2)
-            self.uout1 = registered
+            self.uout1 <<= registered
             reset_reg = Reg(self.uin1, reset_value_port=3, reset_port=self.uin2[1])
             reset = Wire()
             reset <<= self.uin2[0]
             reset_reg2 = Reg(self.uin1, reset_value_port=2)
             with self.clk2 as clk:
-                self.uout2 = Reg(self.uin2)
-            self.uout3 = Reg(self.uin1)
+                self.uout2 <<= Reg(self.uin2)
+            self.uout3 <<= Reg(self.uin1)
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -173,7 +173,7 @@ def test_reg3b():
             reset <<= self.uin1[0]
             """
             reset = self.uin1[0]
-            self.uout3 = Reg(self.uin1)
+            self.uout3 <<= Reg(self.uin1)
 
     set_verbosity_level(VerbosityLevels.instantiation)
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
@@ -185,7 +185,7 @@ def test_reg4():
         clk1 = Input(logic)
 
         def body(self):
-            self.sout1 = Reg(self.uin1, clock_port=(self.clk1 & self.uin1[0]))
+            self.sout1 <<= Reg(self.uin1, clock_port=(self.clk1 & self.uin1[0]))
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -237,7 +237,7 @@ def test_const_cast():
         push_data = Output(Unsigned(32))
 
         def body(self):
-            self.push_data = cast(3, Unsigned(32))
+            self.push_data <<= cast(3, Unsigned(32))
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 

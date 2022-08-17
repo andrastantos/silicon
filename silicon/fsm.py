@@ -4,11 +4,11 @@
 # Below, I spelled things out using SelectOne though...
 
 from .module import GenericModule, Module
-from .port import Input, Output, Wire, Junction
+from .port import Input, Output, Wire, Junction, Port
 from .auto_input import ClkPort, RstPort, RstValPort
 from .primitives import SelectOne, Reg
 from .exceptions import SyntaxErrorException
-from .utils import is_junction_base
+from .utils import BoolMarker, is_junction_base
 from .number import logic
 from .constant import get_net_type_for_const
 from .back_end import str_to_id
@@ -33,8 +33,15 @@ class FSMLogic(Module):
     default_state = Input()
 
     def construct(self) -> None:
+        self._allow_port_creation = BoolMarker()
         self._state_transition_table = OrderedDict()
 
+
+    def create_named_port_callback(self, name: str) -> Optional[Port]:
+        if not self._allow_port_creation:
+            return None
+        #print(f"name: {name}")
+        return Input()
 
     def create_transition(self, current_state: Any, new_state: Any) -> Tuple[Junction, str]:
         if is_junction_base(current_state):
@@ -44,14 +51,18 @@ class FSMLogic(Module):
         edge = (current_state, new_state)
         #if edge in self._state_transition_table:
         #    raise SyntaxErrorException(f"State transition from {current_state} to {new_state} already exists in FSM {self}")
-        input = Input()
         if edge in self._state_transition_table:
             port_name = f"input_{_format_state_name(current_state)}_to_{_format_state_name(new_state)}_{len(self._state_transition_table[edge])}"
-            self._state_transition_table[edge].append(input)
         else:
             port_name = f"input_{_format_state_name(current_state)}_to_{_format_state_name(new_state)}"
+        with self._allow_port_creation:
+            input = self.create_named_port(port_name)
+        if input is None:
+            raise SyntaxErrorException(f"Can't create port on '{self}'. Most likely reason is that the interface of it is already frozen.")
+        if edge in self._state_transition_table:
+            self._state_transition_table[edge].append(input)
+        else:
             self._state_transition_table[edge] = [input,]
-        setattr(self, port_name, input)
         return input, port_name
 
     def add_transition(self, current_state: Any, condition: Junction, new_state: Any) -> None:
@@ -115,6 +126,12 @@ class FSM(GenericModule):
         #self._max_state_val = None
         self._state_type = None
         self._state_net_type = None
+        self._allow_port_creation = BoolMarker()
+
+    def create_named_port_callback(self, name: str) -> Optional[Port]:
+        if not self._allow_port_creation:
+            return None
+        return Input()
 
     def add_transition(self, current_state: Any, condition: Junction, new_state: Any) -> None:
         # We have to be a little shifty here: can't connect condition directly to the logic instance
@@ -137,11 +154,13 @@ class FSM(GenericModule):
 
         logic_input, port_name = self.fsm_logic.create_transition(current_state, new_state)
 
-        input = Input()
-        setattr(self, port_name, input)
+        with self._allow_port_creation:
+            input = self.create_named_port(port_name)
+        if input is None:
+            raise SyntaxErrorException(f"Can't create port on '{self}'. Most likely reason is that the interface of it is already frozen.")
         input <<= condition
-
         logic_input <<= input
+        pass
 
     def body(self) -> None:
         # Create a wire containing the current state (since outputs can't be read within the body)

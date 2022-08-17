@@ -45,9 +45,10 @@ class Context(object):
             return None
         return Context.stack[-1]
 
-    elaboration = 1
-    simulation = 2
-    generation = 3
+    construction = 1
+    elaboration = 2
+    simulation = 3
+    generation = 4
 
 class ContextMarker(object):
     def __init__(self, context: Any):
@@ -489,3 +490,101 @@ def vprint(verbosity_level: int, *args, **kwargs):
     if verbose_enough(verbosity_level):
         print(*args, **kwargs, file=sys.stderr)
 
+
+class ScopedAttr(object):
+    """
+    A small object that allows the setting of an attribute of an object for the scope of a with block
+    """
+    def __init__(self, obj: Any, attr: str, value: Any):
+        self.obj = obj
+        self.attr = attr
+        self.value = value
+    def __enter__(self) -> 'ScopedAttr':
+        if hasattr(self.obj, self.attr):
+            self.old_value = getattr(self.obj, self.attr)
+        setattr(self.obj, self.attr, self.value)
+        return self
+    def __exit__(self, exception_type, exception_value, traceback):
+        if hasattr(self, "old_value"):
+            setattr(self.obj, self.attr, self.value)
+        else:
+            delattr(self.obj, self.attr)
+        del self.old_value
+
+
+def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Module', *, debug_print_level: int = 0, debug_scope: str):
+    if hasattr(junction, "convert_to_junction"):
+        junction = junction.convert_to_junction()
+    if hasattr(junction, "get_underlying_junction"):
+        junction = junction.get_underlying_junction()
+    if junction is not None:
+        from .module import Module
+        from .port import Wire
+        junction_parent_module = junction.get_parent_module()
+        if junction_parent_module is None:
+            junction.set_parent_module(parent_module)
+        same_level = junction_parent_module is parent_module
+        sub_level = junction_parent_module._impl.parent is parent_module
+        is_unused_wire = is_wire(junction) and junction.source is None and len(junction.sinks) == 0
+        if junction._no_rtl:
+            if debug_print_level > 0:
+                print(f"\tNO_RTL JUNCTION {name} {id(junction):x} SKIPPED for {debug_scope}")
+            return
+        if (same_level and not is_unused_wire) or sub_level:
+            if sub_level and is_wire(junction):
+                raise SyntaxErrorException(f"You really shouldn't access wires of a sub-module from the outside! You seem to be doing it for {junction}.")
+            # We need to name the net. We do that by adding a wire with a name attached to it, which matches
+            # the local variables' name.
+            wire = Wire(parent_module=parent_module)
+            wire.local_name = name
+            if debug_print_level > 1:
+                print(f"\tJUNCTION {wire.name} {id(wire):x} CREATED for {debug_scope}")
+            # We have to figure out the best way to splice the new wire into the junction topology.
+            # This normally doesn't matter, but interfaces are sensitive to it: they insist on a straight
+            # topology with no bifurcations as the reversed members don't know how to deal with that.
+            # The following cases are possible:
+            # 1. junction is same-level input: we splice in after
+            # 2. junction is same-level output: we splice in before
+            # 3. junction is same-level wire: we splice in before/after, doesn't matter
+            # 5. junction is sub-level input: we splice in before
+            # 6. junction is sub-level output: we splice in after
+            # 7. junction is sub-level wire: this is not supported, so leave as-is, don't try to interfere <-- this is handled in the condition above
+            if (is_input_port(junction) and same_level) or (is_output_port(junction) and sub_level) or (is_wire(junction) and same_level):
+                # splice after
+                old_sink = first(junction.sinks) if len(junction.sinks) > 0 else None
+                if debug_print_level > 1:
+                    print(f"\tjunction {id(junction):x} connectivity:")
+                    if junction.source is not None:
+                        print(f"\t   source: {id(junction.source):x}")
+                    sinks = "; ".join(f"{id(sink):x}" for sink in junction.sinks)
+                    print(f"\t   sinks: {sinks}")
+                if old_sink is not None:
+                    if debug_print_level > 1:
+                        print(f"\t-- splice after SETTING SOURCE OF {id(old_sink):x} to {id(wire):x} (used to be {id(old_sink.source):x})")
+                    old_sink.set_source(wire, scope=parent_module)
+                if debug_print_level > 1:
+                    print(f"\t-- splice after SETTING SOURCE OF {id(wire):x} to {id(junction):x}")
+                wire.set_source(junction, scope=parent_module)
+            else:
+                # splice before
+                old_source = junction.source
+                if old_source is not None:
+                    if debug_print_level > 1:
+                        print(f"\t-- splice before SETTING SOURCE OF {id(wire):x} to {id(old_source):x}")
+                    wire.set_source(old_source, scope=parent_module)
+                if debug_print_level > 1:
+                    print(f"\t-- splice before SETTING SOURCE OF {id(junction):x} to {id(wire):x} (used to be {id(junction.source):x})")
+                junction.set_source(wire, scope=parent_module)
+        elif same_level and is_unused_wire:
+            # This is an unused local wire.
+            if debug_print_level > 0:
+                print(f"\tUNUSED_LOCAL JUNCTION {name} {id(junction):x} SKIPPED for {debug_scope}")
+        else:
+            if debug_print_level > 0:
+                print(f"\tNON_LOCAL JUNCTION {name} {id(junction):x} SKIPPED for {debug_scope}")
+
+def no_rtl(junction: 'JunctionBase') -> 'JunctionBase':
+    if not is_junction_base(junction):
+        raise SyntaxErrorException(f"no_rtl can only be set on a junction")
+    junction._no_rtl = True
+    return junction

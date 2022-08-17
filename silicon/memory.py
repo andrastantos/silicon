@@ -120,6 +120,12 @@ class _Memory(GenericModule):
         from copy import deepcopy
         self.config = deepcopy(config)
         self.optional_ports = OrderedDict()
+        self.primary_port_config = None
+        self.secondary_port_configs = []
+        self.mem_size = None
+        self.mem_data_bits = None
+        self.mem_addr_range = None
+
         for idx, port_config in enumerate(self.config.port_configs):
             port_prefix = f"port{idx+1}"
             if port_config is not None:
@@ -152,12 +158,12 @@ class _Memory(GenericModule):
                 )
             )
 
-    def create_named_port(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str) -> Optional[Port]:
         """
         Called from the framework when unknown ports are accessed. This allows for dynamic port creation, though the default is to do nothing.
         Port creation should be as restrictive as possible and for any non-supported name, return None.
         This allows for regular attribute creation for non-port attributes.
-        NOTE: create_named_port should return the created port object instead of directly adding it to self
+        NOTE: create_named_port_callback should return the created port object instead of directly adding it to self
         """
         if name in self.optional_ports:
             if self.optional_ports[name][1] == Memory.INPUT:
@@ -180,9 +186,6 @@ class _Memory(GenericModule):
         return data_in_port, data_out_port, write_en_port, addr_port, clk_port
 
     def _setup(self):
-        self.primary_port_config = None
-        self.secondary_port_configs = []
-
         has_data_in = False
 
         for port_config in self.config.port_configs:
@@ -602,12 +605,12 @@ class Memory(GenericModule):
                 )
             )
 
-    def create_named_port(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str) -> Optional[Port]:
         """
         Called from the framework when unknown ports are accessed. This allows for dynamic port creation, though the default is to do nothing.
         Port creation should be as restrictive as possible and for any non-supported name, return None.
         This allows for regular attribute creation for non-port attributes.
-        NOTE: create_named_port should return the created port object instead of directly adding it to self
+        NOTE: create_named_port_callback should return the created port object instead of directly adding it to self
         """
         if name in self.optional_ports:
             if self.optional_ports[name][1] == Memory.INPUT:
@@ -632,13 +635,17 @@ class Memory(GenericModule):
         for port_name, port in self.get_inputs().items():
             if port_name.endswith("data_in"):
                 port = explicit_adapt(port, Unsigned(length=port.get_num_bits()))
-            setattr(real_mem, port_name, port)
+            mem_port = getattr(real_mem, port_name)
+            mem_port <<= port
+            #setattr(real_mem, port_name, port)
         for port_name, port in self.get_outputs().items():
             if port_name.endswith("data_out"):
                 port <<= explicit_adapt(getattr(real_mem, port_name), port.get_net_type())
             else:
                 port <<= getattr(real_mem, port_name)
-        port = None # Make sure tracer doesn't generate an unnecessary Wire object
+        # clean up namespace
+        del port
+        del mem_port
 
 class SimpleDualPortMemory(Memory):
     READ_PORT = 1

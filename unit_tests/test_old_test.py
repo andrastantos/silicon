@@ -126,8 +126,8 @@ def test_local_gates():
         out_c = Output(logic)
 
         def body(self):
-            self.out_a = xor_gate1(self.in_a, xor_gate2(self.in_b, self.in_c))
-            self.out_c = or_gate(
+            self.out_a <<= xor_gate1(self.in_a, xor_gate2(self.in_b, self.in_c))
+            self.out_c <<= or_gate(
                 and_gate1(self.in_a, self.in_b),
                 or_gate(
                     and_gate2(self.in_a, self.in_c),
@@ -169,7 +169,7 @@ def test_local_gates():
             A = and_gate()
             B = and_gate()
             A(in_a = B.out_a)
-            A.in_b = B.out_a
+            A.in_b <<= B.out_a
             c = and_gate(A.out_a, B.out_a) # In-line instantiation of non-generic modules
             d = and_gate()(c, generic_and_gate(3, 42)(A.out_a, B.out_a)) # In-line instantiation of generic modules. Note the first braces that list the generic parameters, and the second one, listing the port bindings
             dd = d
@@ -182,14 +182,14 @@ def test_local_gates():
             #A.out_a = B.in_a # This style of binding is only allowed inside the module, not outside
             (out_a, outc) = full_adder(self.in_1, self.in_2, self.in_3)
             out_a.get_parent_module()._impl.name = "FA"
-            self.out_2 = self.in_4
-            self.out_1 = out_a
-            self.out_3 = outc
-            #self.out_4 = self.out_3 # This is not allowed (though maybe it should be?)
+            self.out_2 <<= self.in_4
+            self.out_1 <<= out_a
+            self.out_3 <<= outc
+            #self.out_4 <<= self.out_3 # This is not allowed (though maybe it should be?)
             #r1 = gc.get_referrers(A)
             #print(str(r1))
-            self.out_5 = 0
-            self.out_6 = const(1)
+            self.out_5 <<= 0
+            self.out_6 <<= const(1)
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -297,8 +297,8 @@ def test_old_number():
             a0 = self.in_a[0]
             b0 = self.in_b[0]
             c0 = and_gate(a0, b0)
-            self.out_num = self.in_b & self.in_c
-            self.out_num_b = 31
+            self.out_num <<= self.in_b & self.in_c
+            self.out_num_b <<= 31
             self.out_b[0] <<= c0
             self.out_b[4] <<= and_gate(self.in_a[3], self.in_a[4])
             self.out_b[3:1] <<= self.in_a[3:1]
@@ -313,8 +313,8 @@ def test_old_number():
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 if __name__ == "__main__":
-    test_old_number()
-    #test_local_gates()
+    #test_old_number()
+    test_local_gates()
     #test_unconnected_submodule()
 
 """

@@ -25,7 +25,7 @@ def test_select_struct():
         sel_in = Input(Unsigned(2))
 
         def body(self):
-            self.out_port = Select(self.sel_in, self.in1, self.in2, self.in3, self.in4)
+            self.out_port <<= Select(self.sel_in, self.in1, self.in2, self.in3, self.in4)
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -39,7 +39,7 @@ def test_select_one_struct():
         sel_in = Input(Unsigned(4))
 
         def body(self):
-            self.out_port = SelectOne(self.sel_in[0], self.in1, self.sel_in[1], self.in2, self.sel_in[2], self.in3, self.sel_in[3], self.in4)
+            self.out_port <<= SelectOne(self.sel_in[0], self.in1, self.sel_in[1], self.in2, self.sel_in[2], self.in3, self.sel_in[3], self.in4)
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -53,7 +53,7 @@ def test_select_first_struct(mode: str = "rtl"):
         sel_in = Input(Unsigned(4))
 
         def body(self):
-            self.out_port = SelectFirst(self.sel_in[0], self.in1, self.sel_in[1], self.in2, self.sel_in[2], self.in3, self.sel_in[3], self.in4)
+            self.out_port <<= SelectFirst(self.sel_in[0], self.in1, self.sel_in[1], self.in2, self.sel_in[2], self.in3, self.sel_in[3], self.in4)
         def simulate(self):
             self.in1.r <<= 11
             self.in1.g <<= 12
@@ -91,17 +91,17 @@ def test_reg_struct():
 
         def body(self):
             clk = self.clk1
-            self.sout1 = Reg(self.uin1, clock_port=self.clk1)
+            self.sout1 <<= Reg(self.uin1, clock_port=self.clk1)
             registered = Reg(self.uin2)
-            self.uout1 = registered
+            self.uout1 <<= registered
             reset_reg = Reg(self.uin1, reset_value_port=self.uin2, reset_port=self.uin2.r[4])
             reset = self.uin2.r[0]
             reset_reg2 = Reg(self.uin1, reset_value_port=self.uin2)
             with self.clk2 as clk:
-                self.uout2 = Reg(self.uin2)
+                self.uout2 <<= Reg(self.uin2)
             #self.uout3 = Reg(self.uin1)
             clk = self.clk1
-            self.uout3 = Reg(self.uin1)
+            self.uout3 <<= Reg(self.uin1)
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -194,7 +194,7 @@ def test_struct_with_method():
         outp = Output(Pixel)
 
         def body(self):
-            self.outp = self.in1.blend(self.in2, self.alpha)
+            self.outp <<= self.in1.blend(self.in2, self.alpha)
 
     test.rtl_generation(AlphaBender, inspect.currentframe().f_code.co_name)
 
@@ -207,7 +207,7 @@ def test_struct_to_number(mode: str = "rtl"):
         outp = Output()
 
         def body(self):
-            self.outp = explicit_adapt(self.in1, Unsigned(length=self.in1.get_num_bits()))
+            self.outp <<= explicit_adapt(self.in1, Unsigned(length=self.in1.get_num_bits()))
 
         def simulate(self):
             def test(r,g,b):
@@ -296,14 +296,14 @@ def test_struct_sub_module(mode: str = "rtl"):
         outp = Output(GPixel(pixel_width))
 
         def body(self):
-            self.outp = Select(1, self.in1, self.in2)
+            self.outp <<= Select(1, self.in1, self.in2)
 
     class Top(Module):
         in1 = Input(GPixel(pixel_width))
         outp = Output()
 
         def body(self):
-            self.outp = Sub(self.in1, self.in1)
+            self.outp <<= Sub(self.in1, self.in1)
 
     if mode == "rtl":
         test.rtl_generation(Top, inspect.currentframe().f_code.co_name)

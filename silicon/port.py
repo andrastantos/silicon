@@ -44,6 +44,7 @@ class JunctionBase(object):
         self._allow_auto_bind = True
         self._parent_module = parent_module
         self._in_with_block = False
+        self._no_rtl = False # If set to true, we'll try to not generate RTL code for this junction, by not registering it in Tracer or in _body
 
     def __getitem__(self, key: Any) -> Any:
         if Context.current() == Context.simulation:

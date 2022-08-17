@@ -299,7 +299,7 @@ class Netlist(object):
         from .port import Junction, Wire, Input, Output
         from .utils import is_port
         for module in self.modules:
-            for junction in module.get_junctions().values():
+            for junction in chain(module.get_junctions().values(), module._impl.get_local_wires()):
                 self.xnets |= create_xnets_for_junction(junction)
 
         for module in self.modules:
@@ -433,9 +433,11 @@ class Netlist(object):
         - Generate module and net names
         - Creation of XNets
         - Ranking modules into logic cones
-        - Sorting all the modules into instance classes. That is, create a set of module instances whom share the same implementation.
+        - Sorting all the modules into instance classes. That is, create a set of module instances who share the same implementation.
           This is a bit more complex then simply looking at their type or __class__: generic modules or modules with dynamic port creation
           support may not share the body even if they are of the same class.
+          TODO: in fact, this shouldn't happen at all this way: it's way too brittle. I think a better way of dealing with this is to
+                str-compare the generated guts after the fact and eject the identical ones.
         """
         def populate_names(module: 'Module'):
             from .module import Module

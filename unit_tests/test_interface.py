@@ -46,7 +46,7 @@ def test_interface2(mode = "rtl"):
         out_a = Output(MyInterface)
 
         def body(self):
-            self.out_a = self.in_a
+            self.out_a <<= self.in_a
 
     class top_tb(top):
         def simulate(self):

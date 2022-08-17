@@ -39,8 +39,8 @@ def test_module_with_assigned_io():
         output1 = si.Output(si.Signed(8))
         output2 = si.Output(si.Signed(8))
         def body(self):
-            self.output1 = self.input_port
-            self.output2 = 0
+            self.output1 <<= self.input_port
+            self.output2 <<= 0
 
     t.test.rtl_generation(top, inspect.currentframe().f_code.co_name, allow_new_attributes=True)
 
@@ -117,6 +117,28 @@ def test_wire_array2():
 
     t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_scoped_bind():
+    class top(si.Module):
+        out_a = si.Output(si.Unsigned(8))
+        out_b = si.Output(si.Unsigned(8))
+        out_c = si.Output(si.Unsigned(8))
+        out_d = si.Output(si.Unsigned(8))
+        in_a = si.Input(si.Unsigned(8))
+        in_b = si.Input(si.Unsigned(8))
+        in_c = si.Input(si.Unsigned(8))
+        in_d = si.Input(si.Unsigned(8))
+    
+        def body(self):
+            a = self.in_a
+            #with self.in_a as a:
+            #    self.out_a <<= a
+            self.out_b <<= a
+            with self.in_c as a:
+                self.out_c <<= a
+            self.out_d <<= a
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 def test_slice_bind():
     class top(si.Module):
@@ -138,13 +160,19 @@ def test_module_decorator():
         out_a = si.Output(si.Signed(5))
         out_b = si.Output(si.Signed(5))
         out_c = si.Output(si.Signed(5))
+        out_d = si.Output(si.Signed(5))
+        out_e = si.Output(si.Signed(5))
+        out_f = si.Output(si.Signed(5))
         in_a = si.Input(si.Signed(1))
         in_b = si.Input(si.Signed(1))
 
         def body(self):
-            self.out_a = function_as_module(self.in_a, self.in_b)
-            self.out_b = function_as_module(self.in_a, self.in_b)
-            self.out_c = function_as_module(self.in_a, 1)
+            self.out_a <<= function_as_module(a=self.in_a, b=self.in_b)
+            self.out_b <<= function_as_module(self.in_a, b=self.in_b)
+            self.out_c <<= function_as_module(self.in_a, self.in_b)
+            self.out_d <<= function_as_module(1, self.in_b)
+            self.out_e <<= function_as_module(self.in_a, 2)
+            self.out_f <<= function_as_module(1, 2)
 
     t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
@@ -159,7 +187,7 @@ def test_module_decorator1():
         in_b = si.Input(si.Signed(3))
 
         def body(self):
-            self.out_a = function_as_module(self.in_a, self.in_b)
+            self.out_a <<= function_as_module(self.in_a, self.in_b)
 
     t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
 
@@ -179,8 +207,8 @@ def test_double_port_assign():
         def body(self):
             A = and_gate()
             A(in_a = self.in_a)
-            A.in_b = self.in_a
-            self.out_a = A.out_a
+            A.in_b <<= self.in_a
+            self.out_a <<= A.out_a
 
     t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
@@ -314,17 +342,18 @@ def test_lhs_slice(mode="rtl"):
 
 if __name__ == "__main__":
     #test_module_decorator1()
-    #test_module_decorator()
+    test_module_decorator()
     #test_empty_module()
     #test_module_with_io()
     #test_module_with_assigned_io()
     #test_pass_through()
     #test_wire_names()
     #test_wire_array3()
-    test_wire_array2()
+    #test_wire_array2()
     #test_slice_bind()
     #test_double_port_assign()
     #test_full_adder()
     #test_loop_finder("rtl")
     #test_rhs_slice("rtl")
     #test_lhs_slice("rtl")
+    #test_scoped_bind()

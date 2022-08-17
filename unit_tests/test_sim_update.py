@@ -21,7 +21,7 @@ def test_sim_update():
             pa_sel = ~self.addr[0]
             pb_sel = self.addr[0]
 
-            self.data_out = SelectOne(
+            self.data_out <<= SelectOne(
                 pa_sel & ~self.n_cs & ~self.n_rd, 0x11,
                 pb_sel & ~self.n_cs & ~self.n_rd, 0x22
             )
@@ -32,19 +32,18 @@ def test_sim_update():
                 yield 10
 
             print("Simulation started")
-            self.n_cs = 1
-            self.n_rd = 1
-            self.data_in = 0
-            self.addr = 0
+            self.n_cs <<= 1
+            self.n_rd <<= 1
+            self.addr <<= 0
             yield from clk()
 
             def read(addr: int) -> Optional[int]:
-                self.n_cs = 0
-                self.n_rd = 0
-                self.addr = addr
+                self.n_cs <<= 0
+                self.n_rd <<= 0
+                self.addr <<= addr
                 yield from clk()
                 #self.n_cs = 1
-                self.n_rd = 1
+                self.n_rd <<= 1
                 return self.data_out.sim_value
 
             pa_addr = 0
@@ -65,9 +64,9 @@ def test_sim_update():
 
 def test_reg2():
     class top(Module):
+        clk = Input(logic)
+        
         def body(self):
-            self.clk = ClkPort()
-
             c1 = self.clk
             c2 = ~self.clk
             c3 = ~c2
@@ -78,7 +77,7 @@ def test_reg2():
             r02 = Reg(c2)
             r03 = Reg(c3)
             r04 = Reg(c4)
-
+            
             with c1 as clk:
                 r10 = Reg(self.clk)
                 r11 = Reg(c1)
@@ -109,14 +108,14 @@ def test_reg2():
 
         def simulate(self):
             for i in range(10):
-                self.clk = 0
+                self.clk <<= 0
                 yield 10
-                self.clk = 1
+                self.clk <<= 1
                 yield 10
 
     test.simulation(top, inspect.currentframe().f_code.co_name)
 
 
 if __name__ == "__main__":
-    test_sim_update()
-    #test_reg2()
+    #test_sim_update()
+    test_reg2()

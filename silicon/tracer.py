@@ -1,13 +1,15 @@
 from typing import Union, Set, Tuple, Dict, Any, Optional, Callable, List
 import sys
 from collections import namedtuple
+
+from .exceptions import SyntaxErrorException
 from .stack import Stack
 class Tracer(object):
     ContextInfo = namedtuple("ContextInfo", ("name", "trace"))
     old_tracer: Optional[Callable] = None
     tracer_active: bool = False
     enable = Stack()
-    black_list: Set[str] = {"write", "__new__","__ilshift__","__setattr__"}
+    black_list: Set[str] = {"write", "print"}
     force_list: Set[str] = {}
     context = Stack()
     debug_print_level: int = 0
@@ -65,9 +67,6 @@ class Tracer(object):
                     return chain()
                 if func_name in Tracer.black_list:
                     return chain()
-            if func_name == 'write':
-                # Ignore write() calls from print statements
-                return chain()
             if Tracer.debug_print_level > 2:
                 print(f"<<<< {func_name} at {filename}:{line_no}")
             stack_frame = frame.f_code
@@ -77,77 +76,20 @@ class Tracer(object):
                 local_value = frame.f_locals[local_name]
                 if local_name == "self":
                     continue
-                from .utils import is_junction_base, is_module, is_input_port, is_output_port, is_wire, first
+                from .utils import is_junction_base, is_module, register_local_wire
                 if is_junction_base(local_value):
                     header_printed = print_header()
-                    if hasattr(local_value, "convert_to_junction"):
-                        junction = local_value.convert_to_junction()
-                    else:
-                        junction = local_value
-                    if hasattr(junction, "get_underlying_junction"):
-                        junction = junction.get_underlying_junction()
-                    if junction is not None:
-                        from .module import Module
-                        from .port import Wire
-                        junction_parent_module = junction.get_parent_module()
-                        parent_module = Module.get_current_scope()
+                    parent_module = Module.get_current_scope()
+                    if parent_module is None:
                         # We can't really assert in tracer, I don't think. So we simply terminate with a nasty message
-                        if parent_module is None:
-                            print(f"Traces is enabled outside of module bodies. THIS IS REALLY BAD!!!", file=sys.stderr)
-                            sys.exit(-1)
-                        same_level = junction_parent_module is parent_module
-                        sub_level = junction_parent_module._impl.parent is parent_module
-                        is_unused_local_wire = is_wire(junction) and junction.source is None and len(junction.sinks) == 0
-                        if (same_level and not is_unused_local_wire) or (sub_level and not is_wire(junction)):
-                            # We need to name the net. We do that by adding a wire with a name attached to it, which matches
-                            # the local variables' name.
-                            wire = Wire(parent_module=parent_module)
-                            wire.local_name = local_name
-                            if Tracer.debug_print_level > 1:
-                                print(f"\tJUNCTION {wire.local_name} {id(wire):x} CREATED for {func_name}")
-                            # We have to figure out the best way to splice the new wire into the junction topology.
-                            # This normally doesn't matter, but interfaces are sensitive to it: they insist on a straight
-                            # topology with no bifurcations as the reversed members don't know how to deal with that.
-                            # The following cases are possible:
-                            # 1. junction is same-level input: we splice in after
-                            # 2. junction is same-level output: we splice in before
-                            # 3. junction is same-level wire: we splice in before/after, doesn't matter
-                            # 5. junction is sub-level input: we splice in before
-                            # 6. junction is sub-level output: we splice in after
-                            # 7. junction is sub-level wire: this is not supported, so leave as-is, don't try to interfere <-- this is handled in the condition above
-                            if (is_input_port(junction) and same_level) or (is_output_port(junction) and sub_level) or (is_wire(junction) and same_level):
-                                # splice after
-                                old_sink = first(junction.sinks) if len(junction.sinks) > 0 else None
-                                if Tracer.debug_print_level > 1:
-                                    print(f"\tjunction {id(junction):x} connectivity:")
-                                    if junction.source is not None:
-                                        print(f"\t   source: {id(junction.source):x}")
-                                    sinks = "; ".join(f"{id(sink):x}" for sink in junction.sinks)
-                                    print(f"\t   sinks: {sinks}")
-                                if old_sink is not None:
-                                    if Tracer.debug_print_level > 1:
-                                        print(f"\t-- splice after SETTING SOURCE OF {id(old_sink):x} to {id(wire):x} (used to be {id(old_sink.source):x})")
-                                    old_sink.set_source(wire, scope=parent_module)
-                                if Tracer.debug_print_level > 1:
-                                    print(f"\t-- splice after SETTING SOURCE OF {id(wire):x} to {id(junction):x}")
-                                wire.set_source(junction, scope=parent_module)
-                            else:
-                                # splice before
-                                old_source = junction.source
-                                if old_source is not None:
-                                    if Tracer.debug_print_level > 1:
-                                        print(f"\t-- splice before SETTING SOURCE OF {id(wire):x} to {id(old_source):x}")
-                                    wire.set_source(old_source, scope=parent_module)
-                                if Tracer.debug_print_level > 1:
-                                    print(f"\t-- splice before SETTING SOURCE OF {id(junction):x} to {id(wire):x} (used to be {id(junction.source):x})")
-                                junction.set_source(wire, scope=parent_module)
-                        elif same_level and not is_unused_local_wire:
-                            # This is an unused local wire.
-                            if Tracer.debug_print_level > 0:
-                                print(f"\tUNUSED_LOCAL JUNCTION {local_name} {id(junction):x} SKIPPED for {func_name}")
-                        else:
-                            if Tracer.debug_print_level > 0:
-                                print(f"\tNON_LOCAL JUNCTION {local_name} {id(junction):x} SKIPPED for {func_name}")
+                        print(f"Traces is enabled outside of module bodies. THIS IS REALLY BAD!!!", file=sys.stderr)
+                        sys.exit(-1)
+                    try:
+                        register_local_wire(local_name, local_value, parent_module, debug_print_level=Tracer.debug_print_level, debug_scope=func_name)
+                    except SyntaxErrorException as ex:
+                        print(f"{ex}", file=sys.stderr)
+                        sys.exit(-1)
+
                 elif is_module(local_value):
                     header_printed = print_header()
                     if Tracer.debug_print_level > 1:
@@ -156,8 +98,7 @@ class Tracer(object):
                     if module._impl.name is not None:
                         print(f"\t\tWARNING: module already has a name {module}. Not changing it")
                     else:
-                        with module._impl._no_junction_bind:
-                            module._impl.name = local_name
+                        module._impl.name = local_name
             return chain()
         elif event == "c_call":
             return chain()
