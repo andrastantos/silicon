@@ -1,7 +1,5 @@
 from typing import Union, Sequence, Any, Optional, Iterable, Dict, List, Callable, IO, Sequence, Tuple, Generator, Set, Iterator
-from .tracer import no_trace
 from .exceptions import SyntaxErrorException, AdaptTypeError
-from collections import deque
 from threading import RLock
 import sys
 

@@ -13,11 +13,9 @@ etc.
 """
 from typing import Tuple, Sequence, Any, Generator
 
-from .module import GenericModule, Module, InlineBlock, InlineExpression
-from .port import Junction, Input, Output, Port, ScopedPort
+from .module import GenericModule, Module, InlineBlock
+from .port import Junction, Input, Output, Port
 from .net_type import KeyKind
-from .tracer import no_trace
-from .utils import BoolMarker, get_caller_local_junctions
 from .exceptions import SyntaxErrorException
 
 """

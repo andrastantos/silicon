@@ -1,17 +1,13 @@
 from typing import Tuple, Union, Any, Dict, Set, Optional, Generator, Sequence
 
-from attr import Attribute
-
 from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta, suppress_init
 from .netlist import Netlist
 from .back_end import BackEnd
 from .exceptions import SimulationException, SyntaxErrorException
 from .module import Module, GenericModule, InlineExpression, InlineBlock, InlineStatement
-from .port import Input, Output, Port, Junction
-from .tracer import no_trace
+from .port import Input, Output, Junction
 from .utils import TSimEvent, MEMBER_DELIMITER, adapt, Context, is_net_type
-from collections import namedtuple, OrderedDict
-from copy import copy
+from collections import OrderedDict
 from .number import Unsigned, Number
 from .port import Wire
 from .exceptions import AdaptTypeError

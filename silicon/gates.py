@@ -1,11 +1,9 @@
 from .module import Module, InlineBlock, InlineExpression
 from typing import Dict, Optional, Tuple, Any, Generator, Union
 from .port import Input, Output, Port
-from .net_type import NetType
 from .number import logic, Number
 from .exceptions import SyntaxErrorException
-from .tracer import no_trace
-from .utils import first, get_common_net_type, TSimEvent, adjust_precision, adjust_precision_sim
+from .utils import get_common_net_type, TSimEvent, adjust_precision
 
 def _is_sim_none(arg: Any) -> bool:
     if arg is None:

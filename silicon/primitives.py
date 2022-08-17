@@ -1,13 +1,11 @@
-from .module import Module, InlineBlock, InlineExpression, InlineStatement, InlineComposite, GenericModule, has_port
-from typing import Dict, Optional, Tuple, Any, Generator, Union, Sequence
+from .module import Module, InlineBlock, InlineExpression, InlineStatement, InlineComposite, has_port
+from typing import Dict, Optional, Tuple, Any, Generator, Union
 from .port import Junction, Input, Output, Port, EdgeType, Wire
 from .auto_input import ClkPort, ClkEnPort, RstPort, RstValPort
-from .net_type import NetType, KeyKind
 from .exceptions import FixmeException, SyntaxErrorException, SimulationException
-from .tracer import no_trace
 from collections import OrderedDict
-from .utils import first, get_common_net_type, BoolMarker
-from .number import logic, NumberMeta
+from .utils import get_common_net_type, BoolMarker
+from .number import NumberMeta
 from .utils import TSimEvent, is_module
 
 class Select(Module):

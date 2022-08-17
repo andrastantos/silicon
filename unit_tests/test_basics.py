@@ -342,7 +342,7 @@ def test_lhs_slice(mode="rtl"):
 
 if __name__ == "__main__":
     #test_module_decorator1()
-    test_module_decorator()
+    #test_module_decorator()
     #test_empty_module()
     #test_module_with_io()
     #test_module_with_assigned_io()
@@ -356,4 +356,4 @@ if __name__ == "__main__":
     #test_loop_finder("rtl")
     #test_rhs_slice("rtl")
     #test_lhs_slice("rtl")
-    #test_scoped_bind()
+    test_scoped_bind()

@@ -1,9 +1,8 @@
 from typing import Optional, Any, Tuple, Generator, Union, Dict, Set, Sequence, Union
 from .exceptions import FixmeException, SyntaxErrorException, SimulationException, AdaptTypeError
 from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta
-from .module import GenericModule, Module, InlineBlock, InlineExpression, has_port
-from .port import Input, JunctionBase, Output, Junction, Port
-from .tracer import no_trace
+from .module import GenericModule, Module, InlineBlock, InlineExpression
+from .port import Input, Output, Junction, Port
 from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, NetValue, is_junction_base
 from collections import OrderedDict
 import re

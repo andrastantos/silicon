@@ -7,7 +7,7 @@ from .port import Junction, Port, Output, Input, Wire, JunctionBase
 from .net_type import NetType, NetTypeMeta
 from .utils import BoolMarker, str_block, CountMarker, TSimEvent, ContextMarker, first, Context
 from .stack import Stack
-from .tracer import Tracer, Trace, NoTrace, trace, no_trace
+from .tracer import Tracer, Trace, no_trace
 from .netlist import Netlist
 from enum import Enum
 from .ordered_set import OrderedSet

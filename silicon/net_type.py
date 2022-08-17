@@ -1,10 +1,8 @@
 from abc import abstractmethod
-from typing import Tuple, Dict, Optional, Any, Type, Sequence, Union
-from types import MethodType
-from .tracer import no_trace
+from typing import Dict, Optional, Any, Sequence, Union
 from .netlist import Netlist
 from .exceptions import AdaptTypeError, SyntaxErrorException
-from .utils import first, BoolMarker
+from .utils import BoolMarker
 from enum import Enum as PyEnum
 
 class KeyKind(PyEnum):
