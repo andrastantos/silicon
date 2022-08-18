@@ -82,7 +82,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from .composite import Struct
 from .utils import str_block, is_power_of_two
-from .exceptions import SyntaxErrorException
+from .exceptions import SyntaxErrorException, InvalidPortError
 from typing import Optional, Sequence, Generator, Any
 from .number import logic, Unsigned
 from .utils import TSimEvent, explicit_adapt
@@ -174,7 +174,7 @@ class _Memory(GenericModule):
                 return Output(self.optional_ports[name][0])
             else:
                 assert False
-        return None
+        raise InvalidPortError()
 
     def get_port_count(self) -> int:
         return len(self.config.port_configs)
@@ -623,7 +623,7 @@ class Memory(GenericModule):
                 return Output(self.optional_ports[name][0])
             else:
                 assert False
-        return None
+        raise InvalidPortError()
 
     def get_port_count(self) -> int:
         return len(self.config.port_configs)

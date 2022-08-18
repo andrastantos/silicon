@@ -1,5 +1,5 @@
 from typing import Optional, Any, Tuple, Generator, Union, Dict, Set, Sequence, Union
-from .exceptions import FixmeException, SyntaxErrorException, SimulationException, AdaptTypeError
+from .exceptions import FixmeException, SyntaxErrorException, SimulationException, AdaptTypeError, InvalidPortError
 from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta
 from .module import GenericModule, Module, InlineBlock, InlineExpression
 from .port import Input, Output, Junction, Port
@@ -788,13 +788,17 @@ class Number(NetTypeFactory):
             def construct(self, key_chains: Sequence[Sequence[Tuple[Any, KeyKind]]]):
                 self.key_chains = key_chains
                 self.input_map = None
-            def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Union[str, Port]]:
+
+            def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Tuple[str, Port]:
                 # Create the associated input to the key. We don't support named ports, only positional ones.
                 if idx >= len(self.key_chains):
-                    return None
+                    raise InvalidPortError
                 name = f"slice_{idx}"
                 ret_val = Input(net_type)
                 return (name, ret_val)
+
+            def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
+                raise InvalidPortError()
 
             def finalize_input_map(self, common_net_type: object):
                 if self.input_map is not None:

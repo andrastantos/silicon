@@ -2,7 +2,7 @@ from .module import Module, InlineBlock, InlineExpression
 from typing import Dict, Optional, Tuple, Any, Generator, Union
 from .port import Input, Output, Port
 from .number import logic, Number
-from .exceptions import SyntaxErrorException
+from .exceptions import SyntaxErrorException, InvalidPortError
 from .utils import get_common_net_type, TSimEvent, adjust_precision
 
 def _is_sim_none(arg: Any) -> bool:
@@ -47,19 +47,19 @@ class Gate(Module):
         assert not self.output_port.is_specialized() or new_net_type is None
         if new_net_type is not None:
             self.output_port.set_net_type(new_net_type)
-    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Union[str, Port]]:
+    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Tuple[str, Port]:
         name = f"input_port_{idx}"
         return (name, self.create_named_port_callback(name, net_type))
     def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         from .number import Number
 
         if self.max_input_cnt is not None and len(self.get_inputs()) > self.max_input_cnt:
-            return None
+            raise InvalidPortError()
 
         if name.startswith("input_port_"):
             return Input(net_type)
         else:
-            return None
+            raise InvalidPortError()
 
     def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
         raise NotImplementedError

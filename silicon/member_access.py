@@ -16,7 +16,7 @@ from typing import Tuple, Sequence, Any, Generator
 from .module import GenericModule, Module, InlineBlock
 from .port import Junction, Input, Output, Port
 from .net_type import KeyKind
-from .exceptions import SyntaxErrorException
+from .exceptions import SyntaxErrorException, InvalidPortError
 
 """
 There should be a generic (non type-specific) way of handling slicing, or even more generally accessing members.
@@ -173,13 +173,16 @@ class PhiSlice(GenericModule):
         # punt the resolution later. Thus, each key is actually a chain of keys.
         self.key_chains = key_chains
 
-    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Tuple[str, Port]]:
+    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Tuple[str, Port]:
         # Create the associated input to the key. We don't support named ports, only positional ones.
         if idx >= len(self.key_chains):
-            return None
+            raise InvalidPortError()
         name = f"slice_{idx}"
         ret_val = Input(net_type)
         return (name, ret_val)
+
+    def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
+        raise InvalidPortError()
 
     def body(self) -> None:
         common_net_type = get_common_net_type(self.get_inputs().values())

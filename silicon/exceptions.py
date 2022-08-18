@@ -41,3 +41,6 @@ class IVerilogException(Exception):
 
 class AdaptTypeError(Exception):
     pass
+
+class InvalidPortError(Exception):
+    pass

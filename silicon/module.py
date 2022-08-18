@@ -11,7 +11,7 @@ from .tracer import Tracer, Trace, no_trace
 from .netlist import Netlist
 from enum import Enum
 from .ordered_set import OrderedSet
-from .exceptions import SimulationException, SyntaxErrorException
+from .exceptions import SimulationException, SyntaxErrorException, InvalidPortError
 from threading import RLock
 from itertools import chain, zip_longest
 from .utils import is_port, is_input_port, is_output_port, is_wire, is_module, fill_arg_names, is_junction_base, is_iterable, MEMBER_DELIMITER, first, implicit_adapt, convert_to_junction
@@ -165,10 +165,12 @@ class Module(object):
             for idx, arg in enumerate(args):
                 if idx >= len(my_positional_inputs) and not self._impl._in_create_port:
                     with self._impl._in_create_port:
-                        name_and_port = self.create_positional_port_callback(idx, net_type=None)
-                        if name_and_port is None or name_and_port[1] is None:
+                        try:
+                            name, port = self.create_positional_port_callback(idx, net_type=None)
+                            assert port is not None
+                            self._impl._set_no_bind_attr(name, port)
+                        except InvalidPortError:
                             raise SyntaxErrorException(f"Module {self} doesn't support dynamic creation of more positional ports")
-                        self._impl._set_no_bind_attr(name_and_port[0], name_and_port[1])
                     my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
                 if arg is not None:
                     my_positional_inputs[idx].set_source(arg, scope)
@@ -209,30 +211,29 @@ class Module(object):
             raise AttributeError
         if Context.current() != Context.elaboration:
             raise AttributeError
-        port = self._impl._create_named_port(name)
-        if port is None:
+        try:
+            return self._impl._create_named_port(name)
+        except InvalidPortError:
             raise AttributeError
-        return port
 
     def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         """
-        Called from the framework when unknown ports are accessed. This allows for dynamic port creation, though the default is to do nothing.
-        Port creation should be as restrictive as possible and for any non-supported name, return None.
-        This allows for regular attribute creation for non-port attributes.
-        NOTE: create_named_port_callback should return the created port object instead of directly adding it to self
+        Called by the framework to dynamically create ports.
+
+        If the default mechanism of port-creation is to be used, return None.
+        If the port should not be created, raise InvalidPortError
+        If the port is successfully created, it should be returned, and *NOT* added to 'self' as an attribute
         """
         return None
 
-    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Union[str, Port]]:
+    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Tuple[str, Port]:
         """
-        Called from the framework when unknown ports are accessed. This allows for dynamic port creation, though the default is to do nothing.
-        Port creation should be as restrictive as possible and for any non-supported index, do nothing.
+        Called by the framework to dynamically create ports.
 
-        NOTE: create_positional_port_callback should return the created port object instead of directly adding it to self
-
-        Returns the name of the port as well as the port object.
+        If the port can't be created, raise InvalidPortError
+        If the port is successfully created, it should be returned along with it's name, and *NOT* added to 'self' as an attribute
         """
-        return None
+        raise InvalidPortError
 
     def body(self) -> None:
         pass
@@ -430,10 +431,10 @@ class Module(object):
     def create_named_port(self, name: str, *, port_type: Optional[Callable] = None, net_type: Optional[NetType] = None) -> Port:
         if self._impl.is_interface_frozen():
             raise SyntaxErrorException(f"The interface if '{self}' is frozen. You can't add new ports anymore.")
-        port = self._impl._create_named_port(name, port_type=port_type, net_type=net_type)
-        if port is None:
+        try:
+            return self._impl._create_named_port(name, port_type=port_type, net_type=net_type)
+        except InvalidPortError:
             raise SyntaxErrorException(f"Can't create port '{name}' on module '{self}'.")
-        return port
 
     class SymbolTable(object):
         def __init__(self):
@@ -890,17 +891,15 @@ class Module(object):
             ##            return
             ##    return self._set_no_bind_attr(name, value)
 
-        def _create_named_port(self, name: str, *, port_type: Optional[Callable] = None, net_type: Optional[NetType] = None) -> Optional[Port]:
+        def _create_named_port(self, name: str, *, port_type: Optional[Callable] = None, net_type: Optional[NetType] = None) -> Port:
             if self.is_interface_frozen():
-                return None
+                raise InvalidPortError
             with self._in_create_port:
-                # To make life easier, collapse port-lists here
-                if port_type is not None:
+                port = self._true_module.create_named_port_callback(name, net_type)
+                if port is None and port_type is not None:
                     port = port_type()
-                else:
-                    port = self._true_module.create_named_port_callback(name, net_type)
                 if port is None:
-                    return None
+                    raise InvalidPortError
                 self._set_no_bind_attr(name, port)
                 return port
 
@@ -1383,7 +1382,7 @@ class DecoratorModule(GenericModule):
 
     def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         if not self._allow_port_creation:
-            return None
+            raise InvalidPortError()
         return Input(net_type)
 
     @no_trace

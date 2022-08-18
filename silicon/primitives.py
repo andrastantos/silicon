@@ -2,7 +2,7 @@ from .module import Module, InlineBlock, InlineExpression, InlineStatement, Inli
 from typing import Dict, Optional, Tuple, Any, Generator, Union
 from .port import Junction, Input, Output, Port, EdgeType, Wire
 from .auto_input import ClkPort, ClkEnPort, RstPort, RstValPort
-from .exceptions import FixmeException, SyntaxErrorException, SimulationException
+from .exceptions import FixmeException, SyntaxErrorException, SimulationException, InvalidPortError
 from collections import OrderedDict
 from .utils import get_common_net_type, BoolMarker
 from .number import NumberMeta
@@ -33,12 +33,12 @@ class Select(Module):
             try:
                 selector_idx = int(name[len(name_prefix):])
             except:
-                return None
+                raise InvalidPortError()
             self.value_ports[selector_idx] = ret_val
             return ret_val
         else:
-            return None
-    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Union[str, Port]]:
+            raise InvalidPortError()
+    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Tuple[str, Port]:
         assert idx > 0
         name = f"value_{idx-1}"
         return (name, self.create_named_port_callback(name, net_type))
@@ -222,12 +222,12 @@ class _SelectOneHot(Module):
                 try:
                     selector_idx = int(name[len(name_prefix):])
                 except:
-                    return None
+                    raise InvalidPortError()
                 collection = getattr(self, name_prefix+"ports")
                 collection[selector_idx] = ret_val
                 return ret_val
-        return None
-    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Union[str, Port]]:
+        raise InvalidPortError()
+    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Tuple[str, Port]:
         if idx % 2 == 0:
             name = f"selector_{idx//2}"
         else:
@@ -448,8 +448,8 @@ class Concatenator(Module):
         elif self.allow_keyed_input and name.startswith("keyed_input_port_"):
             return Input(net_type)
         else:
-            return None
-    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Union[str, Port]]:
+            raise InvalidPortError()
+    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Tuple[str, Port]:
         name = f"input_port_{idx}"
         return (name, self.create_named_port_callback(name, net_type))
 
