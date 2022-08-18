@@ -167,7 +167,7 @@ FQN_DELIMITER = "."
 
 MEMBER_DELIMITER="_"
 
-def assign_levels(objects: Iterable[Any], object: Any, object_to_level: Dict[Any, int], level_to_objects: Dict[int, List[Any]], get_dependencies: Callable) -> int:
+def rank_graph(objects: Iterable[Any], object: Any, object_to_level: Dict[Any, int], level_to_objects: Dict[int, List[Any]], get_dependencies: Callable) -> int:
     def assign_level(object, level):
         object_to_level[object] = level
         if level not in level_to_objects:
@@ -180,15 +180,15 @@ def assign_levels(objects: Iterable[Any], object: Any, object_to_level: Dict[Any
         if len(dependencies) == 0:
             return assign_level(object, 0)
         else:
-            level = max(assign_levels(objects, dependency, object_to_level, level_to_objects, get_dependencies) + 1 for dependency in dependencies)
+            level = max(rank_graph(objects, dependency, object_to_level, level_to_objects, get_dependencies) + 1 for dependency in dependencies)
             return assign_level(object, level)
     return object_to_level[object]
 
-def sort_by_level(objects: Iterable[Any], get_dependencies: Callable, reverse: bool = False) -> List[Any]:
+def sort_by_rank(objects: Iterable[Any], get_dependencies: Callable, reverse: bool = False) -> List[Any]:
     object_to_level: Dict[Any, int] = {}
     level_to_objects: Dict[int, List[Any]] = {}
     for object in objects:
-        assign_levels(objects, object, object_to_level, level_to_objects, get_dependencies)
+        rank_graph(objects, object, object_to_level, level_to_objects, get_dependencies)
     ret_val = []
     levels = list(level for level in level_to_objects.keys())
     levels.sort(reverse = reverse)
