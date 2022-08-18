@@ -2,7 +2,6 @@
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent / ".."))
-from unit_tests.test_utils import skip_iverilog
 
 
 from typing import *

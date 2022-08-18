@@ -1,8 +1,7 @@
 from abc import abstractmethod
-from typing import Dict, Optional, Any, Sequence, Union
+from typing import Optional, Any, Sequence, Union
 from .netlist import Netlist
 from .exceptions import AdaptTypeError, SyntaxErrorException
-from .utils import BoolMarker
 from enum import Enum as PyEnum
 
 class KeyKind(PyEnum):
@@ -66,7 +65,7 @@ class NetTypeFactory(object):
 class NetTypeMeta(type):
     assert_on_eq = False
 
-    eq_is_is = BoolMarker()
+    eq_is_is = False
     def __hash__(self):
         return id(self)
     def __eq__(self, other):

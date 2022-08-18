@@ -5,7 +5,7 @@ import typing
 from collections import OrderedDict
 from .port import Junction, Port, Output, Input, Wire, JunctionBase
 from .net_type import NetType, NetTypeMeta
-from .utils import BoolMarker, str_block, TSimEvent, ContextMarker, first, Context
+from .utils import str_block, TSimEvent, ContextMarker, first, Context
 from .stack import Stack
 from .tracer import Tracer, Trace, no_trace
 from .netlist import Netlist
@@ -158,24 +158,24 @@ class Module(object):
             raise SyntaxErrorException(f"Can't use call-style instantiation with port-bindings of top level module")
         if Context.current() != Context.elaboration:
             raise SyntaxErrorException(f"Can't bind module using call-syntax outside of elaboration context")
+        
         def do_call() -> Union[Port, Tuple[Port]]:
             my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
             if self._impl.is_interface_frozen():
                 raise SyntaxErrorException("Can't change port list after module interface is frozen")
             for idx, arg in enumerate(args):
-                if idx >= len(my_positional_inputs) and not self._impl._in_create_port:
-                    with self._impl._in_create_port:
-                        try:
-                            name, port = self.create_positional_port_callback(idx, net_type=None)
-                            assert port is not None
-                            self._impl._set_no_bind_attr(name, port)
-                        except InvalidPortError:
-                            raise SyntaxErrorException(f"Module {self} doesn't support dynamic creation of more positional ports")
+                if idx >= len(my_positional_inputs):
+                    try:
+                        name, port = self.create_positional_port_callback(idx, net_type=None)
+                        assert port is not None
+                        self._impl._set_no_bind_attr(name, port)
+                    except InvalidPortError:
+                        raise SyntaxErrorException(f"Module {self} doesn't support dynamic creation of more positional ports")
                     my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
                 if arg is not None:
                     my_positional_inputs[idx].set_source(arg, scope)
             for arg_name, arg_value in kwargs.items():
-                if not has_port(self, arg_name) and not self._impl._in_create_port:
+                if not has_port(self, arg_name):
                     self.create_named_port(arg_name)
                 if arg_value is not None:
                     getattr(self, arg_name).set_source(arg_value, scope)
@@ -207,8 +207,6 @@ class Module(object):
         #    my_module.dynamic_port <<= 42
         # where dynamic_port is something that normally would get created by create_named_port_callback.
         # TODO: what to do during simulation??
-        if self._impl._no_port_create_in_get_attr:
-            raise AttributeError
         if Context.current() != Context.elaboration:
             raise AttributeError
         try:
@@ -533,8 +531,6 @@ class Module(object):
             #print(f"================= module init called from: {self._filename}:{self._lineno} for module {type(self)}")
             self.setattr__impl = self._setattr__normal
             with ScopedAttr(self, "setattr__impl", self._setattr__construction):
-                self._in_create_port = BoolMarker()
-                self._no_port_create_in_get_attr = BoolMarker()
                 self._frozen_port_list = False
                 self._ports = OrderedDict()
                 self._inputs = OrderedDict()
@@ -583,7 +579,7 @@ class Module(object):
                         raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with parent module already assigned")
                     instance_port: Port = deepcopy(port_object)
                     # We need to use deepcopy to get all the important
-                    # members, such as source/sinks/BoolMarker objects
+                    # members, such as source/sinks/etc. objects
                     # de-duplicated. However we don't want to create
                     # a bunch of duplicate types, so override the reference
                     # to the newly created net_type
@@ -852,18 +848,13 @@ class Module(object):
             """
             Called whenever we're not in any particular special situation.
 
-            We allow port-creation if the interface wasn't frozen
+            We don't allow port creation
             """
-            with self._no_port_create_in_get_attr:
-                if True:
-                #if self.is_interface_frozen():
-                    if name not in self._true_module.__dict__:
-                        raise SyntaxErrorException(f"Silicon doesn't allow the creation of attributes on Modules at this point. Please set a default value to attribute '{name}' in 'construct'")
-                    if name in self.get_ports().keys():
-                        raise SyntaxErrorException(f"Silicon doesn't allow changing port {name} on module {self.get_diagnostic_name()} at this point. If you intend to bind to this port, use the '<<=' operator.")
-                    self.supersetattr(name, value)
-                #else:
-                #    return self._set_no_bind_attr(name, value, super_setter)
+            if name not in self._true_module.__dict__:
+                raise SyntaxErrorException(f"Silicon doesn't allow the creation of attributes on Modules at this point. Please set a default value to attribute '{name}' in 'construct'")
+            if name in self.get_ports().keys():
+                raise SyntaxErrorException(f"Silicon doesn't allow changing port {name} on module {self.get_diagnostic_name()} at this point. If you intend to bind to this port, use the '<<=' operator.")
+            self.supersetattr(name, value)
 
             # This gets called whether the attribute 'name' exists or not.
             # TODO: we shouldn't allow port creation at all after 'construct'. All members set as junctions afterwards
@@ -875,7 +866,7 @@ class Module(object):
             #       which BTW means that the tracer should also be reviewed.
             #       If both self.boo and boo exists, self.boo takes priority and boo becomes boo1 or something.
             #       Also, local boo should never be promoted to self.boo, even though it exists in Module.Impl.wires.
-            ##with self._no_port_create_in_get_attr:
+            ##with ScopedAttr(self, "_no_port_create_in_get_attr", True):
             ##    if name in self._true_module.__dict__ and self._true_module.__dict__[name] is value:
             ##        return
             ##    if name in self.get_ports().keys():
@@ -894,14 +885,13 @@ class Module(object):
         def _create_named_port(self, name: str, *, port_type: Optional[Callable] = None, net_type: Optional[NetType] = None) -> Port:
             if self.is_interface_frozen():
                 raise InvalidPortError
-            with self._in_create_port:
-                port = self._true_module.create_named_port_callback(name, net_type)
-                if port is None and port_type is not None:
-                    port = port_type()
-                if port is None:
-                    raise InvalidPortError
-                self._set_no_bind_attr(name, port)
-                return port
+            port = self._true_module.create_named_port_callback(name, net_type)
+            if port is None and port_type is not None:
+                port = port_type()
+            if port is None:
+                raise InvalidPortError
+            self._set_no_bind_attr(name, port)
+            return port
 
         def freeze_interface(self) -> None:
             self._frozen_port_list = True
@@ -1187,7 +1177,7 @@ class Module(object):
 
             if len(self._construct_kwargs) != len(other._impl._construct_kwargs):
                 return False
-            with NetTypeMeta.eq_is_is:
+            with ScopedAttr(NetTypeMeta, "eq_is_is", True):
                 all_construct_kwargs_are_ok = all(
                     my_arg_name in other._impl._construct_kwargs and my_arg == other._impl._construct_kwargs[my_arg_name] for my_arg_name, my_arg in self._construct_kwargs.items()
                 )
@@ -1366,7 +1356,7 @@ class GenericModule(Module):
 
 class DecoratorModule(GenericModule):
     def construct(self, function: Callable, out_port_cnt: int) -> None:
-        self._allow_port_creation = BoolMarker()
+        self._allow_port_creation = False
 
         def create_output_port(port_name):
             instance_port = Output()
@@ -1409,7 +1399,7 @@ class DecoratorModule(GenericModule):
             if scope is None:
                 raise SyntaxErrorException("Can't instantiate top level module with call-syntax and port-bindings") 
             if is_junction_base(arg):
-                with self._allow_port_creation:
+                with ScopedAttr(self, "_allow_port_creation", True):
                     my_arg = self.create_named_port(name)
                 my_arg.set_source(arg, scope)
             else:
@@ -1458,7 +1448,7 @@ class DecoratorModule(GenericModule):
         bound_args = sig.bind(*self._impl._args, **self._impl._kwargs).arguments
         for name, my_arg in bound_args.items():
             if my_arg in ports_needing_name:
-                with self._allow_port_creation:
+                with ScopedAttr(self, "_allow_port_creation", True):
                     port = self.create_named_port(name)
                 port.set_source(my_arg.arg, scope) # Now that we have our port, we can bind it to the actual port, that's passed int
                 self._impl._args[my_arg.idx] = port # replace the placeholder with the real port, now that we have it
@@ -1466,10 +1456,9 @@ class DecoratorModule(GenericModule):
         # Work through the remaining inputs and simply name them consecutively
         for idx, placeholder in enumerate(ports_needing_name):
             port_name = f"intput_{idx}"
-            with self._impl._no_port_create_in_get_attr:
-                if hasattr(self, port_name):
-                    raise SyntaxErrorException("Can't add port {port_name} to modularized function: the attribute already exists")
-            with self._allow_port_creation:
+            if name in self.__dict__:
+                raise SyntaxErrorException("Can't add port {port_name} to modularized function: the attribute already exists")
+            with ScopedAttr(self, "_allow_port_creation", True):
                 port = self.create_named_port(port_name)
             port.set_source(placeholder.arg, scope)
             self._impl._args[placeholder.idx] = port

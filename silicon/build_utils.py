@@ -1,14 +1,14 @@
 from .exceptions import IVerilogException
 from .back_end import SystemVerilog, File
 from .module import Module, elaborate
-from .utils import BoolMarker, is_module
+from .utils import is_module, ScopedAttr
 from typing import Callable, Union, IO
 import os
 
 class Build:
     _file_list = []
 
-    __skip_iverilog = BoolMarker()
+    _skip_iverilog = False
 
     class RegisteredFile(File):
         """
@@ -28,7 +28,7 @@ class Build:
         netlist = elaborate(top, add_unnamed_scopes=add_unnamed_scopes)
         system_verilog = SystemVerilog(stream_class = Build.RegisteredFile)
         netlist.generate(netlist, system_verilog)
-        if not Build.__skip_iverilog:
+        if not Build._skip_iverilog:
             from shutil import which
             iverilog_path = which("iverilog", mode=os.X_OK)
             if iverilog_path is not None:
@@ -56,7 +56,7 @@ class Build:
 # A simple decorator to skip iVerilog on tests that are known to fail on it due to iVerilog limitations
 def skip_iverilog(func):
     def wrapper(*args, **kwargs):
-        with Build.__skip_iverilog:
+        with ScopedAttr(Build, "_skip_iverilog", True):
             return func(*args, **kwargs)
 
     return wrapper

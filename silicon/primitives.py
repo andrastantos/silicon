@@ -4,7 +4,7 @@ from .port import Junction, Input, Output, Port, EdgeType, Wire
 from .auto_input import ClkPort, ClkEnPort, RstPort, RstValPort
 from .exceptions import FixmeException, SyntaxErrorException, SimulationException, InvalidPortError
 from collections import OrderedDict
-from .utils import get_common_net_type, BoolMarker
+from .utils import ScopedAttr, get_common_net_type
 from .number import NumberMeta
 from .utils import TSimEvent, is_module
 
@@ -433,12 +433,12 @@ class Concatenator(Module):
     def construct(self):
         self.raw_input_map = []
         self.input_map = None
-        self.allow_keyed_input = BoolMarker()
+        self.allow_keyed_input = False
     def add_input(self, key: 'Key', junction: Junction) -> None:
         name = f"keyed_input_port_{len(self.raw_input_map)}"
         if has_port(self, name):
             raise SyntaxErrorException(f"Can't add input as port. Name '{name}' already exists")
-        with self.allow_keyed_input:
+        with ScopedAttr(self, "allow_keyed_input", True):
             port = self.create_named_port(name)
             port <<= junction
         self.raw_input_map.append((key,  getattr(self, name)))

@@ -167,21 +167,6 @@ FQN_DELIMITER = "."
 
 MEMBER_DELIMITER="_"
 
-class BoolMarker(object):
-    def __init__(self):
-        self.value = False
-    def __enter__(self):
-        self.value = True
-        return self
-    def __exit__(self, type, value, traceback):
-        self.value = False
-    def __bool__(self) -> bool:
-        return self.value
-    def __str__(self) -> str:
-        return str(self.value)
-    def __repr__(self) -> str:
-        return repr(self.value)
-
 def assign_levels(objects: Iterable[Any], object: Any, object_to_level: Dict[Any, int], level_to_objects: Dict[int, List[Any]], get_dependencies: Callable) -> int:
     def assign_level(object, level):
         object_to_level[object] = level
@@ -356,7 +341,7 @@ def get_common_net_type(junctions: Sequence['Junction'], partial_results: bool =
     superclass = common_superclass(*net_types)
     from .net_type import NetType, NetTypeMeta
     from inspect import getmro
-    with NetTypeMeta.eq_is_is:
+    with ScopedAttr(NetTypeMeta, "eq_is_is", True):
         if superclass in (object, NetType) or NetType not in getmro(superclass):
             junction_list_as_str = " ".join(str(junction) for junction in junctions)
             raise SyntaxErrorException(f"Ports {junction_list_as_str} don't have a common superclass.")
