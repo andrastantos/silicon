@@ -47,17 +47,17 @@ class Gate(Module):
         assert not self.output_port.is_specialized() or new_net_type is None
         if new_net_type is not None:
             self.output_port.set_net_type(new_net_type)
-    def create_positional_port_callback(self, idx: int) -> Optional[Union[str, Port]]:
+    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Union[str, Port]]:
         name = f"input_port_{idx}"
-        return (name, self.create_named_port_callback(name))
-    def create_named_port_callback(self, name: str) -> Optional[Port]:
+        return (name, self.create_named_port_callback(name, net_type))
+    def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         from .number import Number
 
         if self.max_input_cnt is not None and len(self.get_inputs()) > self.max_input_cnt:
             return None
 
         if name.startswith("input_port_"):
-            return Input()
+            return Input(net_type)
         else:
             return None
 

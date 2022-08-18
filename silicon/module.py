@@ -5,7 +5,7 @@ import typing
 from collections import OrderedDict
 from .port import Junction, Port, Output, Input, Wire, JunctionBase
 from .net_type import NetType, NetTypeMeta
-from .utils import BoolMarker, str_block, CountMarker, TSimEvent, ContextMarker, first, Context
+from .utils import BoolMarker, str_block, TSimEvent, ContextMarker, first, Context
 from .stack import Stack
 from .tracer import Tracer, Trace, no_trace
 from .netlist import Netlist
@@ -89,7 +89,7 @@ class GlobalSymbolTable(object):
         pass
 
 class Module(object):
-    _in_new = BoolMarker()
+    _in_new = False
     _in_new_lock = RLock()
     # Since we don't want to muddy the RTL description with explicit parentage passing, we need to pass this information from parents' body() to childs __init__ over a global.
     # Not the most elegant, but I had no better idea. This however prevents true multi-threaded behavior
@@ -119,7 +119,7 @@ class Module(object):
                     return ret_val
                 else:
                     # Need to call __call__, but for that, we need an instance first.
-                    with cls._in_new:
+                    with ScopedAttr(cls, "_in_new", True):
                         instance = cls()
                     ret_val = instance(*args, **kwargs)
                     return ret_val
@@ -160,20 +160,21 @@ class Module(object):
             raise SyntaxErrorException(f"Can't bind module using call-syntax outside of elaboration context")
         def do_call() -> Union[Port, Tuple[Port]]:
             my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
+            if self._impl.is_interface_frozen():
+                raise SyntaxErrorException("Can't change port list after module interface is frozen")
             for idx, arg in enumerate(args):
                 if idx >= len(my_positional_inputs) and not self._impl._in_create_port:
-                    input_cnt = len(my_positional_inputs)
-                    self._impl._create_positional_port(idx, None)
-                    if len(self._impl.get_inputs()) == input_cnt:
-                        raise SyntaxErrorException(f"Module {self} doesn't support dynamic creation of more positional ports")
+                    with self._impl._in_create_port:
+                        name_and_port = self.create_positional_port_callback(idx, net_type=None)
+                        if name_and_port is None or name_and_port[1] is None:
+                            raise SyntaxErrorException(f"Module {self} doesn't support dynamic creation of more positional ports")
+                        self._impl._set_no_bind_attr(name_and_port[0], name_and_port[1])
                     my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
                 if arg is not None:
                     my_positional_inputs[idx].set_source(arg, scope)
             for arg_name, arg_value in kwargs.items():
                 if not has_port(self, arg_name) and not self._impl._in_create_port:
-                    port = self._impl._create_named_port(arg_name, None)
-                    if port is None:
-                        raise SyntaxErrorException(f"Can't add input {arg_name} to module {self} at this point. Maybe because its interface is already frozen.")
+                    self.create_named_port(arg_name)
                 if arg_value is not None:
                     getattr(self, arg_name).set_source(arg_value, scope)
             ret_val = tuple(self._impl.get_outputs().values())
@@ -213,7 +214,7 @@ class Module(object):
             raise AttributeError
         return port
 
-    def create_named_port_callback(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         """
         Called from the framework when unknown ports are accessed. This allows for dynamic port creation, though the default is to do nothing.
         Port creation should be as restrictive as possible and for any non-supported name, return None.
@@ -222,7 +223,7 @@ class Module(object):
         """
         return None
 
-    def create_positional_port_callback(self, idx: int) -> Optional[Union[str, Port]]:
+    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Union[str, Port]]:
         """
         Called from the framework when unknown ports are accessed. This allows for dynamic port creation, though the default is to do nothing.
         Port creation should be as restrictive as possible and for any non-supported index, do nothing.
@@ -426,10 +427,10 @@ class Module(object):
     def generate_module_header(self, back_end: 'BackEnd') -> str:
         return self._impl.generate_module_header(back_end)
 
-    def create_named_port(self, name: str, net_type: Optional[NetType] = None) -> Port:
+    def create_named_port(self, name: str, *, port_type: Optional[Callable] = None, net_type: Optional[NetType] = None) -> Port:
         if self._impl.is_interface_frozen():
             raise SyntaxErrorException(f"The interface if '{self}' is frozen. You can't add new ports anymore.")
-        port = self._impl._create_named_port(name, net_type)
+        port = self._impl._create_named_port(name, port_type=port_type, net_type=net_type)
         if port is None:
             raise SyntaxErrorException(f"Can't create port '{name}' on module '{self}'.")
         return port
@@ -657,7 +658,7 @@ class Module(object):
             except AttributeError:
                 # It is possible that we get called, after _unordered_sub_modules gets deleted.
                 # The case for that is the following:
-                # 1. There is a sub-module, whos output is bound to a typed junction within this module.
+                # 1. There is a sub-module, whose output is bound to a typed junction within this module.
                 # 2. That sub-module then gets called, and it establishes a new output type for its output port.
                 # 3. The outputs net type is changed, using set_net_type.
                 # 4. This type-change process creates an Adaptor between the output and its previous sink(s)
@@ -719,7 +720,7 @@ class Module(object):
             if self._filename is not None:
                 return f"{prefix}{self._filename}{lineno}"
 
-        def __set_no_bind_attr__(self, name, value) -> None:
+        def _set_no_bind_attr(self, name, value) -> None:
             # If we happen to override an existing Junction object, make sure it gets removed from port lists as well
             if name in self._true_module.__dict__ and self._true_module.__dict__[name] is value:
                 assert False
@@ -793,7 +794,7 @@ class Module(object):
                     raise SyntaxErrorException(f"Port '{name}' binding to '{value}' is not allowed in construction phase for module {self._true_module}")
             except AttributeError:
                 pass
-            return self.__set_no_bind_attr__(name, value)
+            return self._set_no_bind_attr(name, value)
 
         def _setattr__elaboration(self, name, value) -> None:
             """
@@ -832,18 +833,18 @@ class Module(object):
             #    try:
             #        junction = self._true_module.__dict__[name]
             #    except KeyError:
-            #        return self.__set_no_bind_attr__(name, value)
+            #        return self._set_no_bind_attr(name, value)
             #    try:
             #        if junction is not value:
             #            junction._set_sim_val(value)
             #    except AttributeError:
-            #        return self.__set_no_bind_attr__(name, value)
+            #        return self._set_no_bind_attr(name, value)
             #    '''
             #    if name in self._true_module.__dict__ and is_junction_base(self._true_module.__dict__[name]):
             #        if port is not value:
             #            port._set_sim_val(value)
             #    else:
-            #        return self.__set_no_bind_attr__(name, value)
+            #        return self._set_no_bind_attr(name, value)
             #    '''
 
         def _setattr__normal(self, name, value) -> None:
@@ -861,7 +862,7 @@ class Module(object):
                         raise SyntaxErrorException(f"Silicon doesn't allow changing port {name} on module {self.get_diagnostic_name()} at this point. If you intend to bind to this port, use the '<<=' operator.")
                     self.supersetattr(name, value)
                 #else:
-                #    return self.__set_no_bind_attr__(name, value, super_setter)
+                #    return self._set_no_bind_attr(name, value, super_setter)
 
             # This gets called whether the attribute 'name' exists or not.
             # TODO: we shouldn't allow port creation at all after 'construct'. All members set as junctions afterwards
@@ -884,35 +885,25 @@ class Module(object):
             ##            #   self.local_wire = Select(...)
             ##            # that is: we are trying to create a new wire for the output of the Select sub-module
             ##            wire = Wire()
-            ##            self.__set_no_bind_attr__(name, wire)
+            ##            self._set_no_bind_attr(name, wire)
             ##            wire <<= value
             ##            return
-            ##    return self.__set_no_bind_attr__(name, value)
+            ##    return self._set_no_bind_attr(name, value)
 
-        def _create_named_port(self, name: str, net_type: Optional[NetType] = None) -> Optional[Port]:
+        def _create_named_port(self, name: str, *, port_type: Optional[Callable] = None, net_type: Optional[NetType] = None) -> Optional[Port]:
             if self.is_interface_frozen():
                 return None
             with self._in_create_port:
                 # To make life easier, collapse port-lists here
-                port = self._true_module.create_named_port_callback(name)
+                if port_type is not None:
+                    port = port_type()
+                else:
+                    port = self._true_module.create_named_port_callback(name, net_type)
                 if port is None:
                     return None
-                self.__set_no_bind_attr__(name, port)
-                if net_type is not None:
-                    port.set_net_type(net_type)
+                self._set_no_bind_attr(name, port)
                 return port
 
-        def _create_positional_port(self, idx: int, net_type: Optional[NetType]) -> None:
-            if self.is_interface_frozen():
-                raise SyntaxErrorException("Can't change port list after module interface is frozen")
-            with self._in_create_port:
-                # To make life easier, collapse port-lists here
-                name_and_port = self._true_module.create_positional_port_callback(idx)
-                if name_and_port is None or name_and_port[1] is None:
-                    return
-                self.__set_no_bind_attr__(name_and_port[0], name_and_port[1])
-                #setattr(self._true_module, name_and_port[0], name_and_port[1])
-                name_and_port[1].set_net_type(net_type)
         def freeze_interface(self) -> None:
             self._frozen_port_list = True
         def is_interface_frozen(self) -> bool:
@@ -1372,9 +1363,7 @@ class Module(object):
 class GenericModule(Module):
     def __new__(cls, *args, **kwargs):
         # A generic class will always pass all its arguments to __init__.
-        with cls._in_new_lock:
-            with cls._in_new:
-                return super().__new__(cls)
+        return super().__new__(cls)
 
 class DecoratorModule(GenericModule):
     def construct(self, function: Callable, out_port_cnt: int) -> None:
@@ -1392,10 +1381,10 @@ class DecoratorModule(GenericModule):
                 port_name = f"output_port_{idx+1}"
             create_output_port(port_name)
 
-    def create_named_port_callback(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         if not self._allow_port_creation:
             return None
-        return Input()
+        return Input(net_type)
 
     @no_trace
     def body(self) -> None:

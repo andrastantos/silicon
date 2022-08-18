@@ -36,13 +36,6 @@ class FSMLogic(Module):
         self._allow_port_creation = BoolMarker()
         self._state_transition_table = OrderedDict()
 
-
-    def create_named_port_callback(self, name: str) -> Optional[Port]:
-        if not self._allow_port_creation:
-            return None
-        #print(f"name: {name}")
-        return Input()
-
     def create_transition(self, current_state: Any, new_state: Any) -> Tuple[Junction, str]:
         if is_junction_base(current_state):
             raise SyntaxErrorException(f"Current state must be a constant, not a net.")
@@ -56,7 +49,7 @@ class FSMLogic(Module):
         else:
             port_name = f"input_{_format_state_name(current_state)}_to_{_format_state_name(new_state)}"
         with self._allow_port_creation:
-            input = self.create_named_port(port_name)
+            input = self.create_named_port(port_name, port_type=Input)
         if input is None:
             raise SyntaxErrorException(f"Can't create port on '{self}'. Most likely reason is that the interface of it is already frozen.")
         if edge in self._state_transition_table:
@@ -128,11 +121,6 @@ class FSM(GenericModule):
         self._state_net_type = None
         self._allow_port_creation = BoolMarker()
 
-    def create_named_port_callback(self, name: str) -> Optional[Port]:
-        if not self._allow_port_creation:
-            return None
-        return Input()
-
     def add_transition(self, current_state: Any, condition: Junction, new_state: Any) -> None:
         # We have to be a little shifty here: can't connect condition directly to the logic instance
         # as that would skip hierarchy levels. We'll have to create an intermediary input port and
@@ -155,7 +143,7 @@ class FSM(GenericModule):
         logic_input, port_name = self.fsm_logic.create_transition(current_state, new_state)
 
         with self._allow_port_creation:
-            input = self.create_named_port(port_name)
+            input = self.create_named_port(port_name, port_type=Input)
         if input is None:
             raise SyntaxErrorException(f"Can't create port on '{self}'. Most likely reason is that the interface of it is already frozen.")
         input <<= condition

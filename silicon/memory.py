@@ -158,7 +158,7 @@ class _Memory(GenericModule):
                 )
             )
 
-    def create_named_port_callback(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         """
         Called from the framework when unknown ports are accessed. This allows for dynamic port creation, though the default is to do nothing.
         Port creation should be as restrictive as possible and for any non-supported name, return None.
@@ -166,6 +166,8 @@ class _Memory(GenericModule):
         NOTE: create_named_port_callback should return the created port object instead of directly adding it to self
         """
         if name in self.optional_ports:
+            if net_type is not None and net_type is not self.optional_ports[name][0]:
+                raise SyntaxErrorException("Net type '{net_type}' is not valid for optional port '{name}'")
             if self.optional_ports[name][1] == Memory.INPUT:
                 return Input(self.optional_ports[name][0])
             elif self.optional_ports[name][1] == Memory.OUTPUT:
@@ -605,7 +607,7 @@ class Memory(GenericModule):
                 )
             )
 
-    def create_named_port_callback(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         """
         Called from the framework when unknown ports are accessed. This allows for dynamic port creation, though the default is to do nothing.
         Port creation should be as restrictive as possible and for any non-supported name, return None.
@@ -613,6 +615,8 @@ class Memory(GenericModule):
         NOTE: create_named_port_callback should return the created port object instead of directly adding it to self
         """
         if name in self.optional_ports:
+            if net_type is not None and net_type is not self.optional_ports[name][0]:
+                raise SyntaxErrorException("Net type '{net_type}' is not valid for optional port '{name}'")
             if self.optional_ports[name][1] == Memory.INPUT:
                 return Input(self.optional_ports[name][0])
             elif self.optional_ports[name][1] == Memory.OUTPUT:

@@ -25,10 +25,10 @@ class Select(Module):
         return super().__call__(*args, **kwargs)
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         assert False
-    def create_named_port_callback(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         name_prefix = "value_"
         if name.startswith(name_prefix):
-            ret_val = Input()
+            ret_val = Input(net_type)
             # Extract the selector index and put the input into its appropriate collection.
             try:
                 selector_idx = int(name[len(name_prefix):])
@@ -38,10 +38,10 @@ class Select(Module):
             return ret_val
         else:
             return None
-    def create_positional_port_callback(self, idx: int) -> Optional[Union[str, Port]]:
+    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Union[str, Port]]:
         assert idx > 0
         name = f"value_{idx-1}"
-        return (name, self.create_named_port_callback(name))
+        return (name, self.create_named_port_callback(name, net_type))
 
     def generate_output_type(self) -> Optional['NumberMeta']:
         value_ports = list(self.value_ports.values())
@@ -214,10 +214,10 @@ class _SelectOneHot(Module):
         return self.default_port.has_driver()
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         assert False
-    def create_named_port_callback(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         for name_prefix in ("value_", "selector_"):
             if name.startswith(name_prefix):
-                ret_val = Input()
+                ret_val = Input(net_type)
                 # Extract the selector index and put the input into its appropriate collection.
                 try:
                     selector_idx = int(name[len(name_prefix):])
@@ -227,12 +227,12 @@ class _SelectOneHot(Module):
                 collection[selector_idx] = ret_val
                 return ret_val
         return None
-    def create_positional_port_callback(self, idx: int) -> Optional[Union[str, Port]]:
+    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Union[str, Port]]:
         if idx % 2 == 0:
             name = f"selector_{idx//2}"
         else:
             name = f"value_{idx//2}"
-        return (name, self.create_named_port_callback(name))
+        return (name, self.create_named_port_callback(name, net_type))
 
 
 
@@ -436,24 +436,22 @@ class Concatenator(Module):
         self.allow_keyed_input = BoolMarker()
     def add_input(self, key: 'Key', junction: Junction) -> None:
         name = f"keyed_input_port_{len(self.raw_input_map)}"
-        if has_prot(self, name):
+        if has_port(self, name):
             raise SyntaxErrorException(f"Can't add input as port. Name '{name}' already exists")
         with self.allow_keyed_input:
-            port = self._impl._create_named_port(name)
-            if port is None:
-                raise SyntaxErrorException("Can't add inputs to Concatenator at this point. Probably because its interface is already frozen.")
+            port = self.create_named_port(name)
             port <<= junction
         self.raw_input_map.append((key,  getattr(self, name)))
-    def create_named_port_callback(self, name: str) -> Optional[Port]:
+    def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         if name.startswith("input_port_"):
-            return Input()
+            return Input(net_type)
         elif self.allow_keyed_input and name.startswith("keyed_input_port_"):
-            return Input()
+            return Input(net_type)
         else:
             return None
-    def create_positional_port_callback(self, idx: int) -> Optional[Union[str, Port]]:
+    def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Optional[Union[str, Port]]:
         name = f"input_port_{idx}"
-        return (name, self.create_named_port_callback(name))
+        return (name, self.create_named_port_callback(name, net_type))
 
     def finalize_input_map(self, common_net_type: object):
         if self.input_map is not None:

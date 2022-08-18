@@ -182,21 +182,6 @@ class BoolMarker(object):
     def __repr__(self) -> str:
         return repr(self.value)
 
-class CountMarker(object):
-    def __init__(self, initial_value: int = 0):
-        self.value = initial_value
-    def __enter__(self):
-        self.value += 1
-        return self
-    def __exit__(self, type, value, traceback):
-        self.value -= 1
-    def __coerce__(self, other) -> Optional[Tuple[int]]:
-        if not type(other) is int:
-            return None
-        return (self.value, other)
-    def __int__(self) -> int:
-        return self.value
-
 def assign_levels(objects: Iterable[Any], object: Any, object_to_level: Dict[Any, int], level_to_objects: Dict[int, List[Any]], get_dependencies: Callable) -> int:
     def assign_level(object, level):
         object_to_level[object] = level
@@ -504,7 +489,7 @@ class ScopedAttr(object):
         return self
     def __exit__(self, exception_type, exception_value, traceback):
         if hasattr(self, "old_value"):
-            setattr(self.obj, self.attr, self.value)
+            setattr(self.obj, self.attr, self.old_value)
         else:
             delattr(self.obj, self.attr)
         del self.old_value
