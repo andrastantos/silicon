@@ -167,35 +167,6 @@ FQN_DELIMITER = "."
 
 MEMBER_DELIMITER="_"
 
-def rank_graph(objects: Iterable[Any], object: Any, object_to_level: Dict[Any, int], level_to_objects: Dict[int, List[Any]], get_dependencies: Callable) -> int:
-    def assign_level(object, level):
-        object_to_level[object] = level
-        if level not in level_to_objects:
-            level_to_objects[level] = []
-        level_to_objects[level].append(object)
-        return level
-
-    if object not in object_to_level:
-        dependencies = get_dependencies(object)
-        if len(dependencies) == 0:
-            return assign_level(object, 0)
-        else:
-            level = max(rank_graph(objects, dependency, object_to_level, level_to_objects, get_dependencies) + 1 for dependency in dependencies)
-            return assign_level(object, level)
-    return object_to_level[object]
-
-def sort_by_rank(objects: Iterable[Any], get_dependencies: Callable, reverse: bool = False) -> List[Any]:
-    object_to_level: Dict[Any, int] = {}
-    level_to_objects: Dict[int, List[Any]] = {}
-    for object in objects:
-        rank_graph(objects, object, object_to_level, level_to_objects, get_dependencies)
-    ret_val = []
-    levels = list(level for level in level_to_objects.keys())
-    levels.sort(reverse = reverse)
-    for level in levels:
-        ret_val += level_to_objects[level]
-    return ret_val
-
 def first(collection: Iterable[Any]) -> Any:
     return next(iter(collection))
 
@@ -308,10 +279,6 @@ def adapt(input: Any, output_type: 'NetType', implicit: bool, force: bool) -> 'J
             raise SyntaxErrorException(f"Can't generate adaptor from {input.get_net_type().__name__} to {output_type.__name__} for port {input}")
         except AttributeError:
             raise SyntaxErrorException(f"Can't generate adaptor from {input} to {output_type}")
-
-def product(__iterable: Iterable[int]):
-    from functools import reduce
-    return reduce((lambda x, y: x * y), __iterable)
 
 def common_superclass(*args, **kwargs) -> object:
     """
