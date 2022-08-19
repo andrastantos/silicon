@@ -373,7 +373,7 @@ class Netlist(object):
                     return ' a.k.a. '.join(xnet.names)
                 def xnet_trace_names():
                     return "\n    ".join(get_xnet_names(xnet) for xnet in xnet_trace)
-                raise SyntaxErrorException(f"Combinatorial loop found:\n    {xnet_trace_names()}")
+                raise SyntaxErrorException(f"Combinational loop found:\n    {xnet_trace_names()}")
             visited_modules.add(module)
             if not module.is_combinational():
                 rank = 0

@@ -1,4 +1,4 @@
-from typing import Optional, List, Set, Dict, Tuple, Callable, Generator, IO, Union, Iterable, Any
+from typing import Optional, List, Set, Dict, Tuple, Callable, Generator, IO, Union, Iterable, Any, Generator
 from .module import Module
 from vcd import VCDWriter
 from .netlist import Netlist, XNet
@@ -127,7 +127,7 @@ class Simulator(object):
             for _ in range(self.max_rank):
                 self.generators.append(set())
 
-        def add_generator(self, generator: Any) -> None:
+        def add_generator(self, generator: Generator) -> None:
             module = generator.gi_frame.f_locals['self'] # Limitation: We must have a 'self' in the generator params. Else: KeyError is raised
             module_rank = self.rank_map[module]
             # Disabling assert for perf reasons...
@@ -242,9 +242,9 @@ class Simulator(object):
         def now(self) -> int:
             return self.simulator.now
 
-        def schedule_generator(self, generator: Any, when: Optional[int] = None) -> None:
+        def schedule_generator(self, generator: Generator, when: Optional[int] = None) -> None:
             """
-            Called by Event.trigger to re-schedule generator calls
+            Called by Event.trigger (through Simulator._process_yield) to re-schedule generator calls
             """
             if when is None or when == self.simulator.now:
                 self.simulator.current_event.add_generator(generator)

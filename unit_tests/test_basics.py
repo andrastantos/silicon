@@ -226,6 +226,43 @@ def test_double_port_assign():
 
     t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_comb_loop_slice():
+    class top(si.Module):
+        in_a = si.Input(si.Unsigned(2))
+        out_a = si.Output(si.Unsigned(2))
+
+        def body(self):
+            self.out_a[0] <<= 1
+            self.out_a[1] <<= self.out_a[0] & self.in_a[1] # This is marked as a combinational loop even though it's technically not.
+
+    with t.ExpectError(si.SyntaxErrorException):
+        t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+def test_invalid_slice():
+    class top(si.Module):
+        in_a = si.Input(si.Unsigned(2))
+        out_a = si.Output(si.Unsigned(2))
+
+        def body(self):
+            self.in_a[0] <<= 1 # This is an invalid binding of an input port (slice)
+
+    with t.ExpectError(si.SyntaxErrorException):
+        t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+def test_output_slice():
+    class top(si.Module):
+        in_a = si.Input(si.Unsigned(2))
+        out_a = si.Output(si.Unsigned(2))
+        clk = si.Input(si.logic)
+
+        def body(self):
+            self.out_a[0] <<= si.Reg(self.out_a[1] & self.in_a[0]) # This is an invalid binding of an input port (slice)
+            self.out_a[1] <<= self.in_a[1]
+
+    #with t.ExpectError(si.SyntaxErrorException):
+    if True:
+        t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 
 """
 # 4. Testing pass-through of inlined modules in loops
@@ -370,4 +407,7 @@ if __name__ == "__main__":
     #test_loop_finder("rtl")
     #test_rhs_slice("rtl")
     #test_lhs_slice("rtl")
-    test_scoped_bind()
+    #test_scoped_bind()
+    #test_comb_loop_slice()
+    #test_invalid_slice()
+    test_output_slice()

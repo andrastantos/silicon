@@ -1,0 +1,17 @@
+////////////////////////////////////////////////////////////////////////////////
+// top
+////////////////////////////////////////////////////////////////////////////////
+module top (
+	input logic [1:0] in_a,
+	output logic [1:0] out_a,
+	input logic clk
+);
+
+	logic u3_output_port;
+
+	always_ff @(posedge clk) u3_output_port <= (out_a[1] & in_a[0]);
+	assign out_a = {in_a[1], u3_output_port};
+
+endmodule
+
+
