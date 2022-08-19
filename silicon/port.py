@@ -398,6 +398,7 @@ class Junction(JunctionBase):
         self._member_junctions = OrderedDict() # Contains members for struct/interfaces/vectors
         self._parent_junction = None # Reverences back to the container for struct/interface/vector members
         self._net_type = None
+        self._xnet = None # This is set by Netlist to cache the result of Netlist.get_xnet_for_junction(self)
         if net_type is not None:
             if not is_net_type(net_type):
                 raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType.")

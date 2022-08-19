@@ -4,8 +4,8 @@ from vcd import VCDWriter
 from .netlist import Netlist, XNet
 from .ordered_set import OrderedSet
 from collections import OrderedDict
-from .utils import Context
-from .exceptions import SimulationException
+from .utils import Context, is_junction_base
+from .exceptions import SimulationException, SyntaxErrorException
 from pathlib import Path
 
 """
@@ -13,7 +13,7 @@ A discrete time simulator for Silicon
 """
 
 """
-We are going to keep around one cached event object for every source port in the netlist.
+We are going to keep around one cached event object for every XNet in the netlist.
 
 This is sort of equivalent to 'nets' or 'wires', though there are significant differences:
     1. These events cross hierarchy boundaries and contain the true source, that is the source that can impart a value change to the wire
@@ -34,12 +34,10 @@ def debug_print(*args, **kwargs):
 
 class SimXNetState(object):
     """
-    Junction state object to be attached to each port in the system during simulation.
+    A state object to be attached to each XNet in the system during simulation.
     """
     def __init__(self, sim_context: 'Simulator.SimulatorContext', parent_xnet: XNet):
-        #self.listeners: Set[Generator] = OrderedSet() # All the modules that registered to get call-backs on value-change of this port
         self.listeners: Set[Generator] = set() # All the modules that registered to get call-backs on value-change of this port
-        #self.value: Any = None # Current (potentially cached) value
         net_type = parent_xnet.get_net_type()
         self.value: Any = net_type.get_unconnected_sim_value() if net_type is not None else None
         self.previous_value: Any = None # Previous value
@@ -53,11 +51,13 @@ class SimXNetState(object):
     def add_listener(self, listener: Generator) -> None:
         #print(f"--- at {self.sim_context.now} xnet {first(self.parent_xnet.names)}: adding listener {listener}")
         self.listeners.add(listener)
+
     def is_edge(self) -> bool:
         """
         Returns True if there is a change on the port at the current moment in the simulation.
         """
         return self._last_changed == self.sim_context.now
+
     def set_value(self, new_value: Any, now: int) -> None:
         #print(f"--- at {self.sim_context.now} {self.parent_xnet.get_diagnostic_name()} setting value to {new_value}")
         #assert self._last_changed != self.sim_context.now, "Combinational loop detected???"
@@ -88,50 +88,43 @@ class SimXNetState(object):
 
 class Simulator(object):
     @staticmethod
-    def _process_yield(generator: Generator, yielded_value: Any, sim_context: 'SimContext', now: int) -> None:
+    def _process_yield(generator: Generator, yielded_value: Any, sim_context: 'SimulatorContext', now: int) -> None:
         if isinstance(yielded_value, int):
             next_trigger_time = now + yielded_value
             sim_context.schedule_generator(generator, next_trigger_time)
         else:
             # for speed-up purposes, relax the checks and unroll some code:
-            # 1. Instead of checking for exact types, check simply for 'sim_value' being an attribute
+            # 1. Instead of checking for exact types, check simply for '_xnet' being an attribute
             # 2. Don't double-check these, once for creating the tuple from a single value, then when iterating the same tuple
-            # Original code is left here for reference...
-            '''
-            if is_junction_or_slice_slice(yielded_value):
-                yielded_value = (yielded_value, )
-            assert is_iterable(yielded_value), "The simulate method can only yield an integer, a Port or a sequence of Port objects"
-            for port in yielded_value:
-                if is_junction_member(port):
-                    raise SimulationException(f"Simulator currently doesn't support slices in sensitivity lists. Please use the whole value instead of a slice", port)
-                if not is_junction_base(port):
-                    raise SimulationException(f"The simulate method can only yield an integer, a Port or a sequence of Port objects", port)
-                port._xnet.sim_state.add_listener(generator)
-            '''
-            if hasattr(yielded_value, "_xnet"):
-                yielded_value._xnet.sim_state.add_listener(generator)
+            if is_junction_base(yielded_value):
+                xnet = sim_context.netlist.get_xnet_for_junction(yielded_value)
+                xnet.sim_state.add_listener(generator)
             else:
                 try:
                     for port in yielded_value:
                         for member_port in port.get_all_member_junctions(add_self=True):
-                            if not hasattr(member_port, "_xnet"):
-                                raise SimulationException(f"The simulate method can only yield an integer, a Port (not a slice of a port) or a sequence of Port objects", member_port)
-                            member_port._xnet.sim_state.add_listener(generator)
+                            xnet = sim_context.netlist.get_xnet_for_junction(member_port)
+                            xnet.sim_state.add_listener(generator)
                 except TypeError:
                     raise SimulationException(f"The simulate method can only yield an integer, a Port or a sequence of Port objects. The type of the yielded value is {type(port)}", port)
 
     class Event(object):
+        """
+        An object that captures all the XNet value changes and callbacks that need to happen at a certain point in time.
+
+        In the Netlist, we have each module assigned a rank. Every non-combinational module is forced to rank 0.
+        This means that events flow from rank 0 down to all other ranks. During this flow, we might schedule
+        new events for rank-0 elements, but never for others. By processing events in rank-order we can greatly minimize
+        the amount of churn in XNet value updates and make the simulation that much faster.
+        """
         def __init__(self, when: int, sim_context: 'SimulatorContext'):
             self.max_rank = len(sim_context.simulator.netlist.rank_list)
             self.value_changes: Dict[XNet, Any] = OrderedDict()
             self.when = when
             self.rank_map = sim_context.simulator.netlist.rank_map
-            self._create_generators()
 
-        def _create_generators(self):
             self.generators = []
             for _ in range(self.max_rank):
-                #self.generators.append(OrderedSet())
                 self.generators.append(set())
 
         def add_generator(self, generator: Any) -> None:
@@ -169,7 +162,6 @@ class Simulator(object):
                     # That would result in them being re-insterted into the same generators[current_rank] set.
                     # As such, we can't clear the set after-the-fact. We have to replace it with an empty set
                     # before entering the for loop below
-                    #self.generators[current_rank] = OrderedSet()
                     self.generators[current_rank] = set()
                     for generator in generators_in_rank:
                         #debug_print(f"--- CG: {generator.gi_frame.f_locals['self']}")
@@ -192,6 +184,7 @@ class Simulator(object):
 
             self.simulator = simulator
             self.vcd_writer = VCDWriter(vcd_stream, timescale=timescale, scope_sep=FQN_DELIMITER)
+            self.netlist = simulator.netlist # Cache the netlist object
             self._last_now = None
             self._delta = 0
 
@@ -204,18 +197,7 @@ class Simulator(object):
             for xnet in self.simulator.netlist.xnets:
                 xnet.sim_state = SimXNetState(self, xnet)
 
-            def setup_junction_for_sim(junction: 'Junction'):
-                if junction.is_composite():
-                    for member_junction, _ in junction.get_member_junctions().values():
-                        setup_junction_for_sim(member_junction)
-                else:
-                    junction._netlist = self.simulator.netlist
-                    junction._xnet = junction._netlist.junction_to_xnet_map[junction]
-
-            for module in self.simulator.netlist.modules:
-                for junction in module.get_junctions().values():
-                    setup_junction_for_sim(junction)
-                    # Schedule an event to call all 'simulate' methods. This will start the simulation.
+            # Schedule an event to call all 'simulate' methods. This will start the simulation.
             for module in self.simulator.netlist.modules:
                 # We extract all generators from the 'simulate' methods and run them to the first yield.
                 # This means that:

@@ -268,9 +268,11 @@ class Netlist(object):
                                 else:
                                     x_net.transitions.add(sink)
                             self.junction_to_xnet_map[sink] = x_net
+                            sink._xnet = x_net
                             trace_x_net(sink)
 
                     self.junction_to_xnet_map[for_junction] = x_net
+                    for_junction._xnet = x_net
                     trace_x_net(for_junction)
 
                     if x_net.num_junctions(include_source=True) == 0:
