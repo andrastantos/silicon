@@ -1,8 +1,8 @@
 from .exceptions import IVerilogException
 from .back_end import SystemVerilog, File
-from .module import Module
-from .utils import is_module, ScopedAttr
-from typing import Callable, Union, IO
+from .netlist import Netlist
+from .utils import ScopedAttr
+from typing import Callable, IO
 import os
 
 class Build:
@@ -19,13 +19,11 @@ class Build:
             return super().__enter__()
 
     @staticmethod
-    def generate_rtl(top_class: Union[Callable, Module], *, add_unnamed_scopes: bool = False):
+    def generate_rtl(top_class: Callable, *, add_unnamed_scopes: bool = False):
         Build.clear()
-        if is_module(top_class):
-            top = top_class
-        else:
+        netlist = Netlist()
+        with netlist.elaborate(add_unnamed_scopes=add_unnamed_scopes):
             top = top_class()
-        netlist = elaborate(top, add_unnamed_scopes=add_unnamed_scopes)
         system_verilog = SystemVerilog(stream_class = Build.RegisteredFile)
         netlist.generate(netlist, system_verilog)
         if not Build._skip_iverilog:
@@ -44,8 +42,9 @@ class Build:
         if vcd_filename is None:
             vcd_filename = top_class.__name__.lower()
         Build.clear()
-        top = top_class()
-        netlist = elaborate(top, add_unnamed_scopes=add_unnamed_scopes)
+        netlist = Netlist()
+        with netlist.elaborate(add_unnamed_scopes=add_unnamed_scopes):
+            top = top_class()
         netlist.simulate(vcd_filename)
 
     @staticmethod

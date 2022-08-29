@@ -565,13 +565,24 @@ class Netlist(object):
     def get_top_level_name(self) -> str:
         return self.get_module_class_name(self.top_level)
 
-    def elaborate(self, top_level: Callable, *, add_unnamed_scopes: bool = False) -> None:
-        if self.top_level is not None:
-            raise SyntaxErrorException("Netlists top level is already set. There can only be a single top level Module. Did you call 'elaborate' already?")
-        with self:
-            with ContextMarker(Context.elaboration):
-                top = top_level()
-                return self.top_level._impl.elaborate(add_unnamed_scopes=add_unnamed_scopes)
+    class Elaborator(object):
+        def __init__(self, netlist: 'Netlist', *, add_unnamed_scopes: bool = False):
+            self.netlist = netlist
+            self.add_unnamed_scopes = add_unnamed_scopes
+        def __enter__(self):
+            self.netlist.__enter__()
+            self.marker = ContextMarker(Context.elaboration)
+            self.marker.__enter__()
+            return self.netlist
+        def __exit__(self, exception_type, exception_value, traceback):
+            try:
+                self.netlist.top_level._impl.elaborate(add_unnamed_scopes=self.add_unnamed_scopes)
+            finally:
+                self.marker.__exit__(exception_type, exception_value, traceback)
+                self.netlist.__exit__(exception_type, exception_value, traceback)
+    
+    def elaborate(self, *, add_unnamed_scopes: bool = False) -> 'Netlist.Elaborator':
+        return Netlist.Elaborator(self, add_unnamed_scopes=add_unnamed_scopes)
 
     def generate(self, back_end: 'BackEnd') -> None:
         from .utils import str_block

@@ -69,8 +69,9 @@ class test(Build):
         test.clear()
         test.reference_dir = Path("reference") / test_name
         test.output_dir = Path("output") / test_name
-        with Netlist() as netlist:
-            netlist.elaborate(top_class, add_unnamed_scopes=add_unnamed_scopes)
+        netlist = Netlist()
+        with netlist.elaborate(add_unnamed_scopes=add_unnamed_scopes):
+            top_class()
         logged_system_verilog = SystemVerilog(stream_class = test.DiffedFile)
         netlist.generate(logged_system_verilog)
         test_diff = ""
@@ -103,8 +104,9 @@ class test(Build):
         test.clear()
         test.reference_dir = Path("reference") / Path(test_name)
         test.output_dir = Path("output") / Path(test_name)
-        with Netlist() as netlist:
-            netlist.elaborate(top_class, add_unnamed_scopes=add_unnamed_scopes)
+        netlist = Netlist()
+        with netlist.elaborate(add_unnamed_scopes=add_unnamed_scopes):
+            top_class()
         test.output_dir.mkdir(parents=True, exist_ok=True)
         vcd_filename = test.output_dir / Path(f"{test_name}.vcd")
         netlist.simulate(vcd_filename)
