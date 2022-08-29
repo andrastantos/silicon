@@ -923,8 +923,7 @@ class Module(object):
 
             assert len(self._local_wires) == 0
 
-            with ContextMarker(Context.elaboration):
-                self._body(trace) # Will create all the sub-modules
+            self._body(trace) # Will create all the sub-modules
 
             for sub_module in self._sub_modules:
                 # handle any pending auto-binds
@@ -932,10 +931,13 @@ class Module(object):
                     if port._auto:
                         port.auto_bind(self._true_module) # If already bound, this is a no-op, so it's safe to call it multiple times
 
-            for wire in tuple(self._local_wires):
+            remaining_local_wires = []
+            for wire in self._local_wires:
                 if len(wire.sinks) == 0 and wire.source is None:
                     print(f"WARNING: deleting unused local wire: {wire}")
-                    self._local_wires.remove(wire)
+                else:
+                    remaining_local_wires.append(wire)
+            self._local_wires = remaining_local_wires
 
             # Go through each sub-module in a loop, and finalize their interface until everything is frozen
 
@@ -958,8 +960,7 @@ class Module(object):
                             # Inserting an adaptor
                             scope = junction._source.scope
                             with self.netlist.set_current_scope(scope):
-                                with ContextMarker(Context.elaboration):
-                                    source = implicit_adapt(old_source, junction.get_net_type())
+                                source = implicit_adapt(old_source, junction.get_net_type())
                                 # If an adaptor was created, we'll have to make sure it's properly registered.
                                 if source is not old_source:
                                     if Context.current() != Context.elaboration:

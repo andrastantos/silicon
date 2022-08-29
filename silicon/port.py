@@ -1,10 +1,10 @@
 from abc import abstractmethod
-from typing import Tuple, Dict, Optional, Set, Any, Type, Sequence, Union, Callable
+from typing import Tuple, Dict, Optional, Set, Any, Type, Sequence
 import inspect
 from .net_type import NetType, KeyKind, NetTypeMeta
 from .ordered_set import OrderedSet
 from .exceptions import SyntaxErrorException, SimulationException
-from .utils import convert_to_junction, is_iterable, is_junction_base, is_input_port, is_output_port, get_caller_local_junctions, is_module, implicit_adapt, MEMBER_DELIMITER, Context, ContextMarker, is_net_type
+from .utils import convert_to_junction, is_iterable, is_junction_base, is_input_port, is_output_port, get_caller_local_junctions, is_module, MEMBER_DELIMITER, Context, is_net_type
 from .port import KeyKind
 from collections import OrderedDict
 from enum import Enum

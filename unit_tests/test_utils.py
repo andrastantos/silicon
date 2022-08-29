@@ -73,7 +73,7 @@ class test(Build):
         with Netlist() as netlist:
             with ContextMarker(Context.elaboration):
                 top = top_class()
-            netlist.elaborate(add_unnamed_scopes=add_unnamed_scopes)
+                netlist.elaborate(add_unnamed_scopes=add_unnamed_scopes)
         logged_system_verilog = SystemVerilog(stream_class = test.DiffedFile)
         netlist.generate(logged_system_verilog)
         test_diff = ""
@@ -109,7 +109,7 @@ class test(Build):
         with Netlist() as netlist:
             with ContextMarker(Context.elaboration):
                 top = top_class()
-            netlist.elaborate(add_unnamed_scopes=add_unnamed_scopes)
+                netlist.elaborate(add_unnamed_scopes=add_unnamed_scopes)
         test.output_dir.mkdir(parents=True, exist_ok=True)
         vcd_filename = test.output_dir / Path(f"{test_name}.vcd")
         netlist.simulate(vcd_filename)
