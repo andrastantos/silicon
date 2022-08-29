@@ -14,7 +14,7 @@ from .exceptions import SimulationException, SyntaxErrorException, InvalidPortEr
 from threading import RLock
 from itertools import chain, zip_longest
 from .utils import is_port, is_input_port, is_output_port, is_wire, is_module, fill_arg_names, is_junction_base, is_iterable, MEMBER_DELIMITER, first, implicit_adapt, convert_to_junction
-from .utils import vprint, verbose_enough, VerbosityLevels, ScopedAttr, register_local_wire
+from .utils import ScopedAttr, register_local_wire
 from .state_stack import StateStackElement
 import inspect
 
@@ -1020,32 +1020,6 @@ class Module(object):
 
         def is_top_level(self) -> bool:
             return self.netlist.top_level is self._true_module
-
-        def elaborate(self, *, add_unnamed_scopes: bool = False) -> None:
-            assert self not in self.netlist.modules, f"Module {self._true_module} has already been elaborated."
-            assert self.parent is None, "Only top level modules can be elaborated"
-
-            self.freeze_interface()
-
-            # Give top level a name and mark it as user-assigned.
-            if self.name is None:
-                self.name = type(self._true_module).__name__
-                self.has_explicit_name = True
-
-            all_inputs_specialized = all(tuple(input.is_specialized() for input in self.get_inputs().values()))
-            with Module.Context(self):
-                if not all_inputs_specialized:
-                    raise SyntaxErrorException(f"Top level module must have all its inputs specialized before it can be elaborated")
-                self._elaborate(hier_level=0, trace=True)
-            self.netlist._post_elaborate(add_unnamed_scopes)
-
-            def print_submodules(module: 'Module', level: int = 0) -> None:
-                if verbose_enough(VerbosityLevels.instantiation):
-                    vprint(VerbosityLevels.instantiation, f"  {'  '*level}{module._impl.get_diagnostic_name()}")
-                    for sub_module in module._impl._sub_modules:
-                        print_submodules(sub_module, level+1)
-            vprint(VerbosityLevels.instantiation, "Module hierarchy:")
-            print_submodules(self._true_module)
 
         def _body(self, trace: bool = True) -> None:
             """

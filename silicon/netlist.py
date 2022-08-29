@@ -3,6 +3,7 @@ import typing
 from .ordered_set import OrderedSet
 from collections import OrderedDict
 from .utils import is_input_port, is_output_port, is_wire, is_module, is_port, MEMBER_DELIMITER, ContextMarker, Context
+from .utils import vprint, verbose_enough, VerbosityLevels
 from itertools import chain
 from .exceptions import SyntaxErrorException
 from .stack import Stack
@@ -464,22 +465,69 @@ class Netlist(object):
             return set()
         return self.module_to_xnet_map[module]
 
-    def _post_elaborate(self, add_unnamed_scopes: bool) -> None:
-        """
-        Called from the elaborate of the top level module.
+    def get_module_class_name(self, module_instance: 'Module') -> Optional[str]:
+        assert is_module(module_instance)
+        if module_instance not in self.module_to_class_map:
+            return None
+        return self.module_to_class_map[module_instance]
 
-        This method deals with all the cleanup after elaboration.
+    def register_module(self, module: 'Module'):
+        assert is_module(module)
+        if self.top_level is None:
+            self.top_level = module
+        self.modules.add(module)
 
-        For now, it consists of:
-        - Generate module and net names
-        - Creation of XNets
-        - Ranking modules into logic cones
-        - Sorting all the modules into instance classes. That is, create a set of module instances who share the same implementation.
-          This is a bit more complex then simply looking at their type or __class__: generic modules or modules with dynamic port creation
-          support may not share the body even if they are of the same class.
-          TODO: in fact, this shouldn't happen at all this way: it's way too brittle. I think a better way of dealing with this is to
-                str-compare the generated guts after the fact and eject the identical ones.
-        """
+    def get_top_level_name(self) -> str:
+        return self.get_module_class_name(self.top_level)
+
+    class Elaborator(object):
+        def __init__(self, netlist: 'Netlist', *, add_unnamed_scopes: bool = False):
+            self.netlist = netlist
+            self.add_unnamed_scopes = add_unnamed_scopes
+        def __enter__(self):
+            self.netlist.__enter__()
+            self.marker = ContextMarker(Context.elaboration)
+            self.marker.__enter__()
+            return self.netlist
+        def __exit__(self, exception_type, exception_value, traceback):
+            try:
+                self.netlist._elaborate(add_unnamed_scopes=self.add_unnamed_scopes)
+            finally:
+                self.marker.__exit__(exception_type, exception_value, traceback)
+                self.netlist.__exit__(exception_type, exception_value, traceback)
+    
+    def elaborate(self, *, add_unnamed_scopes: bool = False) -> 'Netlist.Elaborator':
+        return Netlist.Elaborator(self, add_unnamed_scopes=add_unnamed_scopes)
+
+    def _elaborate(self, *, add_unnamed_scopes: bool = False) -> None:
+        from .module import Module
+
+        top_impl: Module.Impl = self.top_level._impl
+        
+        top_impl.freeze_interface()
+
+        # Give top level a name and mark it as user-assigned.
+        if top_impl.name is None:
+            top_impl.name = type(self.top_level).__name__
+            top_impl.has_explicit_name = True
+
+        all_inputs_specialized = all(tuple(input.is_specialized() for input in top_impl.get_inputs().values()))
+        with Module.Context(top_impl):
+            if not all_inputs_specialized:
+                raise SyntaxErrorException(f"Top level module must have all its inputs specialized before it can be elaborated")
+            top_impl._elaborate(hier_level=0, trace=True)
+
+        # Deal with all the cleanup after elaboration.
+        # 
+        # For now, it consists of:
+        # - Generate module and net names
+        # - Creation of XNets
+        # - Ranking modules into logic cones
+        # - Sorting all the modules into instance classes. That is, create a set of module instances who share the same implementation.
+        #   This is a bit more complex then simply looking at their type or __class__: generic modules or modules with dynamic port creation
+        #   support may not share the body even if they are of the same class.
+        #   TODO: in fact, this shouldn't happen at all this way: it's way too brittle. I think a better way of dealing with this is to
+        #         str-compare the generated guts after the fact and eject the identical ones.
         def populate_names(module: 'Module'):
             from .module import Module
             module._impl.create_symbol_table()
@@ -529,13 +577,13 @@ class Netlist(object):
 
             _populate_module_variants(module)
 
-        def assert_modules(module: 'Module'):
+        def lint_modules(module: 'Module'):
             assert module in self.modules
             assert module._impl.netlist is self
             for sub_module in module._impl.get_sub_modules():
-                assert_modules(sub_module)
+                lint_modules(sub_module)
 
-        assert_modules(self.top_level)
+        lint_modules(self.top_level)
         for module in self.modules:
             for junction in module.get_junctions().values():
                 self._register_junction(junction)
@@ -546,43 +594,18 @@ class Netlist(object):
         self.module_variants = OrderedDict()
         self.module_to_class_map = OrderedDict()
         populate_module_variants(self.top_level)
-        # Make sure we've to everyone
+        # Make sure we've got to everyone
         for module in self.modules:
             assert module in self.module_to_class_map
 
-    def get_module_class_name(self, module_instance: 'Module') -> Optional[str]:
-        assert is_module(module_instance)
-        if module_instance not in self.module_to_class_map:
-            return None
-        return self.module_to_class_map[module_instance]
+        def print_submodules(module: 'Module', level: int = 0) -> None:
+            if verbose_enough(VerbosityLevels.instantiation):
+                vprint(VerbosityLevels.instantiation, f"  {'  '*level}{module._impl.get_diagnostic_name()}")
+                for sub_module in module._impl._sub_modules:
+                    print_submodules(sub_module, level+1)
+        vprint(VerbosityLevels.instantiation, "Module hierarchy:")
+        print_submodules(self.top_level)
 
-    def register_module(self, module: 'Module'):
-        assert is_module(module)
-        if self.top_level is None:
-            self.top_level = module
-        self.modules.add(module)
-
-    def get_top_level_name(self) -> str:
-        return self.get_module_class_name(self.top_level)
-
-    class Elaborator(object):
-        def __init__(self, netlist: 'Netlist', *, add_unnamed_scopes: bool = False):
-            self.netlist = netlist
-            self.add_unnamed_scopes = add_unnamed_scopes
-        def __enter__(self):
-            self.netlist.__enter__()
-            self.marker = ContextMarker(Context.elaboration)
-            self.marker.__enter__()
-            return self.netlist
-        def __exit__(self, exception_type, exception_value, traceback):
-            try:
-                self.netlist.top_level._impl.elaborate(add_unnamed_scopes=self.add_unnamed_scopes)
-            finally:
-                self.marker.__exit__(exception_type, exception_value, traceback)
-                self.netlist.__exit__(exception_type, exception_value, traceback)
-    
-    def elaborate(self, *, add_unnamed_scopes: bool = False) -> 'Netlist.Elaborator':
-        return Netlist.Elaborator(self, add_unnamed_scopes=add_unnamed_scopes)
 
     def generate(self, back_end: 'BackEnd') -> None:
         from .utils import str_block
