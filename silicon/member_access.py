@@ -17,6 +17,7 @@ from .module import GenericModule, Module, InlineBlock
 from .port import Junction, Input, Output, Port
 from .net_type import KeyKind
 from .exceptions import SyntaxErrorException, InvalidPortError
+from .netlist import Netlist
 
 """
 There should be a generic (non type-specific) way of handling slicing, or even more generally accessing members.
@@ -132,8 +133,7 @@ class UniSlicer(JunctionBase):
         # If this is called, we're in a LHS context, that is: we are used to assign to a slice of a net.
         # What we need to do now is to dump all the slice info into our parent so that the PhiSlice
         # module can later be created.
-        from .module import Module
-        scope = Module.get_current_scope()
+        scope = Netlist.get_current_scope()
         self.set_partial_source(tuple(), other, scope)
         return IgnoreMeAfterIlShift
 

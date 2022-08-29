@@ -38,13 +38,13 @@ module top (
 	logic [7:0] registered_b;
 	logic [7:0] registered_g;
 	logic [7:0] registered_r;
-	logic reset;
 	logic [7:0] reset_reg_b;
 	logic [7:0] reset_reg_g;
 	logic [7:0] reset_reg_r;
 	logic [7:0] reset_reg2_b;
 	logic [7:0] reset_reg2_g;
 	logic [7:0] reset_reg2_r;
+	logic reset;
 
 	always_ff @(posedge clk1) sout1_b <= uin1_b;
 	always_ff @(posedge clk1) sout1_g <= uin1_g;

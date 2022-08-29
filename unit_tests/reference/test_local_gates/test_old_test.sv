@@ -16,16 +16,16 @@ module top (
 
 	logic xxx;
 	logic xxxx;
+	logic A_out_a;
 	logic ttt;
 	logic tttt;
-	logic A_out_a;
 	logic c;
+	logic d;
+	logic dd;
 	logic u1_out_a;
 	logic out_a;
 	logic yyyy;
 	logic outc;
-	logic d;
-	logic dd;
 
 	assign out_5 = 1'h0;
 	assign out_6 = 1'h1;
@@ -73,10 +73,10 @@ module top (
 	assign xxxx = in_4;
 	assign out_4 = 1'hx;
 	assign ttt = tttt;
+	assign d = dd;
 	assign out_1 = yyyy;
 	assign out_a = yyyy;
 	assign out_3 = outc;
-	assign d = dd;
 endmodule
 
 
@@ -92,9 +92,9 @@ module full_adder (
 );
 
 	logic u_out_a;
+	logic u4_out_a;
 	logic u2_out_a;
 	logic u3_out_a;
-	logic u4_out_a;
 	logic u5_out_a;
 
 	xor_gate2 u (

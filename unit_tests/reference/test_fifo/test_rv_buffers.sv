@@ -47,11 +47,11 @@ module Fifo (
 );
 
 	logic [7:0] input_data_data;
-	logic push_will_wrap;
 	logic push;
-	logic [3:0] next_push_addr;
-	logic pop_will_wrap;
 	logic pop;
+	logic push_will_wrap;
+	logic pop_will_wrap;
+	logic [3:0] next_push_addr;
 	logic [3:0] next_pop_addr;
 	logic next_looped;
 	logic next_empty_or_full;
@@ -62,9 +62,9 @@ module Fifo (
 	logic empty;
 	logic full;
 	logic looped;
-	logic [7:0] buffer_1_port2_data_out_data;
 	logic [7:0] u83_output_port_data;
 	logic [7:0] output_data_data;
+	logic [7:0] buffer_1_port2_data_out_data;
 
 	assign input_port_ready =  ~ full;
 	assign output_port_valid =  ~ empty;

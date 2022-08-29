@@ -7,9 +7,9 @@ class SyntaxErrorException(Exception):
         if is_module(context):
             context = context._impl
         if context is None:
-            from .module import Module
+            from .netlist import Netlist
             try:
-                context = Module.get_current_scope()._impl
+                context = Netlist.get_current_scope()._impl
             except Exception:
                 pass
         loc = None

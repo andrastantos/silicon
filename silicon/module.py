@@ -6,7 +6,6 @@ from collections import OrderedDict
 from .port import Junction, Port, Output, Input, Wire, JunctionBase
 from .net_type import NetType, NetTypeMeta
 from .utils import str_block, TSimEvent, ContextMarker, first, Context
-from .stack import Stack
 from .tracer import Tracer, Trace, no_trace
 from .netlist import Netlist
 from enum import Enum
@@ -93,12 +92,6 @@ class Module(object):
     _in_new_lock = RLock()
     # Since we don't want to muddy the RTL description with explicit parentage passing, we need to pass this information from parents' body() to childs __init__ over a global.
     # Not the most elegant, but I had no better idea. This however prevents true multi-threaded behavior
-    _parent_modules = Stack()
-    @staticmethod
-    def get_current_scope() -> Optional['Module']:
-        if Module._parent_modules.is_empty():
-            return None
-        return Module._parent_modules.top()
 
     ignore_caller_filenames = ["tracer.py", "module.py", "number.py", "port.py", "utils.py"]
     ignore_caller_libs= ["silicon"]
@@ -475,12 +468,11 @@ class Module(object):
             import os
             import pathlib
 
-            parent = Module.get_current_scope()
-            if parent is None:
-                self.netlist = Netlist(true_module)
-            else:
+            self.netlist = Netlist.get_global_netlist()
+            self.netlist.register_module(true_module)
+            parent = self.netlist.get_current_scope()
+            if parent is not None:
                 parent._impl.register_sub_module(true_module)
-                self.netlist = parent._impl.netlist
 
             # We have to work around a problem under windows where subst can create a confusion about drive letters and various paths pointing to the same file
             try:
@@ -594,7 +586,7 @@ class Module(object):
                 #print("module {} is created".format(type(self)))
                 # Store construct arguments locally so we can compare them later for is_equivalent
                 (self._construct_args, self._construct_kwargs) = fill_arg_names(self._true_module.construct, args, kwargs)
-                with Module._parent_modules.push(self._true_module):
+                with self.netlist.set_current_scope(self._true_module):
                     with Module.Context(self):
                         with Trace():
                             self._true_module.construct(*self._construct_args, **self._construct_kwargs)
@@ -965,7 +957,7 @@ class Module(object):
                         if junction.get_net_type() is not old_source.get_net_type():
                             # Inserting an adaptor
                             scope = junction._source.scope
-                            with Module._parent_modules.push(scope):
+                            with self.netlist.set_current_scope(scope):
                                 with ContextMarker(Context.elaboration):
                                     source = implicit_adapt(old_source, junction.get_net_type())
                                 # If an adaptor was created, we'll have to make sure it's properly registered.
@@ -982,7 +974,7 @@ class Module(object):
                                     else:
                                         junction.set_source(source, scope)
 
-            with Module._parent_modules.push(self._true_module):
+            with self.netlist.set_current_scope(self._true_module):
                 incomplete_sub_modules = OrderedSet(self._sub_modules)
                 changes = True
                 while len(incomplete_sub_modules) > 0 and changes:
@@ -1028,8 +1020,7 @@ class Module(object):
         def is_top_level(self) -> bool:
             return self.netlist.top_level is self._true_module
 
-        def elaborate(self, *, add_unnamed_scopes: bool = False) -> Netlist:
-
+        def elaborate(self, *, add_unnamed_scopes: bool = False) -> None:
             assert self not in self.netlist.modules, f"Module {self._true_module} has already been elaborated."
             assert self.parent is None, "Only top level modules can be elaborated"
 
@@ -1054,14 +1045,13 @@ class Module(object):
                         print_submodules(sub_module, level+1)
             vprint(VerbosityLevels.instantiation, "Module hierarchy:")
             print_submodules(self._true_module)
-            return self.netlist
 
         def _body(self, trace: bool = True) -> None:
             """
             Called from the framework as a wrapper for the per-module (class) body method
             """
             with ScopedAttr(self, "setattr__impl", self._setattr__elaboration):
-                with Module._parent_modules.push(self._true_module):
+                with self.netlist.set_current_scope(self._true_module):
                     assert self.is_interface_frozen()
                     with Module.Context(self):
                         old_attr_list = set(dir(self._true_module))
@@ -1485,7 +1475,4 @@ def module(ret_val_cnt) -> Callable:
         return DecoratedFunction(callable, ret_val_cnt)
 
     return inner
-
-def elaborate(top_level: Module, *, add_unnamed_scopes: bool = False) -> Netlist:
-    return top_level._impl.elaborate(add_unnamed_scopes=add_unnamed_scopes)
 

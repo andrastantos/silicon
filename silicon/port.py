@@ -312,8 +312,8 @@ class JunctionBase(object):
     def ilshift__elab(self, other: Any) -> 'Junction':
         if self.source is not None:
             raise SyntaxErrorException(f"{self} is already bound to {self.source}.")
-        from .module import Module
-        self.set_source(other, Module.get_current_scope())
+        from .netlist import Netlist
+        self.set_source(other, Netlist.get_current_scope())
         return self
 
     def ilshift__none(self, other: Any) -> 'Junction':
@@ -941,9 +941,9 @@ class OutputPort(Port):
 class WireJunction(Junction):
 
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None):
-        from .module import Module
+        from .netlist import Netlist
         if parent_module is None:
-            parent_module = Module.get_current_scope()
+            parent_module = Netlist.get_current_scope()
         super().__init__(net_type, parent_module)
         if parent_module is not None:
             parent_module._impl.register_wire(self)

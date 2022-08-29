@@ -1,6 +1,6 @@
 from .exceptions import IVerilogException
 from .back_end import SystemVerilog, File
-from .module import Module, elaborate
+from .module import Module
 from .utils import is_module, ScopedAttr
 from typing import Callable, Union, IO
 import os

@@ -11,9 +11,9 @@ module test_self_wire (
 );
 
 	logic wr_en;
+	logic rd_en;
 	logic [7:0] ddd;
 	logic [7:0] r0_horizontal_total;
-	logic rd_en;
 
 	assign wr_en =  ~ n_cs &  ~ n_wr;
 	assign ddd = wr_en ? data_in : r0_horizontal_total;

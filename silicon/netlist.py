@@ -5,6 +5,7 @@ from collections import OrderedDict
 from .utils import is_input_port, is_output_port, is_wire, is_module, is_port, MEMBER_DELIMITER
 from itertools import chain
 from .exceptions import SyntaxErrorException
+from .stack import Stack
 from pathlib import Path
 
 def fully_qualified_name(thing: Any, mangle: bool=True) -> str:
@@ -200,9 +201,8 @@ class XNet(object):
         return self.get_net_type().get_num_bits()
 
 class Netlist(object):
-    def __init__(self, top_level: 'Module'):
-        assert is_module(top_level)
-        self.top_level = top_level
+    def __init__(self):
+        self.top_level = None
         self.modules: Set['Module'] = OrderedSet()
         self.net_types: Dict[str, List['NetType']]= OrderedDict()
         self.ports: Set[object] = OrderedSet()
@@ -213,7 +213,46 @@ class Netlist(object):
         self.xnets = OrderedSet()
         self.junction_to_xnet_map = OrderedDict()
         self.module_to_xnet_map = OrderedDict()
+        self._parent_modules = Stack()
+        self.enter_depth = 0
 
+    @staticmethod
+    def get_global_netlist():
+        return globals()["netlist"]
+
+    def get_current_scope(self = None) -> Optional['Module']:
+        """
+        Returns the current scope module, or None if no scope is set.
+        """
+        if self is None:
+            try:
+                return globals()["netlist"].get_current_scope()
+            except KeyError:
+                return None
+        if self._parent_modules.is_empty():
+            return None
+        return self._parent_modules.top()
+
+    def set_current_scope(self, module: 'Module') -> Stack.Context:
+        """
+        Sets the current scope to 'module'.
+        
+        Returns an context manager that can be used in a 'with' block to control the lifetime of the scope safely.
+        """
+        return self._parent_modules.push(module)
+
+    def __enter__(self) -> 'Netlist':
+        if "netlist" in globals():
+            if globals()["netlist"] is not self:
+                raise SyntaxErrorException("There can be only one active Netlist")
+        globals()["netlist"] = self
+        self.enter_depth += 1
+        return self
+    def __exit__(self, exception_type, exception_value, traceback):
+        if self.enter_depth == 1:
+            del globals()["netlist"]
+        self.enter_depth -= 1
+    
     def _register_net_type(self, net_type: 'NetType'):
         type_name = net_type.get_type_name()
         if type_name is not None:
@@ -490,12 +529,16 @@ class Netlist(object):
 
             _populate_module_variants(module)
 
-        def register_modules(module: 'Module'):
-            self.register_module(module)
+        def assert_modules(module: 'Module'):
+            assert module in self.modules
+            assert module._impl.netlist is self
             for sub_module in module._impl.get_sub_modules():
-                register_modules(sub_module)
+                assert_modules(sub_module)
 
-        register_modules(self.top_level)
+        assert_modules(self.top_level)
+        for module in self.modules:
+            for junction in module.get_junctions().values():
+                self._register_junction(junction)
         self._create_xnets()
         populate_names(self.top_level)
         self._fill_xnet_names(add_unnamed_scopes)
@@ -515,14 +558,18 @@ class Netlist(object):
 
     def register_module(self, module: 'Module'):
         assert is_module(module)
+        if self.top_level is None:
+            self.top_level = module
         self.modules.add(module)
-        for junction in module.get_junctions().values():
-            self._register_junction(junction)
 
     def get_top_level_name(self) -> str:
         return self.get_module_class_name(self.top_level)
 
-    def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> None:
+    def elaborate(self, *, add_unnamed_scopes: bool = False) -> None:
+        with self:
+            return self.top_level._impl.elaborate(add_unnamed_scopes=add_unnamed_scopes)
+
+    def generate(self, back_end: 'BackEnd') -> None:
         from .utils import str_block
 
         streams = back_end.generate_order(self)

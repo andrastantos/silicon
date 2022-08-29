@@ -17,7 +17,7 @@ class Tracer(object):
 
     @staticmethod
     def trace_event_handler(frame, event, arg):
-        from .module import Module
+        from .netlist import Netlist
         def chain():
             if Tracer.old_tracer is not None:
                 return Tracer.old_tracer(frame, event, arg)
@@ -79,7 +79,7 @@ class Tracer(object):
                 from .utils import is_junction_base, is_module, register_local_wire
                 if is_junction_base(local_value):
                     header_printed = print_header()
-                    parent_module = Module.get_current_scope()
+                    parent_module = Netlist.get_current_scope()
                     if parent_module is None:
                         # We can't really assert in tracer, I don't think. So we simply terminate with a nasty message
                         print(f"Traces is enabled outside of module bodies. THIS IS REALLY BAD!!!", file=sys.stderr)

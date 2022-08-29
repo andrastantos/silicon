@@ -6,10 +6,10 @@ module Top (
 	input logic rst
 );
 
-	logic [1:0] u2_next_state;
-	logic [1:0] u2_state;
 	logic aaa;
 	logic ddd;
+	logic [1:0] u2_state;
+	logic [1:0] u2_next_state;
 
 	assign aaa = u2_state == 1'h0;
 	assign ddd = u2_state == 1'h0;
@@ -42,8 +42,8 @@ module FSM (
 	input logic input_0_to_3
 );
 
-	logic [1:0] local_next_state;
 	logic [1:0] local_state;
+	logic [1:0] local_next_state;
 
 	always_ff @(posedge clock_port) local_state <= reset_port ? reset_value : local_next_state;
 
@@ -55,8 +55,8 @@ module FSM (
 		.input_0_to_3(input_0_to_3)
 	);
 
-	assign next_state = local_next_state;
 	assign state = local_state;
+	assign next_state = local_next_state;
 endmodule
 
 
@@ -71,8 +71,8 @@ module FSMLogic (
 	input logic input_0_to_3
 );
 
-	logic [1:0] condition_selector;
 	logic condition_port;
+	logic [1:0] condition_selector;
 
 	assign condition_selector = input_0_to_1 ? 1'h1 : 2'b0 | input_0_to_3 ? 2'h3 : 2'b0 | default_state;
 	assign next_state = state == 1'h0 ? condition_selector : 2'b0 | default_state;

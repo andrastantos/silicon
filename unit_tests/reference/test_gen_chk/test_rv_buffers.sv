@@ -6,9 +6,9 @@ module top (
 	input logic rst
 );
 
+	logic data_ready;
 	logic data_valid;
 	logic [7:0] data_data;
-	logic data_ready;
 
 	Generator u (
 		.output_port_data(data_data),
@@ -45,8 +45,8 @@ module Checker (
 
 	logic [7:0] data_members_data;
 
-	assign data_members_data = input_port_data;
 	assign input_port_ready = 1'hx;
+	assign data_members_data = input_port_data;
 endmodule
 
 

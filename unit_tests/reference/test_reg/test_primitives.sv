@@ -16,11 +16,11 @@ module top (
 	logic clk;
 	logic [1:0] u_output_port;
 	logic [3:0] registered;
+	logic [1:0] reset_reg;
+	logic [1:0] reset_reg2;
 	logic [3:0] u5_output_port;
 	logic [1:0] u6_output_port;
 	logic reset;
-	logic [1:0] reset_reg;
-	logic [1:0] reset_reg2;
 
 	always_ff @(posedge clk1) u_output_port <= uin1;
 	always_ff @(posedge clk1) registered <= uin2;

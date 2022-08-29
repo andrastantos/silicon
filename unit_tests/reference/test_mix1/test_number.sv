@@ -13,10 +13,10 @@ module top (
 	output logic [10:0] out_d
 );
 
-	logic a0;
-	logic b0;
 	logic c0;
 	logic u7_out_a;
+	logic a0;
+	logic b0;
 
 	assign a0 = in_a[0];
 	assign b0 = in_b[0];
