@@ -1,5 +1,4 @@
 from silicon import SystemVerilog, File, Build, Netlist
-from silicon.utils import Context, ContextMarker
 from typing import IO, Callable, Any
 import pytest
 from pathlib import Path
@@ -71,9 +70,7 @@ class test(Build):
         test.reference_dir = Path("reference") / test_name
         test.output_dir = Path("output") / test_name
         with Netlist() as netlist:
-            with ContextMarker(Context.elaboration):
-                top = top_class()
-                netlist.elaborate(add_unnamed_scopes=add_unnamed_scopes)
+            netlist.elaborate(top_class, add_unnamed_scopes=add_unnamed_scopes)
         logged_system_verilog = SystemVerilog(stream_class = test.DiffedFile)
         netlist.generate(logged_system_verilog)
         test_diff = ""
@@ -107,9 +104,7 @@ class test(Build):
         test.reference_dir = Path("reference") / Path(test_name)
         test.output_dir = Path("output") / Path(test_name)
         with Netlist() as netlist:
-            with ContextMarker(Context.elaboration):
-                top = top_class()
-                netlist.elaborate(add_unnamed_scopes=add_unnamed_scopes)
+            netlist.elaborate(top_class, add_unnamed_scopes=add_unnamed_scopes)
         test.output_dir.mkdir(parents=True, exist_ok=True)
         vcd_filename = test.output_dir / Path(f"{test_name}.vcd")
         netlist.simulate(vcd_filename)

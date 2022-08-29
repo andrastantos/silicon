@@ -2,7 +2,7 @@ from typing import Union, Set, Tuple, Dict, Any, Optional, List, Iterable, Named
 import typing
 from .ordered_set import OrderedSet
 from collections import OrderedDict
-from .utils import is_input_port, is_output_port, is_wire, is_module, is_port, MEMBER_DELIMITER
+from .utils import is_input_port, is_output_port, is_wire, is_module, is_port, MEMBER_DELIMITER, ContextMarker, Context
 from itertools import chain
 from .exceptions import SyntaxErrorException
 from .stack import Stack
@@ -565,9 +565,13 @@ class Netlist(object):
     def get_top_level_name(self) -> str:
         return self.get_module_class_name(self.top_level)
 
-    def elaborate(self, *, add_unnamed_scopes: bool = False) -> None:
+    def elaborate(self, top_level: Callable, *, add_unnamed_scopes: bool = False) -> None:
+        if self.top_level is not None:
+            raise SyntaxErrorException("Netlists top level is already set. There can only be a single top level Module. Did you call 'elaborate' already?")
         with self:
-            return self.top_level._impl.elaborate(add_unnamed_scopes=add_unnamed_scopes)
+            with ContextMarker(Context.elaboration):
+                top = top_level()
+                return self.top_level._impl.elaborate(add_unnamed_scopes=add_unnamed_scopes)
 
     def generate(self, back_end: 'BackEnd') -> None:
         from .utils import str_block
