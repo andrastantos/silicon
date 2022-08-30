@@ -529,9 +529,13 @@ class Module(object):
                 self._positional_inputs = OrderedDict()
                 self._outputs = OrderedDict()
                 self._positional_outputs = OrderedDict()
-                self._wires = OrderedDict()
+                self._wires = OrderedDict() # Wires that are declared as attributes. All local_wires get promoted here during XNet creation
                 self._junctions = OrderedDict()
-                self._local_wires = [] # A list of all the wires declared in the body of the module
+                # Local wires are wires declared in the body of the module as variables instead of attributes. Most wires are like that.
+                # They don't necessarily have a name, and if they do, that's set on the Wire.local_name attribute. They are later, during
+                # XNet creation are given a name and promoted to the _wire map.
+                # This map is indexed by id(wire) to work around the elaboration context __eq__ override problem.
+                self._local_wires: Dict[int, Junction] = dict()
                 self._generate_needed = False # Set to True if body generation is needed, False if not (that is if module got inlined)
                 self._body_generated = False # Set to true if a body was already generated. This prevents body generation, even if _generate_needed is set
                 self.name = None
@@ -671,9 +675,9 @@ class Module(object):
         def get_wires(self) -> 'OrderedDict[str, Wire]':
             return self._wires
         def get_local_wires(self) -> Sequence[Wire]:
-            return self._local_wires
-        def get_junctions(self) -> 'OrderedDict[str, Junction]':
-            return self._junctions
+            return self._local_wires.values
+        def get_junctions(self) -> Sequence[Junction]:
+            return chain(self._junctions.values(), self._local_wires.values())
         def __get_instance_name(self) -> str:
             if self.parent is None and self.name is None:
                 return type(self).__name__
@@ -754,12 +758,12 @@ class Module(object):
                         self._positional_outputs[name] = junction
                 elif is_wire(junction):
                     self._wires[name] = junction
-                    # We can't use 'in' for two reasons: we don't want __eq__, we want 'is', and we're in
-                    # elaboration context so __eq__ generates a gate instead of doing the comparison anyways
-                    for idx, local_wire in enumerate(self._local_wires):
-                        if junction is local_wire:
-                            del self._local_wires[idx]
-                            break
+                    # Wires get thrown in _local_wires by their constructor.
+                    # If they are later assigned to an attribute, let's remove them from the _local_wires collecion.
+                    try:
+                        del self._local_wires[id(junction)]
+                    except KeyError:
+                        raise SyntaxErrorException(f"Can't add wire {junction} to module. Only wires created within the body of the same module can be added.")
                 else:
                     assert False, "Unknown junction object kind {}".format(type(value))
                 value.set_parent_module(self._true_module)
@@ -767,8 +771,8 @@ class Module(object):
             self.supersetattr(name, value)
         
         def register_wire(self, wire: Wire) -> None:
-            wire.set_parent_module(self._true_module)
-            self._local_wires.append(wire)
+            assert id(wire) not in self._local_wires
+            self._local_wires[id(wire)] = wire
 
         def _setattr__construction(self, name, value) -> None:
             """
@@ -907,127 +911,29 @@ class Module(object):
                         return convert_to_junction(parent_wires[name])
             return None
 
-        def _elaborate(self, hier_level, trace: bool) -> None:
+        def get_all_junctions(self) -> Sequence[Junction]:
+            """
+            Returns all junctions that are in the scope of this module.
+            
+            This includes ports and wires of the module itself, plus all the ports of all sub-modules
+            """
+            return chain(
+                self.get_junctions(),
+                chain(*(sub_module.get_inputs().values() for sub_module in self._sub_modules))
+            )
+
+        def _elaborate(self, trace: bool) -> None:
             # Recursively go through each new node, add it to the netlist and call its body (which most likely will create more new nodes).
             # The algorithm does a depth-first walk of the netlist hierarchy, eventually resulting in the full network and netlist created
             self.freeze_interface()
-            # Remove all wires without sources and sinks.
-            for wire_name, wire in tuple(self._wires.items()):
-                if not wire.is_specialized():
-                    if len(wire.sinks) == 0:
-                        print(f"WARNING: deleting unused wire: {wire_name} in module {self._true_module}")
-                        self._wires.pop(wire_name)
-                        self._junctions.pop(wire_name)
-                    else:
-                        raise SyntaxErrorException(f"Wire {wire_name} is used without a source")
+            if len(self._wires) != 0:
+                raise SyntaxErrorException("A module can only have Inputs and Outputs before it's body gets called")
 
             assert len(self._local_wires) == 0
 
-            self._body(trace) # Will create all the sub-modules
-
-            for sub_module in self._sub_modules:
-                # handle any pending auto-binds
-                for port in sub_module.get_ports().values():
-                    if port._auto:
-                        port.auto_bind(self._true_module) # If already bound, this is a no-op, so it's safe to call it multiple times
-
-            remaining_local_wires = []
-            for wire in self._local_wires:
-                if len(wire.sinks) == 0 and wire.source is None:
-                    print(f"WARNING: deleting unused local wire: {wire}")
-                else:
-                    remaining_local_wires.append(wire)
-            self._local_wires = remaining_local_wires
-
-            # Go through each sub-module in a loop, and finalize their interface until everything is frozen
-
-            def propagate_net_types():
-                # First set net types on junctions where the source has a type, but the sink doesn't
-                incomplete_junctions = OrderedSet(junction for junction in chain(self.get_junctions().values(), self._local_wires) if not junction.is_specialized() and junction.source is not None)
-                changes = True
-                while len(incomplete_junctions) > 0 and changes:
-                    changes = False
-                    for junction in tuple(incomplete_junctions):
-                        if junction.source.is_specialized():
-                            junction.set_net_type(junction.source.get_net_type())
-                            changes = True
-                            incomplete_junctions.remove(junction)
-                # Look through all junctions for incompatible source-sink types and insert adaptors as needed
-                for junction in tuple(chain(self.get_junctions().values(), self._local_wires)):
-                    old_source = junction.source
-                    if junction.is_specialized() and old_source is not None and old_source.is_specialized():
-                        if junction.get_net_type() is not old_source.get_net_type():
-                            # Inserting an adaptor
-                            scope = junction._source.scope
-                            with self.netlist.set_current_scope(scope):
-                                source = implicit_adapt(old_source, junction.get_net_type())
-                                # If an adaptor was created, we'll have to make sure it's properly registered.
-                                if source is not old_source:
-                                    if Context.current() != Context.elaboration:
-                                        adaptor = source.get_parent_module()
-                                        adaptor._impl.freeze_interface()
-                                        adaptor._impl._body(trace=False)
-                                    if old_source.get_parent_module()._impl.has_explicit_name:
-                                        naming_wire = Wire(source.get_net_type(), scope)
-                                        naming_wire.local_name = old_source.interface_name # This creates duplicates of course, but that will be resolved later on
-                                        naming_wire.set_source(source, scope=scope)
-                                        junction.set_source(naming_wire, scope)
-                                    else:
-                                        junction.set_source(source, scope)
-
-            with self.netlist.set_current_scope(self._true_module):
-                incomplete_sub_modules = OrderedSet(self._sub_modules)
-                changes = True
-                while len(incomplete_sub_modules) > 0 and changes:
-                    changes = True
-                    # Propagate types from submodule ports to wires. Keep propagating until we can't do anything more.
-                    propagate_net_types()
-
-                    changes = False
-                    for sub_module in tuple(incomplete_sub_modules):
-                        # propagate all newly assigned ports
-                        for input in sub_module.get_inputs().values():
-                            if not input.is_specialized() and input.source is not None and input.source.is_specialized():
-                                input.set_net_type(input.source.get_net_type())
-                        all_inputs_specialized = all(tuple(input.is_specialized() or not input.has_driver() for input in sub_module.get_inputs().values()))
-                        if all_inputs_specialized:
-                            with Module.Context(sub_module._impl):
-                                sub_module._impl._elaborate(hier_level + 1, trace)
-                            changes = True
-                            incomplete_sub_modules.remove(sub_module)
-
-                propagate_net_types()
-            if len(incomplete_sub_modules) != 0:
-                # Collect all nets that don't have a type, but must to continue
-                input_list = []
-                for sub_module in tuple(incomplete_sub_modules):
-                    input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or not input.has_driver()))
-                if len(input_list) > 10:
-                    list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list[:5]) + "\n    ...\n    " + "\n    ".join(i.get_diagnostic_name() for i in input_list[-5:])
-                else:
-                    list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list)
-                raise SyntaxErrorException(f"Can't determine net types for:\n    {list_str}")
-
-            # Propagate output types, if needed
-            for output in self.get_outputs().values():
-                if not output.is_specialized():
-                    if output.source is not None:
-                        if output.source.is_specialized():
-                            output.set_net_type(output.source.get_net_type())
-                        else:
-                            raise SyntaxErrorException(f"Output port {output} is not fully specialized after body call. Can't finalize interface")
-            assert all((output.is_specialized() or output.source is None) for output in self.get_outputs().values())
-
-        def is_top_level(self) -> bool:
-            return self.netlist.top_level is self._true_module
-
-        def _body(self, trace: bool = True) -> None:
-            """
-            Called from the framework as a wrapper for the per-module (class) body method
-            """
+            # Let's call 'body' which will create all the sub-modules
             with ScopedAttr(self, "setattr__impl", self._setattr__elaboration):
                 with self.netlist.set_current_scope(self._true_module):
-                    assert self.is_interface_frozen()
                     with Module.Context(self):
                         old_attr_list = set(dir(self._true_module))
                         if trace:
@@ -1046,7 +952,7 @@ class Module(object):
                     # Finish ordering sub-modules:
                     for sub_module in self._unordered_sub_modules:
                         self._sub_modules.append(sub_module)
-                    self._unordered_sub_modules.clear()
+                    del self._unordered_sub_modules # This will force all subsequent module instantiations (during type-propagation) to directly go to _sub_modules
 
                     def finalize_slices(junction):
                         if junction.is_composite():
@@ -1056,17 +962,95 @@ class Module(object):
                             junction.finalize_slices(self._true_module)
 
                     # Go through each junction and make sure their PhiSlices are created if needed
-                    for junction in self.get_junctions().values():
-                        finalize_slices(junction)
-                    for junction in self._local_wires:
+                    for junction in self.get_junctions():
                         finalize_slices(junction)
 
-                    # The above code might have added some modules into _unordered_sub_modules, so let's clear them once again
-                    for sub_module in self._unordered_sub_modules:
-                        self._sub_modules.append(sub_module)
+            for sub_module in self._sub_modules:
+                # handle any pending auto-binds
+                for port in sub_module.get_ports().values():
+                    if port._auto:
+                        port.auto_bind(self._true_module) # If already bound, this is a no-op, so it's safe to call it multiple times
 
-                    del self._unordered_sub_modules # This will force all subsequent module instantiations (during type-propagation) to directly go to _sub_modules
+            remaining_local_wires = dict()
+            for wire in self._local_wires.values():
+                if len(wire.sinks) == 0 and wire.source is None:
+                    print(f"WARNING: deleting unused local wire: {wire}")
+                else:
+                    remaining_local_wires[id(wire)] = wire
+            self._local_wires = remaining_local_wires
 
+            # Go through each sub-module in a loop, and finalize their interface until everything every Input port type is known
+
+            def propagate_net_types():
+                # First set net types on junctions where the source has a type, but the sink doesn't
+                #incomplete_junctions = set(junction for junction in chain(self.get_junctions()) if not junction.is_specialized() and junction.source is not None)
+                incomplete_junctions = set(junction for junction in self.get_all_junctions() if not junction.is_specialized() and junction.source is not None)
+                changes = True
+                while len(incomplete_junctions) > 0 and changes:
+                    changes = False
+                    for junction in tuple(incomplete_junctions):
+                        if junction.source.is_specialized():
+                            junction.set_net_type(junction.source.get_net_type())
+                            changes = True
+                            incomplete_junctions.remove(junction)
+                # Look through all junctions for incompatible source-sink types and insert adaptors as needed
+                for junction in tuple(self.get_all_junctions()):
+                    old_source = junction.source
+                    if junction.is_specialized() and old_source is not None and old_source.is_specialized():
+                        if junction.get_net_type() is not old_source.get_net_type():
+                            # Inserting an adaptor
+                            scope = junction._source.scope
+                            with self.netlist.set_current_scope(scope):
+                                source = implicit_adapt(old_source, junction.get_net_type())
+                                # If an adaptor was created, fix up connectivity, including inserting a naming wire, if needed
+                                if source is not old_source:
+                                    if old_source.get_parent_module()._impl.has_explicit_name:
+                                        naming_wire = Wire(source.get_net_type(), scope)
+                                        naming_wire.local_name = old_source.interface_name # This creates duplicates of course, but that will be resolved later on
+                                        naming_wire.set_source(source, scope=scope)
+                                        junction.set_source(naming_wire, scope)
+                                    else:
+                                        junction.set_source(source, scope)
+
+            with self.netlist.set_current_scope(self._true_module):
+                incomplete_sub_modules = OrderedSet(self._sub_modules)
+                changes = True
+                while len(incomplete_sub_modules) > 0 and changes:
+                    # Propagate types around on this hierarchy level until we can't do anything more.
+                    propagate_net_types()
+
+                    changes = False
+                    for sub_module in tuple(incomplete_sub_modules):
+                        all_inputs_specialized = all(tuple(input.is_specialized() or not input.has_driver() for input in sub_module.get_inputs().values()))
+                        if all_inputs_specialized:
+                            with Module.Context(sub_module._impl):
+                                sub_module._impl._elaborate(trace)
+                            changes = True
+                            incomplete_sub_modules.remove(sub_module)
+                # The elaboration of the final sub-module probably assigned some output net types, so propagate those around
+                propagate_net_types()
+
+            # If there were some sub-modules that we couldn't elaborate, that means we have some net types we can't determine.
+            # Generate a fancy error message and bail.
+            if len(incomplete_sub_modules) != 0:
+                # Collect all nets that don't have a type, but must to continue
+                input_list = []
+                for sub_module in tuple(incomplete_sub_modules):
+                    input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or not input.has_driver()))
+                if len(input_list) > 10:
+                    list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list[:5]) + "\n    ...\n    " + "\n    ".join(i.get_diagnostic_name() for i in input_list[-5:])
+                else:
+                    list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list)
+                raise SyntaxErrorException(f"Can't determine net types for:\n    {list_str}")
+
+            # The guts of the module is now complete. Let's make sure our outputs are in order as well.
+            for output in self.get_outputs().values():
+                if not output.is_specialized():
+                    raise SyntaxErrorException(f"Output port {output} is not fully specialized after body call. Can't finalize interface")
+            assert all((output.is_specialized() or output.source is None) for output in self.get_outputs().values())
+
+        def is_top_level(self) -> bool:
+            return self.netlist.top_level is self._true_module
 
         def is_equivalent(self, other: 'module', netlist: 'NetList') -> bool:
             """
@@ -1239,7 +1223,7 @@ class Module(object):
             # 1. promote them to the _wire map as well as make sure they're unique
             # 2. Add them to the associated xnet
             # 3. Give them a name if they're not named (for example, if they're part of a container such as a list or tuple)
-            for my_wire in tuple(self._local_wires):
+            for my_wire in tuple(self._local_wires.values()):
                 local_name = my_wire.local_name
                 if local_name is None: local_name = my_wire.interface_name
                 explicit = local_name is not None
@@ -1271,7 +1255,7 @@ class Module(object):
                     xnet.add_name(self._true_module, unique_name, is_explicit=explicit, is_input=False)
                     self._wires[unique_name] = wire
                     self._junctions[unique_name] = wire
-                self._local_wires.remove(my_wire)
+                del self._local_wires[id(my_wire)]
             assert len(self._local_wires) == 0
 
             # Finally, look through sub-module ports again, and check that all of them has at least one name

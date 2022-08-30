@@ -341,7 +341,7 @@ class Netlist(object):
         from .port import Junction, Wire, Input, Output
         from .utils import is_port
         for module in self.modules:
-            for junction in chain(module.get_junctions().values(), module._impl.get_local_wires()):
+            for junction in chain(module.get_junctions()):
                 self.xnets |= create_xnets_for_junction(junction)
 
         for module in self.modules:
@@ -504,18 +504,16 @@ class Netlist(object):
 
         top_impl: Module.Impl = self.top_level._impl
         
-        top_impl.freeze_interface()
-
         # Give top level a name and mark it as user-assigned.
         if top_impl.name is None:
             top_impl.name = type(self.top_level).__name__
             top_impl.has_explicit_name = True
 
-        all_inputs_specialized = all(tuple(input.is_specialized() for input in top_impl.get_inputs().values()))
         with Module.Context(top_impl):
+            all_inputs_specialized = all(tuple(input.is_specialized() for input in top_impl.get_inputs().values()))
             if not all_inputs_specialized:
                 raise SyntaxErrorException(f"Top level module must have all its inputs specialized before it can be elaborated")
-            top_impl._elaborate(hier_level=0, trace=True)
+            top_impl._elaborate(trace=True)
 
         # Deal with all the cleanup after elaboration.
         # 
@@ -585,7 +583,7 @@ class Netlist(object):
 
         lint_modules(self.top_level)
         for module in self.modules:
-            for junction in module.get_junctions().values():
+            for junction in module.get_junctions():
                 self._register_junction(junction)
         self._create_xnets()
         populate_names(self.top_level)
