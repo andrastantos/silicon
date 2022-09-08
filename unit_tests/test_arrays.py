@@ -39,5 +39,5 @@ def test_array_slice1():
 
 
 if __name__ == "__main__":
-    #test_array_assign()
-    test_array_slice1()
+    test_array_assign()
+    #test_array_slice1()

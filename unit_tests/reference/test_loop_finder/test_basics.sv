@@ -8,18 +8,18 @@ module Top (
 
 	logic aaa;
 	logic ddd;
-	logic [1:0] u2_state;
-	logic [1:0] u2_next_state;
+	logic [1:0] u_state;
+	logic [1:0] u_next_state;
 
-	assign aaa = u2_state == 1'h0;
-	assign ddd = u2_state == 1'h0;
+	assign aaa = u_state == 1'h0;
+	assign ddd = u_state == 1'h0;
 
-	FSM u2 (
+	FSM u (
 		.clock_port(clk),
 		.reset_port(rst),
 		.reset_value(1'h0),
-		.state(u2_state),
-		.next_state(u2_next_state),
+		.state(u_state),
+		.next_state(u_next_state),
 		.default_state(1'h0),
 		.input_0_to_1(aaa),
 		.input_0_to_3(ddd)

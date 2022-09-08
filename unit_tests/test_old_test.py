@@ -178,10 +178,10 @@ def test_local_gates():
             yyyy = self.out_1
             tttt = A.in_a
             ttt = tttt
-            d.get_parent_module()._impl.name = "D"
+            d.get_parent_module()._impl.set_name("D", explicit=True)
             #A.out_a = B.in_a # This style of binding is only allowed inside the module, not outside
             (out_a, outc) = full_adder(self.in_1, self.in_2, self.in_3)
-            out_a.get_parent_module()._impl.name = "FA"
+            out_a.get_parent_module()._impl.set_name("FA", explicit=True)
             self.out_2 <<= self.in_4
             self.out_1 <<= out_a
             self.out_3 <<= outc

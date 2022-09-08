@@ -10,29 +10,11 @@ from .utils import TSimEvent, adapt, Context, is_net_type
 from collections import OrderedDict
 from .number import Unsigned, Number
 from .port import Wire
-from .exceptions import AdaptTypeError
-
+from .exceptions import AdaptTypeError, InvalidPortError
+from .composite import Reverse, is_reverse, is_composite_member
 import types
 
-# TODO: interface nesting in SystemVerilog is not supported. What to do about that? Maybe it's better if interfaces are modelled as individual wires???
-
-class Reverse(object):
-    """
-    If added to an interface member, it reverses the direction of the member. Useful for handshake signals.
-    """
-    def __init__(self, net_type: NetType):
-        if not is_net_type(net_type):
-            raise SyntaxErrorException(f"Can only reverse Net types. {net_type} is of type {type(net_type)}.")
-        self.net_type = net_type
-
-def is_reverse(thing: Any) -> bool:
-    return isinstance(thing, Reverse)
-
-def is_composite_member(thing: Any) -> bool:
-    if is_net_type(thing):
-        return True
-    return is_reverse(thing)
-class Composite(NetType):
+class Aggregate(NetType):
     """
     A Composite type is the base for both interfaces and structs
     """
@@ -41,14 +23,19 @@ class Composite(NetType):
         cls._support_reverse = support_reverse
         cls._init_members()
 
+    class MemberDesc(object):
+        def __init__(self, member: NetType, is_reversed: bool):
+            self.member = member
+            self.is_reversed = is_reversed
+ 
     @classmethod
     def _init_members(cls):
-        cls.members = OrderedDict()
+        cls.members: Dict[str, 'Aggregate.MemberDesc'] = OrderedDict()
         for name in dir(cls):
             # Skip all dunder attributes
             # The reason for it is that the type system is recursive. That is to say, that __base__ and such
             # might contain things that are NetTypes, thus would qualify as a composite member.
-            if name.startswith("__") and not name.startswith("___"):
+            if name.startswith("__") and name.endswith("__"):
                 continue
             try:
                 val = getattr(cls,name)
@@ -64,29 +51,18 @@ class Composite(NetType):
         if name in cls.members:
             raise SyntaxErrorException(f"Member {name} already exists on composite type {cls}")
         if is_net_type(member):
-            cls.members[name] = (member, False)
+            cls.members[name] = Aggregate.MemberDesc(member, False)
         elif is_reverse(member):
             if cls._support_reverse:
-                cls.members[name] = (member.net_type, True)
+                cls.members[name] = Aggregate.MemberDesc(member.net_type, True)
             else:
                 raise SyntaxErrorException(f"Composite type {cls} doesn't support reverse members")
         else:
             raise SyntaxErrorException(f"Composite type members must be either NetTypes or Reverse(NetType)-s. {member} is of type {type(member)}")
 
     @classmethod
-    def get_members(cls) -> Dict[str, Tuple[Union[NetType, bool]]]:
+    def get_members(cls) -> Dict[str, 'Aggregate.MemberDesc']:
         return cls.members
-
-    @classmethod
-    def sort_source_keys(cls, keys: Dict['Key', 'Junction'], back_end: 'BackEnd') -> Tuple['Key']:
-        """ Sort the set of blobs as required by the back-end """
-        assert back_end.language == "SystemVerilog"
-        return tuple(keys.keys())
-
-    @classmethod
-    def sort_sink_keys(cls, keys: Dict['Key', Set['Junction']], back_end: 'BackEnd') -> Tuple['Key']:
-        """ Sort the set of blobs as required by the back-end """
-        return cls.sort_source_keys(keys, back_end)
 
     @classmethod
     def generate_type_ref(cls, back_end: 'BackEnd') -> str:
@@ -100,7 +76,7 @@ class Composite(NetType):
 
     @classmethod
     def get_num_bits(cls) -> int:
-        return sum(member_type.get_num_bits() for member_type, member_reverse in cls.get_members().values())
+        return sum(member.member.get_num_bits() for member in cls.get_members().values())
 
     @classmethod
     @property
@@ -108,23 +84,210 @@ class Composite(NetType):
         return None
 
     @classmethod
-    def generate_assign(cls, sink_name: str, source_expression: str, xnet: 'XNet', back_end: 'BackEnd') -> str:
-        # This function cannot be implemented (easily) for composite types. Luckily it should never be called as we never create XNets of composites.
-        raise NotImplementedError
+    def _generate_member_names(cls, prefix: str, back_end: 'BackEnd') -> Sequence[str]:
+        member_names = []
+        for name, member_desc in cls.get_members().items():
+            member_name = prefix + back_end.get_member_delimiter() + name
+            if hasattr(member_desc.member, "_generate_member_names"):
+                member_names += member_desc.member._generate_member_names(member_name)
+            else:
+                member_names.append(member_name)
+        return member_names
 
     @classmethod
-    def setup_junction(cls, junction: 'Junction') -> None:
-        for (member_name, (member_type, member_reverse)) in cls.get_members().items():
-            junction.create_member_junction(member_name, member_type, member_reverse)
-        super().setup_junction(junction)
+    def generate_assign(cls, sink_name: str, source_expression: str, xnet: 'XNet', back_end: 'BackEnd') -> str:
+        member_names = cls._generate_member_names(sink_name, back_end)
+        # TODO: beautify this expression with new lines and indentation
+        return f"assign {', '.join(member_names)} = {source_expression};"
 
     @classmethod
     def get_unconnected_sim_value(cls) -> Any:
-        assert False, "Simulation should never enquire about unconnected values of Composites"
+        return None
 
     @classmethod
     def get_default_sim_value(cls) -> Any:
-        assert False, "Simulation should never enquire about default values of Composites"
+        return None
+
+    def __new__(cls, *args, **kwargs):
+        # If an instance is ever created for this type, we'll have to disable add_member.
+        # The reason is this: we rely on type-equivalence to determine compatibility. That
+        # requires that all instances of an Aggregate have the same members. Which in turn
+        # requires that members are class variables. So, add_member really adds a member
+        # to *all existing instances* of an Aggregate. That is almost certainly *not* what
+        # was intended if add_member was called on an instance. So what we'll do is to 
+        # hide the class-level method by providing an instance-level one with the same name
+        # that just raises an exception
+        ret_val = super().__new__(cls, *args, **kwargs)
+        ret_val.add_member = ret_val._add_member_override
+        return ret_val
+
+    def _add_member_override(self, name: str, member: Union[NetType, Reverse]) -> None:
+        raise SyntaxErrorException(f"Arrays don't support dynamic members")
+
+    class RhsSlice(GenericModule):
+        """
+        Accessor instances are used to implement the following constructs:
+
+        b <<= a[3]
+        b <<= a[3:0]
+        b <<= a[3:0][2]
+
+        They are instantiated from Aggregate.get_slice and Aggregate.get_rhs_slicer.
+
+        TODO: get_slice will need review
+        """
+        def construct(self, member_name: str, aggregate: 'Aggregate') -> None:
+            self.key = member_name
+            if member_name not in aggregate.get_members():
+                raise SyntaxErrorException(f"Aggregate '{aggregate}' doesn't have a member named '{member_name}'")
+            member_type = aggregate.get_members()[member_name]
+            self.input_port = Input(member_type)
+            self.output_port = Output(aggregate)
+        def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
+            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+        def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
+            assert back_end.language == "SystemVerilog"
+
+            # Since we blow up aggregates into individual wires in RTL, we'll need to get a name for the rhs, not an expression
+            rhs_name, precedence = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), allow_expression = False)
+            rhs_name = rhs_name + back_end.get_member_delimiter() + self.key
+            return rhs_name, precedence
+
+        @staticmethod
+        def static_sim(in_val: Any, key: str):
+            assert False
+
+        def simulate(self) -> TSimEvent:
+            while True:
+                yield self.input_port
+                in_val = self.input_port.sim_value
+                if in_val is None:
+                    out_val = None
+                else:
+                    out_val = in_val.get_member(self.member_name)
+                self.output_port <<= out_val
+
+        def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
+            assert False
+
+        def is_combinational(self) -> bool:
+            """
+            Returns True if the module is purely combinational, False otherwise
+            """
+            return True
+
+    def get_rhs_slicer(self, key: Any, key_kind: KeyKind) -> 'Module':
+        if key_kind != KeyKind.Index:
+            raise SyntaxErrorException("FIXME: Aggregates should support attribute-access as well as array-style member access.")
+        return Aggregate.RhsSlice(key, self.get_net_type())
+
+    class PhiSlice(GenericModule):
+        """
+        This class handles the case of member-wise assignment to Aggregates. Things, like:
+
+        a[3:0] <<= b
+        a[3:0][1] <<= c
+
+        and things like that.
+
+        PhiSlices are type-specific and have different guts for ex. Numbers.
+
+        For Aggregates, they are collecting *all* the assignments to a given junction and generate
+        a single assignment Verilog statement. This is needed because Silicon treats Aggregates as a single
+        entity and expects to be able to generate a single assignment.
+        """
+        output_port = Output()
+
+        def construct(self, key_chains: Sequence[Sequence[Tuple[Any, KeyKind]]], aggregate: 'Aggregate'):
+            self.key_chains = key_chains
+            self.input_map = None
+            self.output_port.set_net_type(aggregate)
+
+        def create_positional_port_callback(self, idx: int, net_type: Optional['NetType'] = None) -> Tuple[str, Port]:
+            # Create the associated input to the key. We don't support named ports, only positional ones.
+            if idx >= len(self.key_chains):
+                raise InvalidPortError
+            name = f"slice_{idx}"
+            ret_val = Input(net_type)
+            return name, ret_val
+
+        def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
+            raise InvalidPortError()
+
+        def finalize_input_map(self, common_net_type: object):
+            if self.input_map is not None:
+                return
+            self.input_map = OrderedDict()
+            keyed_inputs = set()
+            for raw_key, input in zip(self.key_chains, self.get_inputs().values()):
+                remaining_keys, final_key = common_net_type.resolve_key_sequence_for_set(raw_key)
+                if remaining_keys is not None:
+                    raise FixmeException("Can't resolve all keys in a LHS context. THIS COULD BE FIXED!!!!")
+                key = common_net_type.Key(final_key) # Convert the raw key into something that the common type understands
+                if key in self.input_map:
+                    raise SyntaxErrorException(f"Input key {raw_key} is not unique for concatenator output type {common_net_type}")
+                self.input_map[key] = input
+                keyed_inputs.add(input)
+            for input in self.get_inputs().values():
+                assert input in keyed_inputs, f"Strange: PhiSlice has an input {input} without an associated key"
+
+        def body(self) -> None:
+            pass
+
+        def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
+            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+        def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
+            return self.output_port.get_net_type().compose_concatenated_expression(back_end, self.input_map, target_namespace)
+        def simulate(self) -> TSimEvent:
+            net_type = self.output_port.get_net_type()
+            cache = net_type.prep_simulate_concatenated_expression(self.input_map)
+            while True:
+                yield self.get_inputs().values()
+                self.output_port <<= net_type.simulate_concatenated_expression(cache)
+
+        def is_combinational(self) -> bool:
+            """
+            Returns True if the module is purely combinational, False otherwise
+            """
+            return True
+
+    @staticmethod
+    def get_lhs_slicer(key_chains: Sequence[Sequence[Tuple[Any, KeyKind]]]) -> 'Module':
+        return Number.PhiSlice(key_chains)
+        
+    @classmethod
+    def resolve_key_sequence_for_get(cls, keys: Sequence[Tuple[Any, KeyKind]], for_junction: Junction) -> Tuple[Optional[Sequence[Tuple[Any, KeyKind]]], Junction]:
+        # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing
+        # Returns the final junction and the remaining keys if they cannot be processed.
+        # NOTE: for Aggregates, this is easy, as the chain can only have a single element.
+        remaining_keys, key = cls.resolve_key_sequence_for_set(keys)
+        member_name = key[0]
+        if member_name not in cls.members:
+            raise SyntaxErrorException(f"'{member_name}' is not a member of '{cls}'")
+        member_desc = cls.members[member_name]
+        return remaining_keys, Aggregate.RhsSlice(member_name, member_desc.member)(for_junction)
+
+    @classmethod
+    def resolve_key_sequence_for_set(cls, keys: Sequence[Tuple[Any, KeyKind]]) -> Any:
+        # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing for PhiSlices (set context)
+        # Returns remaining keys and the resolved slice
+        # For aggregates, this is trivial: they key sequence is always a single entry
+        return keys[1:], keys[0]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def is_struct(thing: Any) -> bool:

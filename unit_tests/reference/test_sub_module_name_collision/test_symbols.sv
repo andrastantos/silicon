@@ -1,50 +1,52 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Top
+// top
 ////////////////////////////////////////////////////////////////////////////////
-module Top (
-	output logic [4:0] out_a,
-	output logic [4:0] out_b,
-	input logic [2:0] in_a,
-	input logic [2:0] in_b
+module top (
+	input logic in_1,
+	input logic in_2,
+	output logic out_1,
+	output logic out_2
 );
 
-	DecoratorModule u (
-		.output_port(out_a),
-		.a(in_a)
+	test_symbols_and_gate u (
+		.in_a(in_1),
+		.in_b(in_2),
+		.out_a(out_1)
 	);
 
-	DecoratorModule_2 u1 (
-		.output_port(out_b),
-		.a(in_a[2:0]),
-		.b(in_b[1])
+	test_symbols_or_gate u1 (
+		.in_a(in_1),
+		.in_b(in_2),
+		.out_a(out_2)
 	);
 
 endmodule
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// DecoratorModule_2
+// test_symbols_or_gate
 ////////////////////////////////////////////////////////////////////////////////
-module DecoratorModule_2 (
-	output logic [3:0] output_port,
-	input logic [2:0] a,
-	input logic b
+module test_symbols_or_gate (
+	input logic in_a,
+	input logic in_b,
+	output logic out_a
 );
 
-	assign output_port = a + b;
+	assign out_a = in_a | in_b;
 
 endmodule
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// DecoratorModule
+// test_symbols_and_gate
 ////////////////////////////////////////////////////////////////////////////////
-module DecoratorModule (
-	output logic output_port,
-	input logic [2:0] a
+module test_symbols_and_gate (
+	input logic in_a,
+	input logic in_b,
+	output logic out_a
 );
 
-	assign output_port = a[0];
+	assign out_a = in_a & in_b;
 
 endmodule
 

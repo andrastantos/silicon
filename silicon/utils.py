@@ -447,7 +447,7 @@ class ScopedAttr(object):
         del self.old_value
 
 
-def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Module', *, debug_print_level: int = 0, debug_scope: str):
+def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Module', explicit: bool, *, debug_print_level: int = 0, debug_scope: str):
     if hasattr(junction, "convert_to_junction"):
         junction = junction.convert_to_junction()
     if hasattr(junction, "get_underlying_junction"):
@@ -471,6 +471,10 @@ def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Mod
             # We need to name the net. We do that by adding a wire with a name attached to it, which matches
             # the local variables' name.
             wire = Wire(parent_module=parent_module)
+            if explicit:
+                parent_module._impl.netlist.symbol_table[parent_module].add_hard_symbol(wire, name)
+            else:
+                parent_module._impl.netlist.symbol_table[parent_module].add_soft_symbol(wire, name)
             wire.local_name = name
             if debug_print_level > 1:
                 print(f"\tJUNCTION {wire.name} {id(wire):x} CREATED for {debug_scope}")

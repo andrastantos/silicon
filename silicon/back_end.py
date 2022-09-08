@@ -92,6 +92,9 @@ class SystemVerilog(BackEnd):
     def unsigned_cast(self, expression: str) -> str:
         return f"$unsigned({expression})"
 
+    def get_member_delimiter(self) -> str:
+        return "_"
+
     def get_operator_precedence(self, operator: str, is_unary: bool = None) -> int:
         """
         SystemVerilog operators and their precedence:

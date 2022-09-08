@@ -8,6 +8,7 @@ from itertools import chain
 from .exceptions import SyntaxErrorException
 from .stack import Stack
 from pathlib import Path
+from .sym_table import SymbolTable
 
 def fully_qualified_name(thing: Any, mangle: bool=True) -> str:
     type = thing.__class__
@@ -216,9 +217,10 @@ class Netlist(object):
         self.module_to_xnet_map = OrderedDict()
         self._parent_modules = Stack()
         self.enter_depth = 0
+        self.symbol_table = SymbolTable()
 
     @staticmethod
-    def get_global_netlist():
+    def get_global_netlist() -> 'Netlist':
         return globals()["netlist"]
 
     def get_current_scope(self = None) -> Optional['Module']:
@@ -364,7 +366,7 @@ class Netlist(object):
                     self.module_to_xnet_map[scope] = OrderedSet()
                 self.module_to_xnet_map[scope].add(xnet)
                 module_name = scope._impl.get_fully_qualified_name()
-                if scope._impl.has_explicit_name or add_unnamed_scopes:
+                if not self.symbol_table[scope._impl.parent].is_auto_symbol(scope) or add_unnamed_scopes:
                     names_in_scope = xnet.get_names(scope)
                     for name in names_in_scope:
                         xnet.names.add(module_name + FQN_DELIMITER + name)
@@ -452,6 +454,9 @@ class Netlist(object):
         return self.junction_to_xnet_map[junction]
 
     def get_xnets_for_junction(self, junction: 'Junction', base_name: str = "<unknown>") -> Dict[str, Tuple['XNet', 'Junction']]:
+        """
+        Return a set of XNets for a given junction. Normally, this is just a single XNet, but for composites, it's one XNet per member.
+        """
         if not junction.is_composite():
             return {base_name: (self.get_xnet_for_junction(junction), junction)}
         ret_val = OrderedDict()
@@ -476,6 +481,7 @@ class Netlist(object):
         if self.top_level is None:
             self.top_level = module
         self.modules.add(module)
+        self.symbol_table[self.get_current_scope()].add_auto_symbol(module)
 
     def get_top_level_name(self) -> str:
         return self.get_module_class_name(self.top_level)
@@ -491,7 +497,8 @@ class Netlist(object):
             return self.netlist
         def __exit__(self, exception_type, exception_value, traceback):
             try:
-                self.netlist._elaborate(add_unnamed_scopes=self.add_unnamed_scopes)
+                if exception_type is None:
+                    self.netlist._elaborate(add_unnamed_scopes=self.add_unnamed_scopes)
             finally:
                 self.marker.__exit__(exception_type, exception_value, traceback)
                 self.netlist.__exit__(exception_type, exception_value, traceback)
@@ -505,9 +512,8 @@ class Netlist(object):
         top_impl: Module.Impl = self.top_level._impl
         
         # Give top level a name and mark it as user-assigned.
-        if top_impl.name is None:
-            top_impl.name = type(self.top_level).__name__
-            top_impl.has_explicit_name = True
+        if top_impl.get_name() is None:
+            top_impl.set_name(type(self.top_level).__name__, explicit=True)
 
         with Module.Context(top_impl):
             all_inputs_specialized = all(tuple(input.is_specialized() for input in top_impl.get_inputs().values()))
@@ -527,6 +533,11 @@ class Netlist(object):
         #   TODO: in fact, this shouldn't happen at all this way: it's way too brittle. I think a better way of dealing with this is to
         #         str-compare the generated guts after the fact and eject the identical ones.
         def populate_names(module: 'Module'):
+            def delimiter(obj: object) -> str:
+                if is_module(obj):
+                    return ""
+                return "_"
+            self.symbol_table.make_unique(delimiter)
             from .module import Module
             module._impl.create_symbol_table()
             module._impl.populate_submodule_names(self)

@@ -92,9 +92,9 @@ module full_adder (
 );
 
 	logic u_out_a;
-	logic u4_out_a;
 	logic u2_out_a;
 	logic u3_out_a;
+	logic u4_out_a;
 	logic u5_out_a;
 
 	xor_gate2 u (
@@ -109,32 +109,32 @@ module full_adder (
 		.out_a(out_a)
 	);
 
-	and_gate2 u2 (
+	and_gate2 u3 (
 		.in_a(in_a),
-		.in_b(in_c),
-		.out_a(u2_out_a)
-	);
-
-	and_gate3 u3 (
-		.in_a(in_b),
 		.in_b(in_c),
 		.out_a(u3_out_a)
 	);
 
-	and_gate1 u4 (
-		.in_a(in_a),
-		.in_b(in_b),
+	and_gate3 u4 (
+		.in_a(in_b),
+		.in_b(in_c),
 		.out_a(u4_out_a)
 	);
 
+	and_gate1 u2 (
+		.in_a(in_a),
+		.in_b(in_b),
+		.out_a(u2_out_a)
+	);
+
 	or_gate u5 (
-		.in_a(u2_out_a),
-		.in_b(u3_out_a),
+		.in_a(u3_out_a),
+		.in_b(u4_out_a),
 		.out_a(u5_out_a)
 	);
 
 	or_gate u6 (
-		.in_a(u4_out_a),
+		.in_a(u2_out_a),
 		.in_b(u5_out_a),
 		.out_a(out_c)
 	);

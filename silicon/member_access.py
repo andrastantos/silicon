@@ -141,6 +141,8 @@ class UniSlicer(JunctionBase):
         key_chain = ((self.key, self.key_kind), ) + key_chain
         self.parent.set_partial_source(key_chain, source, scope)
 
+    def get_default_name(self, scope: object) -> str:
+        return "uni_slicer"
 class Slice(GenericModule):
     input_port = Input()
     output_port = Output()

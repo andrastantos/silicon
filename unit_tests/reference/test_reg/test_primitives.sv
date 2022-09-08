@@ -18,21 +18,21 @@ module top (
 	logic [3:0] registered;
 	logic [1:0] reset_reg;
 	logic [1:0] reset_reg2;
-	logic [3:0] u5_output_port;
-	logic [1:0] u6_output_port;
+	logic [3:0] u8_output_port;
+	logic [1:0] u9_output_port;
 	logic reset;
 
 	always_ff @(posedge clk1) u_output_port <= uin1;
 	always_ff @(posedge clk1) registered <= uin2;
-	always_ff @(posedge clk2) u5_output_port <= reset ? 4'h0 : uin2;
-	always_ff @(posedge clk1) u6_output_port <= reset ? 2'h0 : uin1;
+	always_ff @(posedge clk2) u8_output_port <= reset ? 4'h0 : uin2;
+	always_ff @(posedge clk1) u9_output_port <= reset ? 2'h0 : uin1;
 	assign reset = uin2[0];
 	always_ff @(posedge clk1) reset_reg <= uin2[1] ? 2'h3 : uin1;
 	always_ff @(posedge clk1) reset_reg2 <= reset ? 2'h2 : uin1;
 	assign sout1 = u_output_port;
 	assign uout1 = registered;
-	assign uout2 = u5_output_port;
-	assign uout3 = u6_output_port;
+	assign uout2 = u8_output_port;
+	assign uout3 = u9_output_port;
 
 	assign uout4 = 5'hx;
 	assign clk = clk1;

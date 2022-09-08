@@ -142,6 +142,8 @@ class Module(object):
         return self._impl.get_wires()
     def get_junctions(self) -> 'OrderedDict[str, Junction]':
         return self._impl.get_junctions()
+    def get_default_name(self, scope: object) -> str:
+        return "u"
 
 
 
@@ -354,7 +356,7 @@ class Module(object):
 
                     if rtl_instantiations != "":
                         rtl_instantiations += "\n"
-                    rtl_instantiations += f"{module_class_name} {sub_module._impl.name} (\n"
+                    rtl_instantiations += f"{module_class_name} {sub_module._impl.get_name()} (\n"
                     sub_module_ports = sub_module.get_ports()
                     last_port_idx = len(sub_module_ports) - 1
                     for idx, (sub_module_port_name, sub_module_port) in enumerate(sub_module_ports.items()):
@@ -468,7 +470,7 @@ class Module(object):
             import os
             import pathlib
 
-            self.netlist = Netlist.get_global_netlist()
+            self.netlist: 'Netlist' = Netlist.get_global_netlist()
             self.netlist.register_module(true_module)
             parent = self.netlist.get_current_scope()
             if parent is not None:
@@ -538,8 +540,6 @@ class Module(object):
                 self._local_wires: Dict[int, Junction] = dict()
                 self._generate_needed = False # Set to True if body generation is needed, False if not (that is if module got inlined)
                 self._body_generated = False # Set to true if a body was already generated. This prevents body generation, even if _generate_needed is set
-                self.name = None
-                self.has_explicit_name = False
                 #self._sub_modules = OrderedSet()
                 self._sub_modules = []
                 self._unordered_sub_modules = [] # Sub-modules first get inserted into this list. Once an output of a sub-module is accessed, it is moved into _sub_modules. Finally, when all is done, the rest of the sub-modules are moved over as well.
@@ -582,10 +582,11 @@ class Module(object):
                     del instance_port._net_type
                     instance_port._net_type = port_object._net_type
                     instance_port.set_parent_module(self._true_module)
-                    setattr(self._true_module, port_name, instance_port)
                     # Since we didn't actually create a new Port object - we've copied it, it's __init__ didn't get called.
-                    # As such, the new port didn't get registered for context changes. Let's fix that
-                    Context.register(instance_port._context_change)
+                    # As such, some of the initialization didn't happen. Let's fix that
+                    instance_port._init_phase2(self._true_module)
+                    setattr(self._true_module, port_name, instance_port)
+
                     #print("Creating instance port with name: {} and type {}".format(port_name, port_object))
                 #print("module {} is created".format(type(self)))
                 # Store construct arguments locally so we can compare them later for is_equivalent
@@ -678,26 +679,26 @@ class Module(object):
             return self._local_wires.values
         def get_junctions(self) -> Sequence[Junction]:
             return chain(self._junctions.values(), self._local_wires.values())
-        def __get_instance_name(self) -> str:
-            if self.parent is None and self.name is None:
-                return type(self).__name__
-            assert self.name is not None, f"Node {self} somehow doesn't have a name. Maybe didn't elaborate???"
-            return self.name
         def get_fully_qualified_name(self) -> str:
             from .utils import FQN_DELIMITER
             node = self
-            name = self.__get_instance_name()
+            name = self.get_name()
+            assert name is not None, f"Node {self} somehow doesn't have a name. Maybe didn't elaborate???"
             while node.parent is not None:
                 node = node.parent._impl
-                name = node.__get_instance_name() + FQN_DELIMITER + name
+                name = node.get_name() + FQN_DELIMITER + name
             return name
         def get_diagnostic_name(self, add_location: bool = True, add_type: bool = True, add_hierarchy: bool = True) -> str:
             from .utils import FQN_DELIMITER
             node = self
-            if self.name is None and not add_type:
-                name = f"<unnamed:{type(self).__name__}>"
+            names = self.netlist.symbol_table[self.parent].get_names(self._true_module)
+            if len(names) == 0:
+                if not add_type:
+                    name = f"<unnamed:{type(self).__name__}>"
+                else:
+                    name = f"<unnamed>"
             else:
-                name = self.name
+                name = first(names)
             if add_hierarchy:
                 while node.parent is not None:
                     node = node.parent._impl
@@ -714,12 +715,13 @@ class Module(object):
                 return f"{prefix}{self._filename}{lineno}"
 
         def _set_no_bind_attr(self, name, value) -> None:
-            # If we happen to override an existing Junction object, make sure it gets removed from port lists as well
+            # If we happen to override an existing Junction object, make sure it gets removed from port lists and the symbol table as well
             if name in self._true_module.__dict__ and self._true_module.__dict__[name] is value:
                 assert False
             if name in self._true_module.__dict__:
                 old_attr = self._true_module.__dict__[name]
                 if is_junction_base(old_attr):
+                    old_attr.del_interface_name()
                     if not is_wire(old_attr):
                         del self._ports[name]
                     if name in self._inputs:
@@ -736,7 +738,7 @@ class Module(object):
                         del self._positional_inputs[name]
                     elif name in self._positional_outputs:
                         del self._positional_outputs[name]
-            # If we insert a new Junction object, update the port lists as well
+            # If we insert a new Junction object, update the port lists and the symbol table as well
             if is_junction_base(value):
                 from .back_end import get_reserved_names
                 if name in get_reserved_names():
@@ -759,7 +761,7 @@ class Module(object):
                 elif is_wire(junction):
                     self._wires[name] = junction
                     # Wires get thrown in _local_wires by their constructor.
-                    # If they are later assigned to an attribute, let's remove them from the _local_wires collecion.
+                    # If they are later assigned to an attribute, let's remove them from the _local_wires collection.
                     try:
                         del self._local_wires[id(junction)]
                     except KeyError:
@@ -947,7 +949,7 @@ class Module(object):
                                 continue
                             attr_value = getattr(self._true_module, attr_name)
                             if is_junction_base(attr_value):
-                                register_local_wire(attr_name, attr_value, self._true_module, debug_print_level=0, debug_scope=f"{self}")
+                                register_local_wire(attr_name, attr_value, self._true_module, explicit=False, debug_print_level=0, debug_scope=f"{self}")
 
                     # Finish ordering sub-modules:
                     for sub_module in self._unordered_sub_modules:
@@ -1004,8 +1006,10 @@ class Module(object):
                                 source = implicit_adapt(old_source, junction.get_net_type())
                                 # If an adaptor was created, fix up connectivity, including inserting a naming wire, if needed
                                 if source is not old_source:
-                                    if old_source.get_parent_module()._impl.has_explicit_name:
+                                    parent_module = old_source.get_parent_module()
+                                    if not self.netlist.symbol_table[parent_module._impl.parent].is_auto_symbol(parent_module):
                                         naming_wire = Wire(source.get_net_type(), scope)
+                                        self.netlist.symbol_table[scope].add_soft_symbol(naming_wire, old_source.interface_name) # This creates duplicates of course, but that will be resolved later on
                                         naming_wire.local_name = old_source.interface_name # This creates duplicates of course, but that will be resolved later on
                                         naming_wire.set_source(source, scope=scope)
                                         junction.set_source(naming_wire, scope)
@@ -1171,29 +1175,53 @@ class Module(object):
         def create_symbol_table(self) -> None:
             self.symbol_table = Module.SymbolTable()
 
+        def get_name(self) -> Optional[str]:
+            names = self.netlist.symbol_table[self.parent].get_names(self._true_module)
+            if len(names) == 0:
+                return None
+            if len(names) == 1:
+                return first(names)
+            assert False
+
+        def set_name(self, name:str, explicit: bool) -> None:
+            # We only allow changing the name from None to something. That is, naming an auto-symbol.
+            scope_table = self.netlist.symbol_table[self.parent]
+            scope_table.del_auto_symbol(self._true_module)
+            if explicit:
+                scope_table.add_hard_symbol(self._true_module, name)
+            else:
+                scope_table.add_soft_symbol(self._true_module, name)
+
         def populate_submodule_names(self, netlist: 'Netlist') -> None:
             """
             Makes sure that every sub_module have a name and that all names are unique.
             """
 
             for sub_module in self._sub_modules:
-                if sub_module._impl.name is not None:
-                    base_instance_name = sub_module._impl.name
+                sub_module_name = sub_module._impl.get_name()
+                if sub_module_name is not None:
+                    base_instance_name = sub_module_name
+                    explicit = True
                     delimiter = "_"
-                    sub_module._impl.has_explicit_name = True
                 else:
                     base_instance_name = "u"
+                    explicit = False
                     delimiter = ""
-                    sub_module._impl.has_explicit_name = False
                 unique_name = self.symbol_table.register_symbol(base_instance_name, sub_module, delimiter)
 
-                if sub_module._impl.name is not None and sub_module._impl.name != unique_name:
-                    print(f"WARNING: module name {sub_module._impl.name} is not unique or reserved. Overriding to {unique_name}")
-                sub_module._impl.name = unique_name
+                if sub_module._impl.get_name() is not None and sub_module._impl.get_name() != unique_name:
+                    print(f"WARNING: module name {sub_module._impl.get_name()} is not unique or reserved. Overriding to {unique_name}")
+                sub_module._impl.set_name(unique_name, explicit=explicit)
 
         def populate_xnet_names(self, netlist: 'Netlist') -> None:
             """
-            Makes sure that every xnet within the modules body have at least one name and that all names are unqiue.
+            Makes sure that every xnet within the modules body have at least one name.
+
+            At this point, all junction names are populated and made unique.
+            
+            TODO: I'm not sure if this should happen before or after braking up composites.
+                  If it happens before, that means that new XNets (and names) will be created
+                  and as a consequence, there could be new name-collisions.
             """
 
             # Start with all our own ports (least likely to have a name collision, and must have at least one inner name)
@@ -1285,7 +1313,7 @@ class Module(object):
                             if source_module is self._true_module:
                                 name = source_port.interface_name
                             else:
-                                name = f"{source_module._impl.name}{MEMBER_DELIMITER}{source_port.interface_name}"
+                                name = f"{source_module._impl.get_name()}{MEMBER_DELIMITER}{source_port.interface_name}"
                             unique_name = self.symbol_table.register_symbol(name, xnet)
                             assert unique_name == name
                             xnet.add_name(self._true_module, unique_name, is_explicit=False, is_input=False) # These ports are not inputs, at least not as far is this context is concerned.

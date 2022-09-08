@@ -26,14 +26,14 @@ module UseFSM (
 	output logic data_out_valid
 );
 
-	logic [8:0] u34_output_port;
-	logic [8:0] u38_output_port;
+	logic [8:0] u30_output_port;
+	logic [8:0] u35_output_port;
 	logic [7:0] next_my_sum;
 	logic [7:0] my_sum;
 	States my_fsm_state;
 	States my_fsm_next_state;
 
-	assign next_my_sum = my_fsm_next_state == reset ? 1'h0 : 8'b0 | my_fsm_next_state == idle ? 1'h0 : 8'b0 | my_fsm_next_state == get_first_data ? data_in : 8'b0 | my_fsm_next_state == get_data ? u34_output_port[7:0] : 8'b0 | my_fsm_next_state == get_wait ? my_sum : 8'b0 | my_fsm_next_state == send_data ? u38_output_port[7:0] : 8'b0 ;
+	assign next_my_sum = my_fsm_next_state == reset ? 1'h0 : 8'b0 | my_fsm_next_state == idle ? 1'h0 : 8'b0 | my_fsm_next_state == get_first_data ? data_in : 8'b0 | my_fsm_next_state == get_data ? u30_output_port[7:0] : 8'b0 | my_fsm_next_state == get_wait ? my_sum : 8'b0 | my_fsm_next_state == send_data ? u35_output_port[7:0] : 8'b0 ;
 	always_ff @(posedge clk) my_sum <= rst ? 8'h0 : next_my_sum;
 	assign data_out_valid = my_fsm_state == send_data;
 
@@ -61,8 +61,8 @@ module UseFSM (
 		.input_get_first_data_to_send_data(data_in_valid & data_last)
 	);
 
-	assign u34_output_port = my_sum + data_in;
-	assign u38_output_port = my_sum + data_in;
+	assign u30_output_port = my_sum + data_in;
+	assign u35_output_port = my_sum + data_in;
 	assign data_out = my_sum;
 endmodule
 

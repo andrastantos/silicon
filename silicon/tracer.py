@@ -85,7 +85,7 @@ class Tracer(object):
                         print(f"Traces is enabled outside of module bodies. THIS IS REALLY BAD!!!", file=sys.stderr)
                         sys.exit(-1)
                     try:
-                        register_local_wire(local_name, local_value, parent_module, debug_print_level=Tracer.debug_print_level, debug_scope=func_name)
+                        register_local_wire(local_name, local_value, parent_module, explicit=False, debug_print_level=Tracer.debug_print_level, debug_scope=func_name)
                     except SyntaxErrorException as ex:
                         print(f"{ex}", file=sys.stderr)
                         sys.exit(-1)
@@ -95,10 +95,10 @@ class Tracer(object):
                     if Tracer.debug_print_level > 1:
                         print(f"\tModule {local_name} = {local_value}")
                     module = local_value
-                    if module._impl.name is not None:
+                    if module._impl.get_name() is not None:
                         print(f"\t\tWARNING: module already has a name {module}. Not changing it")
                     else:
-                        module._impl.name = local_name
+                        module._impl.set_name(local_name, explicit=True)
             return chain()
         elif event == "c_call":
             return chain()

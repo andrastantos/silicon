@@ -34,16 +34,23 @@ class JunctionBase(object):
         # There is a generic 'deepcopy' call in _init_phase2 that creates the instance-level copies for all the ports.
         # This means that __init__ for those ports is not getting called, the instance-level port is not a brand new
         # object, it's a copy of an already live one. This means, that none of this code gets executed for instance-level
-        # ports. Right now, the most important thing here is that 'Context.register' doesn't get executed, but every time
-        # we put stuff in here, that needs to be checked against the copy functionality in '_init_phase2' of 'Module.
+        # ports. Things that *do* need to get executed in all contexts, should go into '_init_phase2'. That in turn
+        # will get called from '_init_phase2' of 'Module'.
         assert parent_module is None or is_module(parent_module)
 
         super().__init__()
-        Context.register(self._context_change)
-        self._allow_auto_bind = True
         self._parent_module = parent_module
+        self._allow_auto_bind = True
         self._no_rtl = False # If set to true, we'll try to not generate RTL code for this junction, by not registering it in Tracer or in _body
         self._scoped_ports = []
+        if parent_module is not None:
+            self._init_phase2(parent_module)
+
+    def _init_phase2(self, parent_module: 'Module'):
+        assert parent_module is not None
+        self._parent_module = parent_module
+        Context.register(self._context_change)
+        parent_module._impl.netlist.symbol_table[parent_module].add_auto_symbol(self)
 
     def __getitem__(self, key: Any) -> Any:
         if Context.current() == Context.simulation:
@@ -363,6 +370,9 @@ class JunctionBase(object):
         """
         return True
 
+    def __hash__(self):
+        return id(self)
+
 
 
 
@@ -385,8 +395,8 @@ class Junction(JunctionBase):
         # There is a generic 'deepcopy' call in _init_phase2 that creates the instance-level copies for all the ports.
         # This means that __init__ for those ports is not getting called, the instance-level port is not a brand new
         # object, it's a copy of an already live one. This means, that none of this code gets executed for instance-level
-        # ports. Right now, the most important thing here is that 'Context.register' doesn't get executed, but every time
-        # we put stuff in here, that needs to be checked against the copy functionality in '_init_phase2' of 'Module.
+        # ports. Things that *do* need to get executed in all contexts, should go into '_init_phase2'. That in turn
+        # will get called from '_init_phase2' of 'Module'.
         super().__init__(parent_module)
         from .module import Module
         self._source: Optional['Junction.NetEdge'] = None
@@ -447,7 +457,8 @@ class Junction(JunctionBase):
         assert parent_module is None or is_module(parent_module)
         assert self._parent_module is None or self._parent_module is parent_module
         assert self._parent_junction is None or self._parent_junction._parent_module is parent_module
-        self._parent_module = parent_module
+        if self._parent_module is None:
+            self._init_phase2(parent_module)
         # Recurse into members
         for member_junction, _ in self.get_member_junctions().values():
             member_junction.set_parent_module(parent_module)
@@ -760,12 +771,28 @@ class Junction(JunctionBase):
         if self._xnet.source is self:
             self._xnet.sim_state.sim_context.schedule_value_change(self._xnet, new_sim_value, when)
 
+    def get_interface_name(self) -> str:
+        assert self._parent_module is not None
+        names = self._parent_module._impl.get_interface_name(self)
+        assert len(names) == 1
+        return names[0]
 
-    def __hash__(self):
-        return id(self)
+    def del_interface_name(self) -> None:
+        assert self._parent_module is not None
+        self._parent_module._impl.netlist.symbol_table[self._parent_module].del_hard_symbol(self, self.interface_name)
+        self.interface_name = None
+        for member_name, (member_junction, _) in self.get_member_junctions().items():
+            member_junction.del_interface_name()
 
     def set_interface_name(self, name: str) -> None:
+        assert self._parent_module is not None
         self.interface_name = name
+        scope_table = self._parent_module._impl.netlist.symbol_table[self._parent_module]
+        scope_table.add_hard_symbol(self, self.interface_name)
+        try:
+            scope_table.del_auto_symbol(self)
+        except KeyError:
+            pass
         for member_name, (member_junction, _) in self.get_member_junctions().items():
             member_junction.set_interface_name(f"{self.interface_name}{MEMBER_DELIMITER}{member_name}")
 
@@ -854,7 +881,12 @@ class Port(Junction):
         Returns True if the port (an optional auto-port with no driver) got deleted from the interface
         """
         return False
-
+    
+    def get_default_name(self, scope: object) -> str:
+        if scope is not self.get_parent_module()._impl.parent:
+            raise SyntaxErrorException(f"Can't generate default name for port except for its parent scope. Did you end up referencing a port in a different scope?")
+        return f"{self.get_parent_module()._impl.get_name()}{MEMBER_DELIMITER}{self.interface_name}"
+        
 
 
 
@@ -949,6 +981,9 @@ class WireJunction(Junction):
             parent_module._impl.register_wire(self)
         self.rhs_expression: Optional[Tuple[str, int]] = None # Filled-in by the parent_module during the 'generation' phase to contain the expression for the right-hand-side value, if inline expressions are supported for this port.
         self.local_name: Optional[str] = None
+
+    def get_default_name(self, scope: object) -> str:
+        return "unnamed_wire"
 
     @classmethod
     def is_instantiable(cls) -> bool:

@@ -69,6 +69,14 @@
             "cwd": "${workspaceFolder}/unit_tests"
         },
         {
+            "name": "Python: UNIT_TEST/test_symbols",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/unit_tests/test_symbols.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/unit_tests"
+        },
+        {
             "name": "Python: UNIT_TEST/test_primitives",
             "type": "python",
             "request": "launch",
@@ -106,7 +114,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_basics.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/unit_tests"
+            "cwd": "${workspaceFolder}/unit_tests",
+            "justMyCode": False
         },
         {
             "name": "Python: UNIT_TEST/test_self_wire",

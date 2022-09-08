@@ -7,14 +7,14 @@ module Top (
 );
 
 	logic u3_output_port;
-	logic [3:0] u2_state;
+	logic [3:0] u_state;
 	logic [3:0] shouldnt_matter;
 
-	FSM u2 (
+	FSM u (
 		.clock_port(clk),
 		.reset_port(rst),
 		.reset_value(4'hb),
-		.state(u2_state),
+		.state(u_state),
 		.next_state(shouldnt_matter),
 		.default_state(4'hc),
 		.input_11_to_12(u3_output_port)
