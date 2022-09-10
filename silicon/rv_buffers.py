@@ -160,21 +160,21 @@ class Fifo(GenericModule):
                 MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False),
                 MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False)
             ))
-            buffer = Memory(mem_config)
+            buffer_mem = Memory(mem_config)
 
-            buffer.port1_data_in <<= input_data
-            buffer.port1_addr <<= push_addr
-            buffer.port1_write_en <<= push
+            buffer_mem.port1_data_in <<= input_data
+            buffer_mem.port1_addr <<= push_addr
+            buffer_mem.port1_write_en <<= push
             # Since RAM has read-old-value semantics for the case where read and write address matches,
             # we need a bypass pass to get rid of the extra cycle of latency.
             # TODO: Can we do better? We could probably change the logic to take the extra cycle into account.
             #       This way output_data is not registered.
             output_data <<= Select(
                 push_addr == next_pop_addr,
-                buffer.port2_data_out,
+                buffer_mem.port2_data_out,
                 Reg(input_data)
             )
-            buffer.port2_addr <<= next_pop_addr
+            buffer_mem.port2_addr <<= next_pop_addr
             self.output_port.set_data_members(output_data)
 
 

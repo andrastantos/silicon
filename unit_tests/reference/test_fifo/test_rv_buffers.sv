@@ -64,7 +64,7 @@ module Fifo (
 	logic looped;
 	logic [7:0] u83_output_port_data;
 	logic [7:0] output_data_data;
-	logic [7:0] buffer_1_port2_data_out_data;
+	logic [7:0] buffer_mem_port2_data_out_data;
 
 	assign input_port_ready =  ~ full;
 	assign output_port_valid =  ~ empty;
@@ -84,9 +84,9 @@ module Fifo (
 	always_ff @(posedge clock_port) full <= reset_port ? 1'h0 : next_full;
 	always_ff @(posedge clock_port) looped <= reset_port ? 1'h0 : next_looped;
 	always_ff @(posedge clock_port) u83_output_port_data <= reset_port ? 8'h0 : input_port_data;
-	assign output_data_data = push_addr == next_pop_addr ? u83_output_port_data : buffer_1_port2_data_out_data;
+	assign output_data_data = push_addr == next_pop_addr ? u83_output_port_data : buffer_mem_port2_data_out_data;
 
-	Memory buffer_1 (
+	Memory buffer_mem (
 		.port1_addr(push_addr),
 		.port1_clk(clock_port),
 		.port2_addr(next_pop_addr),
@@ -94,7 +94,7 @@ module Fifo (
 		.port1_data_in_data(input_port_data),
 
 		.port1_write_en(push),
-		.port2_data_out_data(buffer_1_port2_data_out_data)
+		.port2_data_out_data(buffer_mem_port2_data_out_data)
 	);
 
 	assign input_data_data = input_port_data;

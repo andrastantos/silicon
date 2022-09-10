@@ -1007,9 +1007,11 @@ class Module(object):
                                 # If an adaptor was created, fix up connectivity, including inserting a naming wire, if needed
                                 if source is not old_source:
                                     parent_module = old_source.get_parent_module()
-                                    if not self.netlist.symbol_table[parent_module._impl.parent].is_auto_symbol(parent_module):
+                                    names = self.netlist.symbol_table[parent_module._impl.parent].get_names(old_source)
+                                    if len(names) > 0:
+                                        name = names[0]
                                         naming_wire = Wire(source.get_net_type(), scope)
-                                        self.netlist.symbol_table[scope].add_soft_symbol(naming_wire, old_source.interface_name) # This creates duplicates of course, but that will be resolved later on
+                                        self.netlist.symbol_table[scope].add_soft_symbol(naming_wire, name) # This creates duplicates of course, but that will be resolved later on
                                         naming_wire.local_name = old_source.interface_name # This creates duplicates of course, but that will be resolved later on
                                         naming_wire.set_source(source, scope=scope)
                                         junction.set_source(naming_wire, scope)
@@ -1186,7 +1188,12 @@ class Module(object):
         def set_name(self, name:str, explicit: bool) -> None:
             # We only allow changing the name from None to something. That is, naming an auto-symbol.
             scope_table = self.netlist.symbol_table[self.parent]
-            scope_table.del_auto_symbol(self._true_module)
+            # TODO: once we have multiple module name support, this method should go away, and we
+            # probable would want to be more strict about deleting existing names
+            try:
+                scope_table.del_auto_symbol(self._true_module)
+            except KeyError:
+                pass
             if explicit:
                 scope_table.add_hard_symbol(self._true_module, name)
             else:

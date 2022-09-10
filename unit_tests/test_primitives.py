@@ -244,8 +244,8 @@ def test_const_cast():
 if __name__ == "__main__":
     #test_select()
     #test_select_one_first()
-    #test_reg()
-    test_reg3()
+    test_reg()
+    #test_reg3()
     #test_reg3b()
     #test_mux()
     #test_select_with_none()
