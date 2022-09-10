@@ -541,7 +541,7 @@ class Module(object):
                 self._generate_needed = False # Set to True if body generation is needed, False if not (that is if module got inlined)
                 self._body_generated = False # Set to true if a body was already generated. This prevents body generation, even if _generate_needed is set
                 #self._sub_modules = OrderedSet()
-                self._sub_modules = []
+                self._sub_modules: Sequence['Module'] = []
                 self._unordered_sub_modules = [] # Sub-modules first get inserted into this list. Once an output of a sub-module is accessed, it is moved into _sub_modules. Finally, when all is done, the rest of the sub-modules are moved over as well.
                 self.parent = parent
 
@@ -1174,6 +1174,7 @@ class Module(object):
             ret_val += ");"
             return ret_val
 
+        # THIS MUST DIE!!!
         def create_symbol_table(self) -> None:
             self.symbol_table = Module.SymbolTable()
 
@@ -1184,41 +1185,6 @@ class Module(object):
             if len(names) == 1:
                 return first(names)
             assert False
-
-        def set_name(self, name:str, explicit: bool) -> None:
-            # We only allow changing the name from None to something. That is, naming an auto-symbol.
-            scope_table = self.netlist.symbol_table[self.parent]
-            # TODO: once we have multiple module name support, this method should go away, and we
-            # probable would want to be more strict about deleting existing names
-            try:
-                scope_table.del_auto_symbol(self._true_module)
-            except KeyError:
-                pass
-            if explicit:
-                scope_table.add_hard_symbol(self._true_module, name)
-            else:
-                scope_table.add_soft_symbol(self._true_module, name)
-
-        def populate_submodule_names(self, netlist: 'Netlist') -> None:
-            """
-            Makes sure that every sub_module have a name and that all names are unique.
-            """
-
-            for sub_module in self._sub_modules:
-                sub_module_name = sub_module._impl.get_name()
-                if sub_module_name is not None:
-                    base_instance_name = sub_module_name
-                    explicit = True
-                    delimiter = "_"
-                else:
-                    base_instance_name = "u"
-                    explicit = False
-                    delimiter = ""
-                unique_name = self.symbol_table.register_symbol(base_instance_name, sub_module, delimiter)
-
-                if sub_module._impl.get_name() is not None and sub_module._impl.get_name() != unique_name:
-                    print(f"WARNING: module name {sub_module._impl.get_name()} is not unique or reserved. Overriding to {unique_name}")
-                sub_module._impl.set_name(unique_name, explicit=explicit)
 
         def populate_xnet_names(self, netlist: 'Netlist') -> None:
             """

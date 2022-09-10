@@ -512,8 +512,10 @@ class Netlist(object):
         top_impl: Module.Impl = self.top_level._impl
         
         # Give top level a name and mark it as user-assigned.
-        if top_impl.get_name() is None:
-            top_impl.set_name(type(self.top_level).__name__, explicit=True)
+        scope_table = self.symbol_table[None]
+        if scope_table.is_auto_symbol(self.top_level):
+            scope_table.del_auto_symbol(self.top_level)
+            scope_table.add_hard_symbol(self.top_level, type(self.top_level).__name__)
 
         with Module.Context(top_impl):
             all_inputs_specialized = all(tuple(input.is_specialized() for input in top_impl.get_inputs().values()))
@@ -537,10 +539,13 @@ class Netlist(object):
                 if is_module(obj):
                     return ""
                 return "_"
+
+            for sub_module in module._impl._sub_modules:
+                assert self.symbol_table[module].exists(sub_module)
+
             self.symbol_table.make_unique(delimiter)
             from .module import Module
             module._impl.create_symbol_table()
-            module._impl.populate_submodule_names(self)
             module._impl.populate_xnet_names(self)
             for sub_module in module._impl.get_sub_modules():
                 populate_names(sub_module)

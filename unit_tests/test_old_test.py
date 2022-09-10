@@ -178,10 +178,13 @@ def test_local_gates():
             yyyy = self.out_1
             tttt = A.in_a
             ttt = tttt
-            d.get_parent_module()._impl.set_name("D", explicit=True)
+            scope_table = self._impl.netlist.symbol_table[self]
+            scope_table.del_auto_symbol(d.get_parent_module())
+            scope_table.add_hard_symbol(d.get_parent_module(), "D")
             #A.out_a = B.in_a # This style of binding is only allowed inside the module, not outside
             (out_a, outc) = full_adder(self.in_1, self.in_2, self.in_3)
-            out_a.get_parent_module()._impl.set_name("FA", explicit=True)
+            scope_table.del_auto_symbol(out_a.get_parent_module())
+            scope_table.add_hard_symbol(out_a.get_parent_module(), "FA")
             self.out_2 <<= self.in_4
             self.out_1 <<= out_a
             self.out_3 <<= outc

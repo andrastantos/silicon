@@ -72,6 +72,9 @@ class Tracer(object):
             stack_frame = frame.f_code
             func_name = stack_frame.co_name
             header_printed = False
+            parent_module = Netlist.get_current_scope()
+            netlist = parent_module._impl.netlist
+            scope_table = netlist.symbol_table[parent_module]
             for local_name in sorted(frame.f_locals.keys()):
                 local_value = frame.f_locals[local_name]
                 if local_name == "self":
@@ -79,7 +82,6 @@ class Tracer(object):
                 from .utils import is_junction_base, is_module, register_local_wire
                 if is_junction_base(local_value):
                     header_printed = print_header()
-                    parent_module = Netlist.get_current_scope()
                     if parent_module is None:
                         # We can't really assert in tracer, I don't think. So we simply terminate with a nasty message
                         print(f"Traces is enabled outside of module bodies. THIS IS REALLY BAD!!!", file=sys.stderr)
@@ -94,11 +96,12 @@ class Tracer(object):
                     header_printed = print_header()
                     if Tracer.debug_print_level > 1:
                         print(f"\tModule {local_name} = {local_value}")
-                    module = local_value
-                    if module._impl.get_name() is not None:
-                        print(f"\t\tWARNING: module already has a name {module}. Not changing it")
+                    module: 'Module' = local_value
+                    if scope_table.is_auto_symbol(module):
+                        scope_table.del_auto_symbol(module)
+                        scope_table.add_hard_symbol(module, local_name)
                     else:
-                        module._impl.set_name(local_name, explicit=True)
+                        print(f"\t\tWARNING: module already has a name {module}. Not changing it")
             return chain()
         elif event == "c_call":
             return chain()
