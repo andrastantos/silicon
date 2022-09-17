@@ -189,6 +189,17 @@ def test_reg4():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_reg5():
+    class top(Module):
+        sout1 = Output(Unsigned(length=2))
+        uin1 = Input(Unsigned(length=2))
+        clk = Input(logic)
+
+        def body(self):
+            self.sout1 <<= Reg(self.uin1)
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 def test_partial_assign():
     class top(Module):
         out1 = Output(Unsigned(length=5))
@@ -244,9 +255,11 @@ def test_const_cast():
 if __name__ == "__main__":
     #test_select()
     #test_select_one_first()
-    test_reg()
+    #test_reg()
     #test_reg3()
     #test_reg3b()
+    #test_reg4()
+    test_reg5()
     #test_mux()
     #test_select_with_none()
     #test_reg4()
