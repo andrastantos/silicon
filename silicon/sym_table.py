@@ -64,6 +64,11 @@ class ScopeTable(object):
 
     def add_hard_symbol(self, obj: object, name: str) -> None:
         assert name is not None
+        # Remove any auto-symbols: we don't want them around anymore, now that we have a proper name
+        try:
+            self.del_auto_symbol(obj)
+        except KeyError:
+            pass
         if name in self.hard_symbols and self.hard_symbols[name] is not obj:
             if self.hard_symbols[name] is ScopeTable.reserved:
                 raise SyntaxErrorException(f"Name {name} is reserved and can't be used")
@@ -77,6 +82,11 @@ class ScopeTable(object):
 
     def add_soft_symbol(self, obj: object, name: str) -> None:
         assert name is not None
+        # Remove any auto-symbols: we don't want them around anymore, now that we have a proper name
+        try:
+            self.del_auto_symbol(obj)
+        except KeyError:
+            pass
         try:
             self.soft_symbols[name].add(obj)
         except KeyError:
@@ -100,13 +110,7 @@ class ScopeTable(object):
         self.soft_names[obj].remove(name)
 
     def del_auto_symbol(self, obj: object) -> None:
-        if obj in self.named_auto_symbols:
-            names = tuple(self.soft_names[obj])
-            for name in names:
-                self.del_soft_symbol(obj, name)
-            self.named_auto_symbols.remove(obj)
-        else:
-            self.auto_symbols.remove(obj)
+        self.auto_symbols.remove(obj)
 
     def replace_symbol(self, old_obj: object, new_obj: object) -> None:
         # Replace all mentions of old with new
@@ -119,7 +123,6 @@ class ScopeTable(object):
                 self.del_soft_symbol(old_obj, soft_name)
                 self.add_soft_symbol(new_obj, soft_name)
         if old_obj in self.auto_symbols:
-            self.del_auto_symbol(old_obj)
             self.add_auto_symbol(new_obj)
 
     def is_reserved_name(self, name) -> bool:
@@ -162,6 +165,18 @@ class ScopeTable(object):
             soft_names = ()
         return frozenset(chain(hard_names, soft_names))
 
+    def get_hard_names(self, obj: object) -> FrozenSet[str]:
+        try:
+            return frozenset(self.hard_names[obj])
+        except KeyError:
+            return ()
+
+    def get_soft_names(self, obj: object) -> FrozenSet[str]:
+        try:
+            return frozenset(self.soft_names[obj])
+        except KeyError:
+            return ()
+
     def is_auto_symbol(self, obj: object) -> bool:
         if obj in self.auto_symbols:
             return True
@@ -193,7 +208,6 @@ class ScopeTable(object):
         # First let's deal with unnamed objects. These can create further name collisions that we'll resolve in the next loop
         for auto_obj in tuple(self.auto_symbols):
             auto_name = auto_obj.get_default_name(scope)
-            self.del_auto_symbol(auto_obj)
             self.add_soft_symbol(auto_obj, auto_name)
             self.named_auto_symbols.add(auto_obj)
         assert len(self.auto_symbols) == 0

@@ -98,7 +98,6 @@ class Tracer(object):
                         print(f"\tModule {local_name} = {local_value}")
                     module: 'Module' = local_value
                     if scope_table.is_auto_symbol(module):
-                        scope_table.del_auto_symbol(module)
                         scope_table.add_hard_symbol(module, local_name)
                     else:
                         print(f"\t\tWARNING: module already has a name {module}. Not changing it")

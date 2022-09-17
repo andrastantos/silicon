@@ -34,7 +34,7 @@ class InlineExpression(InlineBlock):
         self.precedence = precedence
     def get_inline_assignments(self, back_end: 'BackEnd') -> str:
         assert len(self.target_ports) == 1
-        return f"assign {first(self.target_ports).interface_name} = {self.expression};\n"
+        return f"assign {first(first(self.target_ports).get_interface_names())} = {self.expression};\n"
     def inline(self, scope: 'Module', netlist: 'Netlist', back_end: 'BackEnd') -> Optional[str]:
         assert len(self.target_ports) == 1
         inline_port = first(self.target_ports)
@@ -163,6 +163,8 @@ class Module(object):
                     try:
                         name, port = self.create_positional_port_callback(idx, net_type=None)
                         assert port is not None
+                        if not is_port(port):
+                            raise SyntaxErrorException("create_positional_port_callback should return a 'Port' instance")
                         self._impl._set_no_bind_attr(name, port)
                     except InvalidPortError:
                         raise SyntaxErrorException(f"Module {self} doesn't support dynamic creation of more positional ports")
@@ -372,7 +374,7 @@ class Module(object):
                                     source_str, _ = sub_module_port_member.get_rhs_expression(back_end, self)
                                 else:
                                     assert False
-                                rtl_instantiations += back_end.indent(f".{sub_module_port_member.interface_name}({source_str})")
+                                rtl_instantiations += back_end.indent(f".{first(sub_module_port_member.get_interface_names())}({source_str})")
                                 if idx != last_port_idx or sub_idx != last_sub_idx:
                                     rtl_instantiations += ","
                                 rtl_instantiations += "\n"
@@ -428,36 +430,6 @@ class Module(object):
             return self._impl._create_named_port(name, port_type=port_type, net_type=net_type)
         except InvalidPortError:
             raise SyntaxErrorException(f"Can't create port '{name}' on module '{self}'.")
-
-    class SymbolTable(object):
-        def __init__(self):
-            self._symbol_table: Dict[str, Any] = OrderedDict()
-            self._base_names: Dict[str, int] = OrderedDict()
-            # pre-populate reserved names into _base_names makes sure that those will not be used.
-            from .back_end import get_reserved_names
-            for name in get_reserved_names():
-                self._base_names[name] = 0
-        def is_reserved_name(self, name) -> bool:
-            from .back_end import get_reserved_names
-            return name in get_reserved_names()
-        def register_symbol(self, base_name: str, object: Any, delimiter: str = "_") -> str:
-            if base_name not in self._base_names:
-                self._base_names[base_name] = 0
-                name = base_name
-            else:
-                idx = self._base_names[base_name] + 1
-                self._base_names[base_name] = idx
-                name = base_name + delimiter + str(idx)
-            assert name not in self._symbol_table
-            self._symbol_table[name] = object
-            return name
-        def replace_symbol(self, name: str, object: Any) -> Any:
-            ret_val = self._symbol_table[name]
-            self._symbol_table[name] = object
-            return ret_val
-        def get_object(self, name: str) -> Any:
-            ret_val = self._symbol_table[name]
-            return ret_val
 
     class Impl(object):
         def __init__(self, true_module: 'Module', supersetattr: Callable, *args, **kwargs):
@@ -534,8 +506,8 @@ class Module(object):
                 self._wires = OrderedDict() # Wires that are declared as attributes. All local_wires get promoted here during XNet creation
                 self._junctions = OrderedDict()
                 # Local wires are wires declared in the body of the module as variables instead of attributes. Most wires are like that.
-                # They don't necessarily have a name, and if they do, that's set on the Wire.local_name attribute. They are later, during
-                # XNet creation are given a name and promoted to the _wire map.
+                # They don't necessarily have a name, at least initially. By the time we get to XNet creation, they certainly have one.
+                # During XNet creation these wires promoted to the _wire map.
                 # This map is indexed by id(wire) to work around the elaboration context __eq__ override problem.
                 self._local_wires: Dict[int, Junction] = dict()
                 self._generate_needed = False # Set to True if body generation is needed, False if not (that is if module got inlined)
@@ -721,7 +693,8 @@ class Module(object):
             if name in self._true_module.__dict__:
                 old_attr = self._true_module.__dict__[name]
                 if is_junction_base(old_attr):
-                    old_attr.del_interface_name()
+                    if is_port(junction):
+                        old_attr.del_interface_name(name)
                     if not is_wire(old_attr):
                         del self._ports[name]
                     if name in self._inputs:
@@ -746,8 +719,9 @@ class Module(object):
                 junction = value
                 junction.set_parent_module(self._true_module)
                 assert junction.is_instantiable()
-                junction.set_interface_name(name)
                 self._junctions[name] = junction
+                if is_port(junction):
+                    junction.add_interface_name(name)
                 if not is_wire(junction):
                     self._ports[name] = junction
                 if is_input_port(junction):
@@ -807,6 +781,9 @@ class Module(object):
             """
             if name in self.get_ports().keys():
                 raise SyntaxErrorException(f"Can't assign to existing port '{name}' on module '{self._true_module}'. Use the '<<=' operator instead.")
+            if is_wire(value):
+                self._set_no_bind_attr(name, value)
+                return
             self.supersetattr(name, value)
 
         def _setattr__generation(self, name, value) -> None:
@@ -888,6 +865,8 @@ class Module(object):
                 port = port_type()
             if port is None:
                 raise InvalidPortError
+            if not is_port(port):
+                raise SyntaxErrorException("create_named_port_callback should return a 'Port' instance")
             self._set_no_bind_attr(name, port)
             return port
 
@@ -1012,7 +991,6 @@ class Module(object):
                                         name = names[0]
                                         naming_wire = Wire(source.get_net_type(), scope)
                                         self.netlist.symbol_table[scope].add_soft_symbol(naming_wire, name) # This creates duplicates of course, but that will be resolved later on
-                                        naming_wire.local_name = old_source.interface_name # This creates duplicates of course, but that will be resolved later on
                                         naming_wire.set_source(source, scope=scope)
                                         junction.set_source(naming_wire, scope)
                                     else:
@@ -1174,10 +1152,6 @@ class Module(object):
             ret_val += ");"
             return ret_val
 
-        # THIS MUST DIE!!!
-        def create_symbol_table(self) -> None:
-            self.symbol_table = Module.SymbolTable()
-
         def get_name(self) -> Optional[str]:
             names = self.netlist.symbol_table[self.parent].get_names(self._true_module)
             if len(names) == 0:
@@ -1197,65 +1171,34 @@ class Module(object):
                   and as a consequence, there could be new name-collisions.
             """
 
-            # Start with all our own ports (least likely to have a name collision, and must have at least one inner name)
+            # Start with all our own ports (must have at least one inner name)
             for my_port_name, my_port in self.get_ports().items():
                 xnets = netlist.get_xnets_for_junction(my_port, my_port_name)
                 for name, (xnet, port) in xnets.items():
-                    if self.symbol_table.is_reserved_name(name):
-                        raise SyntaxErrorException(f"Port name {name} uses a reserved word")
-                    unique_name = self.symbol_table.register_symbol(name, xnet)
-                    xnet.add_name(self._true_module, unique_name, is_explicit=True, is_input=is_input_port(port))
-                    if unique_name != name:
-                        raise SyntaxErrorException(f"Port name {name} is not unique")
+                    xnet.add_name(self._true_module, name, is_explicit=True, is_input=is_input_port(port))
             # Look at named wires. These also have a name.
             for my_wire_name, my_wire in self.get_wires().items():
                 xnets = netlist.get_xnets_for_junction(my_wire, my_wire_name)
                 for name, (xnet, wire) in xnets.items():
-                    if self.symbol_table.is_reserved_name(name):
-                        raise SyntaxErrorException(f"Wire name {name} uses a reserved word")
-                    unique_name = self.symbol_table.register_symbol(name, xnet)
-                    xnet.add_name(self._true_module, unique_name, is_explicit=True, is_input=False)
-                    if unique_name != name:
-                        raise SyntaxErrorException(f"Wire name {name} is not unique")
-                    assert wire.local_name is None or wire.local_name == name
-                    assert wire.interface_name == name
+                    xnet.add_name(self._true_module, name, is_explicit=True, is_input=False)
 
             # Look through local wires (Wire objects defined in the body of the module)
             # 1. promote them to the _wire map as well as make sure they're unique
             # 2. Add them to the associated xnet
             # 3. Give them a name if they're not named (for example, if they're part of a container such as a list or tuple)
             for my_wire in tuple(self._local_wires.values()):
-                local_name = my_wire.local_name
-                if local_name is None: local_name = my_wire.interface_name
-                explicit = local_name is not None
-                if local_name is None:
-                    local_name = self.symbol_table.register_symbol("unnamed_wire", my_wire)
+                wire_name = first(netlist.symbol_table[self._true_module].get_names(my_wire))
+                explicit = not netlist.symbol_table[self._true_module].is_auto_symbol(my_wire)
                 # Get all the sub-nets (or the net itself if it's not a composite)
                 # and handle those instead of my_wire.
-                xnets = netlist.get_xnets_for_junction(my_wire, local_name)
+                xnets = netlist.get_xnets_for_junction(my_wire, wire_name)
                 for name, (xnet, wire) in xnets.items():
                     # Test if name is already registered as either my_wire or xnet
                     # If it is, make sure that it is the same object.
-                    # Either way, come up with a unique name, assign the xnet to that name
-                    # in symbol table, and make sure the xnet is also aware of that name.
-                    unique_name = None
-                    try:
-                        obj = self.symbol_table.get_object(name)
-                        if obj is wire:
-                            self.symbol_table.replace_symbol(name, xnet)
-                            unique_name = name
-                        elif obj is xnet:
-                            assert name in xnet.get_names(self._true_module)
-                            continue
-                        elif not explicit:
-                            raise SyntaxErrorException(f"Net name {name} already exists in module {self}, yet another explicit net tries to access it.")
-                    except KeyError:
-                        pass
-                    if unique_name is None:
-                        unique_name = self.symbol_table.register_symbol(name, xnet)
-                    xnet.add_name(self._true_module, unique_name, is_explicit=explicit, is_input=False)
-                    self._wires[unique_name] = wire
-                    self._junctions[unique_name] = wire
+                    # Either way, make sure the xnet is aware of that name.
+                    xnet.add_name(self._true_module, name, is_explicit=explicit, is_input=False)
+                    self._wires[name] = wire
+                    self._junctions[name] = wire
                 del self._local_wires[id(my_wire)]
             assert len(self._local_wires) == 0
 
@@ -1265,7 +1208,7 @@ class Module(object):
             #       on visitation order
             # NOTE: we only do this for outputs. The rationale is this: if there is an unconnected input
             #       on a sub-module, that net doesn't really exist in this scope. If the input *is* connected,
-            #       even if we don't iterate through it here, we would eventually come accross it's driving output.
+            #       even if we don't iterate through it here, we would eventually come across it's driving output.
             #       (we're talking nameless wires here, so I think in almost all cases one source and one sink.)
             for sub_module in self._sub_modules:
                 for sub_module_port_name, sub_module_port in sub_module.get_outputs().items():
@@ -1284,12 +1227,10 @@ class Module(object):
                                     source_module = sub_module
                             assert source_module is not None, "Strange: I don't think it's possible that an xnet is sourced by a floating port..."
                             if source_module is self._true_module:
-                                name = source_port.interface_name
+                                name = first(source_port.get_interface_names())
                             else:
-                                name = f"{source_module._impl.get_name()}{MEMBER_DELIMITER}{source_port.interface_name}"
-                            unique_name = self.symbol_table.register_symbol(name, xnet)
-                            assert unique_name == name
-                            xnet.add_name(self._true_module, unique_name, is_explicit=False, is_input=False) # These ports are not inputs, at least not as far is this context is concerned.
+                                name = f"{source_module._impl.get_name()}{MEMBER_DELIMITER}{first(source_port.get_interface_names())}"
+                            xnet.add_name(self._true_module, name, is_explicit=False, is_input=False) # These ports are not inputs, at least not as far is this context is concerned.
 
 
         def _generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> Optional[str]:

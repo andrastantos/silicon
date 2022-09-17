@@ -4,7 +4,7 @@ import inspect
 from .net_type import NetType, KeyKind, NetTypeMeta
 from .ordered_set import OrderedSet
 from .exceptions import SyntaxErrorException, SimulationException
-from .utils import convert_to_junction, is_iterable, is_junction_base, is_input_port, is_output_port, get_caller_local_junctions, is_module, MEMBER_DELIMITER, Context, is_net_type
+from .utils import convert_to_junction, is_iterable, is_junction_base, is_input_port, is_output_port, get_caller_local_junctions, is_module, MEMBER_DELIMITER, Context, is_net_type, first
 from .port import KeyKind
 from collections import OrderedDict
 from enum import Enum
@@ -403,7 +403,6 @@ class Junction(JunctionBase):
         self._partial_sources: Sequence[Tuple[Sequence[Tuple[Any, KeyKind]], 'Junction.NetEdge']] = [] # contains slice/member assignments
         self._sinks: Dict['Junction', 'Module'] = {}
         self._in_attr_access = False
-        self.interface_name = None # set to a string showing the interface name when the port/wire is assigned to a Module attribute (in Module.__setattr__)
         self.keyword_only = keyword_only
         self._member_junctions = OrderedDict() # Contains members for struct/interfaces/vectors
         self._parent_junction = None # Reverences back to the container for struct/interface/vector members
@@ -707,11 +706,14 @@ class Junction(JunctionBase):
         if self.get_parent_module() is None:
             return "<floating>"
         from .utils import FQN_DELIMITER
-        module_name = self.get_parent_module()._impl.get_diagnostic_name(False)
-        if self.interface_name is None:
+        parent_module = self.get_parent_module()
+        module_name = parent_module._impl.get_diagnostic_name(False)
+        scope_table = parent_module._impl.netlist.symbol_table[parent_module]
+        names = scope_table.get_names(self)
+        if len(names) == 0:
             name = "<unknown>"
         else:
-            name = self.interface_name
+            name = first(names)
         name = module_name + FQN_DELIMITER + name
         if add_location:
             name += self.get_parent_module()._impl.get_diagnostic_location(" at ")
@@ -771,31 +773,6 @@ class Junction(JunctionBase):
         if self._xnet.source is self:
             self._xnet.sim_state.sim_context.schedule_value_change(self._xnet, new_sim_value, when)
 
-    def get_interface_name(self) -> str:
-        assert self._parent_module is not None
-        names = self._parent_module._impl.get_interface_name(self)
-        assert len(names) == 1
-        return names[0]
-
-    def del_interface_name(self) -> None:
-        assert self._parent_module is not None
-        self._parent_module._impl.netlist.symbol_table[self._parent_module].del_hard_symbol(self, self.interface_name)
-        self.interface_name = None
-        for member_name, (member_junction, _) in self.get_member_junctions().items():
-            member_junction.del_interface_name()
-
-    def set_interface_name(self, name: str) -> None:
-        assert self._parent_module is not None
-        self.interface_name = name
-        scope_table = self._parent_module._impl.netlist.symbol_table[self._parent_module]
-        scope_table.add_hard_symbol(self, self.interface_name)
-        try:
-            scope_table.del_auto_symbol(self)
-        except KeyError:
-            pass
-        for member_name, (member_junction, _) in self.get_member_junctions().items():
-            member_junction.set_interface_name(f"{self.interface_name}{MEMBER_DELIMITER}{member_name}")
-
 
     ############################################
     # Compund type support
@@ -818,8 +795,18 @@ class Junction(JunctionBase):
         assert self.is_specialized(), "Can only add members to a specialized port. In fact, create_member_junction should only be called from the junctions type."
         junction_type = self.get_member_junction_kind(reversed)
         member = junction_type(net_type, self.get_parent_module())
-        if self.interface_name is not None:
-            member.set_interface_name(f"{self.interface_name}{MEMBER_DELIMITER}{name}")
+
+        # It's possible that we don't have a parent module if this is a class-level composite port:
+        #
+        #    class MyModule(Module):
+        #        MyInput = Input(MyComposite)
+        #    ...
+        if self._parent_module is not None:
+            scope_table = self._parent_module._impl.netlist.symbol_table[self._parent_module]
+            for parent_name in scope_table.get_hard_names(self):
+                scope_table.add_hard_symbol(member, f"{parent_name}{MEMBER_DELIMITER}{name}")
+            for parent_name in scope_table.get_soft_names(self):
+                scope_table.add_soft_symbol(member, f"{parent_name}{MEMBER_DELIMITER}{name}")
         member._parent_junction = self
         self._member_junctions[name] = [member, reversed]
         setattr(self.__class__, name, Junction.MemberJunctionProperty(name))
@@ -885,8 +872,25 @@ class Port(Junction):
     def get_default_name(self, scope: object) -> str:
         if scope is not self.get_parent_module()._impl.parent:
             raise SyntaxErrorException(f"Can't generate default name for port except for its parent scope. Did you end up referencing a port in a different scope?")
-        return f"{self.get_parent_module()._impl.get_name()}{MEMBER_DELIMITER}{self.interface_name}"
-        
+        return f"{self.get_parent_module()._impl.get_name()}{MEMBER_DELIMITER}{first(self.get_interface_names())}"
+
+    def add_interface_name(self, name: str) -> None:
+        assert self._parent_module is not None
+        scope_table = self._parent_module._impl.netlist.symbol_table[self._parent_module]
+        scope_table.add_hard_symbol(self, name)
+        for member_name, (member_junction, _) in self.get_member_junctions().items():
+            member_junction.add_interface_name(f"{name}{MEMBER_DELIMITER}{member_name}")
+
+    def get_interface_names(self) -> str:
+        assert self._parent_module is not None
+        scope_table = self._parent_module._impl.netlist.symbol_table[self._parent_module]
+        return scope_table.get_hard_names(self)
+
+    def del_interface_name(self, name: str) -> None:
+        assert self._parent_module is not None
+        self._parent_module._impl.netlist.symbol_table[self._parent_module].del_hard_symbol(self, name)
+        for member_name, (member_junction, _) in self.get_member_junctions().items():
+            member_junction.del_interface_name()
 
 
 
@@ -980,7 +984,6 @@ class WireJunction(Junction):
         if parent_module is not None:
             parent_module._impl.register_wire(self)
         self.rhs_expression: Optional[Tuple[str, int]] = None # Filled-in by the parent_module during the 'generation' phase to contain the expression for the right-hand-side value, if inline expressions are supported for this port.
-        self.local_name: Optional[str] = None
 
     def get_default_name(self, scope: object) -> str:
         return "unnamed_wire"

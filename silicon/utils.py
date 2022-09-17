@@ -475,7 +475,6 @@ def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Mod
                 parent_module._impl.netlist.symbol_table[parent_module].add_hard_symbol(wire, name)
             else:
                 parent_module._impl.netlist.symbol_table[parent_module].add_soft_symbol(wire, name)
-            wire.local_name = name
             if debug_print_level > 1:
                 print(f"\tJUNCTION {wire.name} {id(wire):x} CREATED for {debug_scope}")
             # We have to figure out the best way to splice the new wire into the junction topology.

@@ -271,9 +271,6 @@ class Netlist(object):
         if is_port(junction):
             self.ports.add(type(junction)) # This would be 'Input' or 'Output' for most cases
 
-    def register_symbol(self, scope: 'Module', base_name: str, object: Any, delimiter: str = "_") -> str:
-        return scope._impl.symbol_table.register_symbol(base_name, object, delimiter)
-
     def _create_xnets(self):
         """
         Creates XNet objects for the netlist.
@@ -514,7 +511,6 @@ class Netlist(object):
         # Give top level a name and mark it as user-assigned.
         scope_table = self.symbol_table[None]
         if scope_table.is_auto_symbol(self.top_level):
-            scope_table.del_auto_symbol(self.top_level)
             scope_table.add_hard_symbol(self.top_level, type(self.top_level).__name__)
 
         with Module.Context(top_impl):
@@ -545,7 +541,6 @@ class Netlist(object):
 
             self.symbol_table.make_unique(delimiter)
             from .module import Module
-            module._impl.create_symbol_table()
             module._impl.populate_xnet_names(self)
             for sub_module in module._impl.get_sub_modules():
                 populate_names(sub_module)

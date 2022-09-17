@@ -81,7 +81,9 @@ from .net_type import NetType
 from collections import OrderedDict
 from dataclasses import dataclass
 from .composite import Struct
-from .utils import str_block, is_power_of_two
+from .utils import str_block, is_power_of_two, first
+from .sym_table import SymbolTable
+from .netlist import Netlist
 from .exceptions import SyntaxErrorException, InvalidPortError
 from typing import Optional, Sequence, Generator, Any
 from .number import logic, Unsigned
@@ -125,7 +127,7 @@ class _Memory(GenericModule):
         self.mem_size = None
         self.mem_data_bits = None
         self.mem_addr_range = None
-
+        self.addr_reg_symbols = []
         for idx, port_config in enumerate(self.config.port_configs):
             port_prefix = f"port{idx+1}"
             if port_config is not None:
@@ -157,6 +159,10 @@ class _Memory(GenericModule):
                     )
                 )
             )
+            self.addr_reg_symbols.append(self._create_symbol(f"{port_config.real_prefix}addr_reg"))
+        self.mem_symbol = self._create_symbol("mem")
+        if len(self.addr_reg_symbols) == 0:
+            self.addr_reg_symbols.append(self._create_symbol("addr_reg"))
 
     def create_named_port_callback(self, name: str, net_type: Optional['NetType'] = None) -> Optional[Port]:
         """
@@ -296,11 +302,21 @@ class _Memory(GenericModule):
 
         return rtl_body
 
+    def _create_symbol(self, base_name: str) -> object:
+        class Instance(object): pass
+        instance = Instance()
+        scope_table = self._impl.netlist.symbol_table[self]
+        scope_table.add_soft_symbol(instance, base_name)
+        return instance
+
+    def _get_symbol_name(self, netlist: 'Netlist', obj: object) -> str:
+        return first(netlist.symbol_table[self].get_names(obj))
+
     def generate_single_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd', target_namespace: 'Module') -> str:
         # Sing-port memory
         prot_config = self.config.port_configs[0]
 
-        memory_name = netlist.register_symbol(target_namespace, "mem", None)
+        memory_name = self._get_symbol_name(netlist, self.mem_symbol)
 
         data_bits = prot_config.data_bits
         addr_bits = prot_config.addr_bits
@@ -319,7 +335,7 @@ class _Memory(GenericModule):
 
         if data_out_port is not None:
             if prot_config.registered_input:
-                addr_name = netlist.register_symbol(target_namespace, "addr_reg", None)
+                addr_name = self._get_symbol_name(netlist, self.addr_reg_symbols[0])
                 rtl_body += f"logic [{addr_bits-1}:0] {addr_name};\n"
             else:
                 addr_name = addr
@@ -342,7 +358,7 @@ class _Memory(GenericModule):
         return rtl_body
 
     def generate_dual_port_memory(self, netlist: 'Netlist', back_end: 'BackEnd', target_namespace: 'Module') -> str:
-        memory_name = netlist.register_symbol(target_namespace, "mem", None)
+        memory_name = self._get_symbol_name(netlist, self.mem_symbol)
 
         rtl_body = ""
 
@@ -366,7 +382,7 @@ class _Memory(GenericModule):
 
         rtl_body += self.generate_reset_content(back_end, memory_name)
 
-        for port_config in self.config.port_configs:
+        for idx, port_config in enumerate(self.config.port_configs):
             data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
 
             data_in, _ = data_in_port.get_rhs_expression(back_end, target_namespace) if data_in_port is not None else (None, None)
@@ -377,7 +393,7 @@ class _Memory(GenericModule):
 
             if data_out_port is not None:
                 if port_config.registered_input:
-                    addr_name = netlist.register_symbol(target_namespace, f"{port_config.real_prefix}addr_reg", None)
+                    addr_name = self._get_symbol_name(netlist, self.addr_reg_symbols[idx])
                     rtl_body += f"logic [{port_config.addr_bits-1}:0] {addr_name};\n"
                 else:
                     addr_name = addr
