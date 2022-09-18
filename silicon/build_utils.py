@@ -19,9 +19,9 @@ class Build:
             return super().__enter__()
 
     @staticmethod
-    def generate_rtl(top_class: Callable, *, add_unnamed_scopes: bool = False):
+    def generate_rtl(top_class: Callable):
         Build.clear()
-        with Netlist().elaborate(add_unnamed_scopes=add_unnamed_scopes) as netlist:
+        with Netlist().elaborate() as netlist:
             top = top_class()
         system_verilog = SystemVerilog(stream_class = Build.RegisteredFile)
         netlist.generate(netlist, system_verilog)
@@ -41,9 +41,9 @@ class Build:
         if vcd_filename is None:
             vcd_filename = top_class.__name__.lower()
         Build.clear()
-        with Netlist().elaborate(add_unnamed_scopes=add_unnamed_scopes) as netlist:
+        with Netlist().elaborate() as netlist:
             top = top_class()
-        netlist.simulate(vcd_filename)
+        netlist.simulate(vcd_filename, add_unnamed_scopes=add_unnamed_scopes)
 
     @staticmethod
     def clear():

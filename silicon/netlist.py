@@ -1,4 +1,4 @@
-from typing import Union, Set, Tuple, Dict, Any, Optional, List, Iterable, NamedTuple, Sequence, Callable
+from typing import Union, Set, Tuple, Dict, Any, Optional, List, Iterable, NamedTuple, Sequence, Callable, Generator
 import typing
 from .ordered_set import OrderedSet
 from collections import OrderedDict
@@ -42,7 +42,6 @@ class XNet(object):
         self.sinks: Set[Port] = OrderedSet()
         self.transitions: Set[Port] = OrderedSet()
         self.aliases: Set[Wire] = OrderedSet()
-        self.names: Set[str] = OrderedSet()
         self.scoped_names: Dict['Module', Dict[str, 'XNet.NameStatus']] = OrderedDict()
         self.rhs_expressions: Dict['Module', Tuple[str, int]] = OrderedDict()
         self.assigned_names: Dict['Module', str] = OrderedDict()
@@ -354,7 +353,7 @@ class Netlist(object):
                         "    - Port is driven by local wire that accidentally assigned to (=) instead of bound (<<=)"
                     )
 
-    def _fill_xnet_names(self, add_unnamed_scopes: bool):
+    def _fill_xnet_names(self):
         # Fill-in names for xnets
         for xnet in self.xnets:
             from .utils import FQN_DELIMITER
@@ -363,10 +362,6 @@ class Netlist(object):
                     self.module_to_xnet_map[scope] = OrderedSet()
                 self.module_to_xnet_map[scope].add(xnet)
                 module_name = scope._impl.get_fully_qualified_name()
-                if not self.symbol_table[scope._impl.parent].is_auto_symbol(scope) or add_unnamed_scopes:
-                    names_in_scope = xnet.get_names(scope)
-                    for name in names_in_scope:
-                        xnet.names.add(module_name + FQN_DELIMITER + name)
 
     def _rank_netlist(self) -> Tuple[List[Set['Module']], Dict['Module', int]]:
         """
@@ -408,8 +403,19 @@ class Netlist(object):
                 return rank_map[module]
             # Check for loops (i.e. if graph truly is a DAG)
             if module in visited_modules:
-                def get_xnet_names(xnet):
-                    return ' a.k.a. '.join(xnet.names)
+                def get_fully_qualified_names(xnet, add_unnamed_scopes: bool) -> Generator[str, None, None]:
+                    from .utils import FQN_DELIMITER
+                    for scope in xnet.scoped_names.keys():
+                        module_name = scope._impl.get_fully_qualified_name()
+                        if not self.symbol_table[scope._impl.parent].is_auto_symbol(scope) or add_unnamed_scopes:
+                            names_in_scope = xnet.get_names(scope)
+                            for name in names_in_scope:
+                                yield module_name + FQN_DELIMITER + name
+                def get_xnet_names(xnet: XNet):
+                    fqn = tuple(get_fully_qualified_names(xnet, False))
+                    if len(fqn) == 0:
+                        fqn = get_fully_qualified_names(xnet, True)
+                    return ' a.k.a. '.join(fqn)
                 def xnet_trace_names():
                     return "\n    ".join(get_xnet_names(xnet) for xnet in xnet_trace)
                 raise SyntaxErrorException(f"Combinational loop found:\n    {xnet_trace_names()}")
@@ -484,9 +490,8 @@ class Netlist(object):
         return self.get_module_class_name(self.top_level)
 
     class Elaborator(object):
-        def __init__(self, netlist: 'Netlist', *, add_unnamed_scopes: bool = False):
+        def __init__(self, netlist: 'Netlist'):
             self.netlist = netlist
-            self.add_unnamed_scopes = add_unnamed_scopes
         def __enter__(self):
             self.netlist.__enter__()
             self.marker = ContextMarker(Context.elaboration)
@@ -495,15 +500,15 @@ class Netlist(object):
         def __exit__(self, exception_type, exception_value, traceback):
             try:
                 if exception_type is None:
-                    self.netlist._elaborate(add_unnamed_scopes=self.add_unnamed_scopes)
+                    self.netlist._elaborate()
             finally:
                 self.marker.__exit__(exception_type, exception_value, traceback)
                 self.netlist.__exit__(exception_type, exception_value, traceback)
     
-    def elaborate(self, *, add_unnamed_scopes: bool = False) -> 'Netlist.Elaborator':
-        return Netlist.Elaborator(self, add_unnamed_scopes=add_unnamed_scopes)
+    def elaborate(self) -> 'Netlist.Elaborator':
+        return Netlist.Elaborator(self)
 
-    def _elaborate(self, *, add_unnamed_scopes: bool = False) -> None:
+    def _elaborate(self) -> None:
         from .module import Module
 
         top_impl: Module.Impl = self.top_level._impl
@@ -598,7 +603,7 @@ class Netlist(object):
                 self._register_junction(junction)
         self._create_xnets()
         populate_names(self.top_level)
-        self._fill_xnet_names(add_unnamed_scopes)
+        self._fill_xnet_names()
         self.rank_list, self.rank_map = self._rank_netlist()
         self.module_variants = OrderedDict()
         self.module_to_class_map = OrderedDict()
@@ -642,7 +647,15 @@ class Netlist(object):
                         module_inst._impl._generate_needed = False
                         module_inst._impl._body_generated = True
 
-    def simulate(self, vcd_file_name: Union[Path,str], end_time: Optional[int] = None, timescale='1ns') -> int:
+    def simulate(
+        self,
+        vcd_file_name: Union[Path,str], 
+        *,
+        end_time: Optional[int] = None,
+        timescale='1ns',
+        signal_pattern: str = ".",
+        add_unnamed_scopes: bool = False
+    ) -> int:
         from .simulator import Simulator
         with Simulator(self, str(vcd_file_name), timescale) as context:
             def finalize_profile():
@@ -657,7 +670,7 @@ class Netlist(object):
                 ps.dump_stats("profile.out")
                 #print(s.getvalue())
 
-            context.dump_signals()
+            context.dump_signals(signal_pattern=signal_pattern, add_unnamed_scopes=add_unnamed_scopes)
             import cProfile as profile
             pr = profile.Profile()
             pr.enable()

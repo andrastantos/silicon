@@ -49,7 +49,6 @@ class SimXNetState(object):
         self.value_validator = net_type.validate_sim_value if net_type is not None else (lambda x, y: x)
 
     def add_listener(self, listener: Generator) -> None:
-        #print(f"--- at {self.sim_context.now} xnet {first(self.parent_xnet.names)}: adding listener {listener}")
         self.listeners.add(listener)
 
     def is_edge(self) -> bool:
@@ -61,7 +60,6 @@ class SimXNetState(object):
     def set_value(self, new_value: Any, now: int) -> None:
         #print(f"--- at {self.sim_context.now} {self.parent_xnet.get_diagnostic_name()} setting value to {new_value}")
         #assert self._last_changed != self.sim_context.now, "Combinational loop detected???"
-        #print(f"--- at {self.sim_context.now} xnet {first(self.parent_xnet.names)}: setting value {new_value}")
 
         new_value = self.value_validator(new_value, self.parent_xnet.source)
         if self._last_changed != now:
@@ -144,7 +142,6 @@ class Simulator(object):
 
             for xnet, value in self.value_changes.items():
                 xnet.sim_state.set_value(value, now)
-                #debug_print(f"--- {first(xnet.names)} <<= {value}")
             self.value_changes = OrderedDict()
 
             # Sort the generators into two groups: ones that belong to combinational modules and ones that are not.
@@ -212,31 +209,28 @@ class Simulator(object):
                         sensitivity_list = generator.send(None)
                         Simulator._process_yield(generator, sensitivity_list, self, 0)
 
-        def dump_signals(self, signal_pattern: str = ".") -> None:
+        def dump_signals(self, signal_pattern: str = ".", add_unnamed_scopes: bool = False) -> None:
             from .utils import FQN_DELIMITER
             from re import compile
             filter = compile(signal_pattern)
             for xnet in self.simulator.netlist.xnets:
-                for name in xnet.names:
-                    if filter.match(name):
-                        port = xnet.source #if xnet.source is not None else first(xnet.sinks)
-                        if port is not None:
-                            # This assert is incorrect: it can actually happen for cases, where auto-input ports
-                            # get connected through the hierarchy, but are left unconnected on the top level.
-                            # If we encounter such an instance, we're simply leaving it out of the dump
-                            # (since we don't know what type to export it as).
-                            #assert port.is_specialized() or len(xnet.sinks) == 0
-                            if port.is_specialized():
-                                scopes = name.split(FQN_DELIMITER)
-                                scope = FQN_DELIMITER.join(scopes[:-1])
-                                name = scopes[-1]
+                port = xnet.source #if xnet.source is not None else first(xnet.sinks)
+                if port is None:
+                    continue
+                if not port.is_specialized():
+                    continue
+                for scope in xnet.scoped_names.keys():
+                    module_name = scope._impl.get_fully_qualified_name()
+                    if not self.netlist.symbol_table[scope._impl.parent].is_auto_symbol(scope) or add_unnamed_scopes:
+                        names_in_scope = xnet.get_names(scope)
+                        for name in names_in_scope:
+                            if filter.match(name):
                                 xnet.sim_state.vcd_vars.append(self.vcd_writer.register_var(
-                                    scope = scope,
+                                    scope = module_name,
                                     name = name,
                                     var_type = port.vcd_type,
                                     size = port.get_num_bits()
                                 ))
-            pass
 
         @property
         def now(self) -> int:

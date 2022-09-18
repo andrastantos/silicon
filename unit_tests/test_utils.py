@@ -1,4 +1,4 @@
-from silicon import SystemVerilog, File, Build, Netlist
+from silicon import SystemVerilog, File, Build, Netlist, Optional
 from typing import IO, Callable, Any
 import pytest
 from pathlib import Path
@@ -62,14 +62,14 @@ class test(Build):
             return ret_val
 
     @staticmethod
-    def rtl_generation(top_class: Callable, test_name: str = None, allow_new_attributes: bool = False, *, add_unnamed_scopes: bool = False):
+    def rtl_generation(top_class: Callable, test_name: str = None, allow_new_attributes: bool = False):
         if test_name is None:
             test_name = top_class.__name__.lower()
         import os
         test.clear()
         test.reference_dir = Path("reference") / test_name
         test.output_dir = Path("output") / test_name
-        with Netlist().elaborate(add_unnamed_scopes=add_unnamed_scopes) as netlist:
+        with Netlist().elaborate() as netlist:
             top_class()
         logged_system_verilog = SystemVerilog(stream_class = test.DiffedFile)
         netlist.generate(logged_system_verilog)
@@ -97,17 +97,31 @@ class test(Build):
                     pytest.fail(f"Test failed with IVerilog errors")
 
     @staticmethod
-    def simulation(top_class: Callable, test_name: str = None, *, add_unnamed_scopes: bool = False):
+    def simulation(
+        top_class: Callable, 
+        test_name: str = None,
+        *,
+        end_time: Optional[int] = None,
+        timescale='1ns',
+        signal_pattern: str = ".",
+        add_unnamed_scopes: bool = False
+    ):
         if test_name is None:
             test_name = top_class.__name__.lower()
         test.clear()
         test.reference_dir = Path("reference") / Path(test_name)
         test.output_dir = Path("output") / Path(test_name)
-        with Netlist().elaborate(add_unnamed_scopes=add_unnamed_scopes) as netlist:
+        with Netlist().elaborate() as netlist:
             top_class()
         test.output_dir.mkdir(parents=True, exist_ok=True)
         vcd_filename = test.output_dir / Path(f"{test_name}.vcd")
-        netlist.simulate(vcd_filename)
+        netlist.simulate(
+            vcd_filename, 
+            end_time = end_time,
+            timescale = timescale,
+            signal_pattern = signal_pattern,
+            add_unnamed_scopes = add_unnamed_scopes
+        )
         print(f"Simulation results saved into {Path(vcd_filename).absolute()}")
         test_diff = ""
         success = True
