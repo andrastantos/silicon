@@ -14,7 +14,7 @@ from .constant import get_net_type_for_const
 from .back_end import str_to_id
 from collections import OrderedDict
 from typing import Any, Optional, Tuple
-from .enum import Enum, is_enum
+from .sil_enum import Enum, is_enum
 
 def _format_state_name(state: Any):
     if isinstance(state, Enum):

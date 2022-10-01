@@ -9,7 +9,7 @@ from typing import *
 from silicon import *
 from test_utils import *
 import inspect
-from enum import Enum
+from silicon.sil_enum import Enum
 
 class UseFSM(Module):
     # We're implementing a simple checksum module: get inputs until 'last', then output the sum of all received inputs

@@ -4,7 +4,7 @@ from .module import *
 from .netlist import *
 from .constant import *
 from .number import *
-from .enum import *
+from .sil_enum import *
 from .gates import *
 from .back_end import *
 from .adaptor import *
