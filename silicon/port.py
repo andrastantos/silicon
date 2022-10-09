@@ -399,7 +399,7 @@ class Junction(JunctionBase):
         # will get called from '_init_phase2' of 'Module'.
         super().__init__(parent_module)
         from .module import Module
-        self._source: Optional['Junction.NetEdge'] = None
+        self._sources: OrderedSet['Junction.NetEdge'] = OrderedSet()
         self._partial_sources: Sequence[Tuple[Sequence[Tuple[Any, KeyKind]], 'Junction.NetEdge']] = [] # contains slice/member assignments
         self._sinks: Dict['Junction', 'Module'] = {}
         self._in_attr_access = False
@@ -419,8 +419,9 @@ class Junction(JunctionBase):
         return tuple(self._sinks.keys())
     @property
     def source(self):
-        if self._source is None: return None
-        return self._source.far_end
+        if len(self._sources) == 0: return None
+        assert len(self._sources) == 1
+        return first(self._sources).far_end
     def __str__(self) -> str:
         ret_val = self.get_diagnostic_name()
         if not self.is_specialized():
@@ -548,12 +549,36 @@ class Junction(JunctionBase):
                 source.set_net_type(self.get_net_type())
             if self.get_net_type() is not source.get_net_type():
                 return
+
             for member_name, (member_junction, reversed) in self.get_member_junctions().items():
                 if reversed:
                     source.get_member_junctions()[member_name][0].set_source(member_junction, scope=scope)
                 else:
                     member_junction.set_source(source.get_member_junctions()[member_name][0], scope=scope)
 
+            """
+            # We have to take care of registering the members as hard or soft-symbols in all the scopes of ourselves
+            # There can be two scopes (we don't deal with XNets yet): the parent module and it's parent
+            from .sym_table import SymbolTable, ScopeTable
+            from typing import List
+            symbol_table: SymbolTable = self.get_parent_module()._impl.netlist.symbol_table
+            parent_parent = self.get_parent_module()._impl.parent
+            scopes: List[ScopeTable] = []
+            scopes.append(symbol_table[self._parent_module])
+            if parent_parent is not None:
+                scopes.append(symbol_table[parent_parent])
+            for member_name, (member_junction, reversed) in self.get_member_junctions().items():
+                for scope in scopes:
+                    for name in scope.get_hard_names(self):
+                        m_name = f"{name}{MEMBER_DELIMITER}{member_name}"
+                        print(f"*********** REGISTERING HARD SYMBOL {m_name} for {name}")
+                        scope.add_hard_symbol(member_junction, m_name)
+                    for name in scope.get_soft_names(self):
+                        m_name = f"{name}{MEMBER_DELIMITER}{member_name}"
+                        print(f"*********** REGISTERING HARD SYMBOL {m_name} for {name}")
+                        scope.add_soft_symbol(member_junction, m_name)
+
+            """
     def _del_source(self) -> None:
         """
         Removes the potentially existing binding between this port and its source

@@ -125,3 +125,53 @@ We should use 'scope' here which already exists.
 
 module.set_name: it has an 'explicit' argument. That should be 'hard', if anything at all.
 register_local_wire has a similar problem
+
+
+******** NEW THOUGHT **********
+Here's an interesting thought: we could not have ports at all on a module. We *always* elaborate modules from the outside in, that is to say, that the usage of the module is established before its guts. So, we could just provisionally allow to bind to any attribute on a module, creating `provisional_port`s as we go. We can even glean whether it should be an input or an output from whether it has a source or not on the outside (of course if it doesn't have either, we can just ignore it, if someone managed to create it through some obscure magic).
+
+Then, when we get inside, we can execute `body` as usual, and every time a provisional port is referenced, it gets converted into a real port. When `body` terminates, we can look through all the left-over provisional ports and simply throw them out: they are as if they don't exist.
+
+The problem with this approach is that it'll accept typos and just treat them as unconnected ports (on both sides, actually). So there isn't any enforcement of the interface. To solve that, we can require that all ports are either used or marked unused inside the module. This could be done by the traditional way of listing inputs and outputs as static members, a list that we would walk right before `body` for instance.
+
+With this of course, one could simply create new ports by mentioning them in the `body`:
+
+    class MyModule(Module):
+        def body(self):
+            self.new_port = Input(logic)
+
+In fact, one doesn't even have to mention the type (it will be known already, or, for outputs will be deduced from the guts of the module), or even the direction: that can be deduced from the usage.
+
+Determining clashes between port directions might get a bit dicey and might have to wait until XNet creation, but eventually multiple drivers are going to become a problem and no drivers could be flagged as well.
+
+There is another problem though: if one introduces a `JunctionBase` attribute to the module inside `body`, it becomes an interface port. That is problematic for complex modules where one might want to pass ports around as attributes between method calls. If port harvesting happens in the tracer as opposed to in __setattr__ though, we could have a solution: simply delete the attribute before `body` termination. An alternative could be naming convention (such as __-prefix) or a custom namespace (self._impl.my_wire) to mark private members. Finally one could take the Python approach of consenting adults, but I don't like that: I'm a static analysis type of guy, especially when it comes to RTL.
+
+Here is the big problem: this invalidates the following ugly, but perfectly valid use-case:
+
+    class MyModule(Module):
+        def body(self):
+            if self.cats == 1:
+                ... do cat stuff
+            else:
+                ... do dog stuff
+
+    class Top(Module):
+        def body(self):
+            M = MyModule()
+            M.cats = 1
+            ... some other things
+
+So, in here, is `cats` a port or a plain old attribute? Hard to tell as `1` could be constant `Number`, and thus `cats` an `Input` port, or just an attribute. From the outside it's impossible to tell, and on the inside it'll blow up if it's treated as a provisional port because `==` will not return a `bool`. But how can we tell what the users' intent was?
+
+So, maybe it's best as-is...
+
+
+# Clearing old symbol table:
+create_symbol_table must die
+
+Modules can have multiple names. So get_name and set_name must change.
+
+
+# Other stuff
+
+Junction.local_name must go and we must use the symbol table for name lookups. Especially since the two could be in contradiction: the wire gets entered into the symbol table as a soft symbol, gets renamed due to a conflict, but it's local_name remains the same.

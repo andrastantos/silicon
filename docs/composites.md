@@ -175,3 +175,13 @@ We should add a 'global' dictionary to Silicon. This dictionary instance is used
 !!!!!!!! IMPORTANT !!!!!!!!!!!!
 
 We should allow for default values for ports. These would define the value for unconnected ports. There's a type-specific fall-back of course, mostly None. We should also allow defaults for composite members and function-style module ports too (ideally using Pythons default value syntax).
+
+## We're back!
+
+So, the idea was, that composites start their life a single junctions. In order to support interfaces, we would need to merge `_source` and `_partial_sources`. Essentially allow - initially - multiple drivers. This, in a later phase would create problems of course. To resolve this, we would need a pass that converts the Netlist into SSA form, probably as part of XNet creation. This is where we would need to introduce PHI nodes. Some PHI nodes would be our PhiSlices, some would deal with the braking up of composites into individual wires. Maybe we could even offer a type-defined way of dealing with and resolving these conflicts.
+
+The trouble starts with type propagation: if we allowed multiple sources, what to do about type conflicts? Notice though that we only need to propagate types, if the sink(s) don't have a type. I think at least that adaptor insertion can wait until the same pass that deals with PHI nodes.
+
+As we merge `_source` and `_partial_sources`, we would need a key for each source, even if such keys are optional. We could say that type propagation is only supported through 'un-keyed' sources, that is sources with the key being None. If there are multiple source sources, we just can't propagate types and that's it. Maybe.
+
+What to do with cascaded slices though? I *think* they are not a bit problem, but I'm not sure. They should become a partial source as anything else. They don't participate in type propagation, and they get resolved in the end as a PHI node.
