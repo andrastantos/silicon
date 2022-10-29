@@ -414,14 +414,6 @@ class Junction(JunctionBase):
             self.set_net_type(net_type)
 
 
-    @property
-    def sinks(self):
-        return tuple(self._sinks.keys())
-    @property
-    def source(self):
-        if len(self._sources) == 0: return None
-        assert len(self._sources) == 1
-        return first(self._sources).far_end
     def __str__(self) -> str:
         ret_val = self.get_diagnostic_name()
         if not self.is_specialized():
@@ -535,7 +527,7 @@ class Junction(JunctionBase):
         source = self.source
         if source is None:
             return
-        scope = self._source.scope
+        scope = self.source_scope
         if self.is_composite():
             if not source.is_specialized():
                 return
@@ -583,20 +575,35 @@ class Junction(JunctionBase):
         """
         Removes the potentially existing binding between this port and its source
         """
-        if self._source is not None:
-            source = self._source.far_end
-            if self.is_composite() and source is not None:
-                for member_name, (member_junction, reversed) in self.get_member_junctions().items():
-                    if reversed:
-                        # It's possible that the source doesn't have a type, in which case this will fail. That's fine
-                        try:
-                            source.get_member_junctions()[member_name][0]._del_source()
-                        except KeyError:
-                            pass
-                    else:
-                        member_junction._del_source()
-            del source._sinks[self]
-        self._source = None
+        if len(self._sources) > 1:
+            for source_edge in self._sources:
+                source = source_edge.far_end
+                if self.is_composite() and source is not None:
+                    for member_name, (member_junction, reversed) in self.get_member_junctions().items():
+                        if reversed:
+                            # It's possible that the source doesn't have a type, in which case this will fail. That's fine
+                            try:
+                                source.get_member_junctions()[member_name][0]._del_source()
+                            except KeyError:
+                                pass
+                        else:
+                            member_junction._del_source()
+                del source._sinks[self]
+        self._sources.clear()
+
+    @property
+    def sinks(self):
+        return tuple(self._sinks.keys())
+    @property
+    def source(self):
+        if len(self._sources) == 0: return None
+        assert len(self._sources) == 1
+        return first(self._sources).far_end
+    @property
+    def source_scope(self):
+        if len(self._sources) == 0: return None
+        assert len(self._sources) == 1
+        return first(self._sources).scope
 
     def set_source(self, source: Any, scope: 'Module') -> None:
         passed_in_source = source
@@ -609,7 +616,7 @@ class Junction(JunctionBase):
 
         old_source = f"{id(self.source):x}" if self.source is not None else "--NONE--"
         self._del_source()
-        self._source = Junction.NetEdge(source, scope)
+        self._sources.add(Junction.NetEdge(source, scope))
         assert self not in source._sinks.keys()
         source._sinks[self] = scope
         self.connect_composite_members()

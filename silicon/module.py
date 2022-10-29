@@ -980,7 +980,7 @@ class Module(object):
                     if junction.is_specialized() and old_source is not None and old_source.is_specialized():
                         if junction.get_net_type() is not old_source.get_net_type():
                             # Inserting an adaptor
-                            scope = junction._source.scope
+                            scope = junction.source_scope
                             with self.netlist.set_current_scope(scope):
                                 source = implicit_adapt(old_source, junction.get_net_type())
                                 # If an adaptor was created, fix up connectivity, including inserting a naming wire, if needed
