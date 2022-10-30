@@ -752,10 +752,26 @@ def test_float_convert():
     p, v = Number.NetValue._precision_and_value(0.1)
     assert p == 55
 
+def test_lhs_slice():
+    class top(Module):
+        in_a = Input(Unsigned(length=5))
+        in_b = Input(logic)
+        out_b = Output(Unsigned(length=11))
+
+        def body(self):
+            c0 = and_gate(self.in_b, self.in_b)
+            self.out_b[0] <<= c0
+            self.out_b[4] <<= and_gate(self.in_a[3], self.in_a[4])
+            self.out_b[3:1] <<= self.in_a[2:0]
+            self.out_b[10:5] <<= 0
+            pass
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 if __name__ == "__main__":
     #test_sim_value_fract()
     #test_sim_value_int()
-    #test_mix1()
+    test_mix1()
     #test_binary_ops()
     #test_closure()
     #test_closure1()
@@ -774,10 +790,11 @@ if __name__ == "__main__":
     #test_precedence()
     #test_fractional1()
     #test_fractional2()
-    test_fractional1_sim()
+    #test_fractional1_sim()
     #test_fractional_const()
     #test_float_convert()
     #test_binary_ops()
+    #test_lhs_slice()
     pass
 
 '''

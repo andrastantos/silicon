@@ -399,8 +399,7 @@ class Junction(JunctionBase):
         # will get called from '_init_phase2' of 'Module'.
         super().__init__(parent_module)
         from .module import Module
-        self._sources: OrderedSet['Junction.NetEdge'] = OrderedSet()
-        self._partial_sources: Sequence[Tuple[Sequence[Tuple[Any, KeyKind]], 'Junction.NetEdge']] = [] # contains slice/member assignments
+        self._partial_sources: Sequence[Tuple[Optional[Sequence[Tuple[Any, KeyKind]]], 'Junction.NetEdge']] = [] # contains slice/member assignments
         self._sinks: Dict['Junction', 'Module'] = {}
         self._in_attr_access = False
         self.keyword_only = keyword_only
@@ -459,12 +458,13 @@ class Junction(JunctionBase):
         if len(self._partial_sources) > 0:
             from silicon.member_access import PhiSlice
 
-            key_chains = tuple(partial_source[0] for partial_source in self._partial_sources)
-            sources = tuple(partial_source[1].far_end for partial_source in self._partial_sources)
-            scopes = tuple(partial_source[1].scope for partial_source in self._partial_sources)
-            self.phi_slice = PhiSlice(key_chains)
-            self.set_source(self.phi_slice(*sources), scope)
-            self._partial_sources = [] # Prevent re-creation of Concatenator
+            key_chains = tuple(partial_source[0] for partial_source in self._partial_sources if partial_source[0] is not None)
+            sources = tuple(partial_source[1].far_end for partial_source in self._partial_sources if partial_source[0] is not None)
+            scopes = tuple(partial_source[1].scope for partial_source in self._partial_sources if partial_source[0] is not None)
+            if len(key_chains) > 0:
+                self.phi_slice = PhiSlice(key_chains)
+                self.set_source(self.phi_slice(*sources), scope)
+                self._partial_sources = [] # Prevent re-creation of Concatenator
 
     def get_junction_type(self) -> type:
         if type(self) is Junction:
@@ -573,37 +573,52 @@ class Junction(JunctionBase):
             """
     def _del_source(self) -> None:
         """
-        Removes the potentially existing binding between this port and its source
+        Removes all potentially existing binding between this port and its (partial) source(s)
         """
-        if len(self._sources) > 1:
-            for source_edge in self._sources:
-                source = source_edge.far_end
-                if self.is_composite() and source is not None:
-                    for member_name, (member_junction, reversed) in self.get_member_junctions().items():
-                        if reversed:
-                            # It's possible that the source doesn't have a type, in which case this will fail. That's fine
-                            try:
-                                source.get_member_junctions()[member_name][0]._del_source()
-                            except KeyError:
-                                pass
-                        else:
-                            member_junction._del_source()
+        seen_sources = set() # This is not strictly needed, but I put it in for verification
+        for key, source_edge in self._partial_sources:
+            source = source_edge.far_end
+            if self.is_composite() and source is not None:
+                for member_name, (member_junction, reversed) in self.get_member_junctions().items():
+                    if reversed:
+                        # It's possible that the source doesn't have a type, in which case this will fail. That's fine
+                        try:
+                            source.get_member_junctions()[member_name][0]._del_source()
+                        except KeyError:
+                            pass
+                    else:
+                        member_junction._del_source()
+            # For some reason partial sources don't register as sinks on the other end????
+            if source not in seen_sources:
                 del source._sinks[self]
-        self._sources.clear()
+            seen_sources.add(source)
+        self._partial_sources.clear()
 
     @property
     def sinks(self):
         return tuple(self._sinks.keys())
+
+    def _get_source_edge(self):
+        found_edge = None
+        for key, source_edge in self._partial_sources:
+            if key is not None:
+                continue
+            assert found_edge is None
+            found_edge = source_edge
+        return found_edge
+
     @property
     def source(self):
-        if len(self._sources) == 0: return None
-        assert len(self._sources) == 1
-        return first(self._sources).far_end
+        # TODO: in fact this should die: we don't have a concept of a unique source anymore.
+        source_edge = self._get_source_edge()
+        if source_edge is None: return None
+        return source_edge.far_end
     @property
     def source_scope(self):
-        if len(self._sources) == 0: return None
-        assert len(self._sources) == 1
-        return first(self._sources).scope
+        # TODO: in fact this should die: we don't have a concept of a unique source anymore.
+        source_edge = self._get_source_edge()
+        if source_edge is None: return None
+        return source_edge.scope
 
     def set_source(self, source: Any, scope: 'Module') -> None:
         passed_in_source = source
@@ -616,7 +631,7 @@ class Junction(JunctionBase):
 
         old_source = f"{id(self.source):x}" if self.source is not None else "--NONE--"
         self._del_source()
-        self._sources.add(Junction.NetEdge(source, scope))
+        self._partial_sources.append((None, Junction.NetEdge(source, scope)))
         assert self not in source._sinks.keys()
         source._sinks[self] = scope
         self.connect_composite_members()
@@ -630,6 +645,18 @@ class Junction(JunctionBase):
                     # It is OK to call this multiple times for the same sub_module. After the first one, it's a no-op.
                     parent_parent_module._impl.order_sub_module(parent_module)
 
+    def replace_source(self, old_source: Any, new_source: Any, scope: 'Module') -> None:
+        """
+        Replace all references of old_source to new_source within our sources (partial or otherwise)
+        """
+        # TODO: is there a faster way than iterating all sources? Seems it scaled poorly, but maybe it doesn't matter.
+        for key, source_edge in self._partial_sources:
+            if source_edge.far_end is old_source:
+                source_edge.far_end = new_source
+                source_edge.scope = scope
+                del old_source._sinks[self]
+                new_source._sinks[self] = scope
+        
     def set_partial_source(self, key_chain: Sequence[Tuple[Any, KeyKind]], source: Any, scope: 'Module') -> None:
         passed_in_source = source
         if source is not None:
@@ -642,6 +669,9 @@ class Junction(JunctionBase):
         self._partial_sources.append(
             (key_chain, Junction.NetEdge(source, scope))
         )
+        # It's possible that a source supplies multiple parts of a sink. For instance: a[3] <<= b ... a[0] <<= b
+        if self not in source._sinks.keys():
+            source._sinks[self] = scope
 
         # TODO: deal with this through inheritance instead of type-check!
         if is_output_port(source):

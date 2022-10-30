@@ -476,7 +476,7 @@ def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Mod
             else:
                 parent_module._impl.netlist.symbol_table[parent_module].add_soft_symbol(wire, name)
             if debug_print_level > 1:
-                print(f"\tJUNCTION {wire.name} {id(wire):x} CREATED for {debug_scope}")
+                print(f"\tJUNCTION {name} {id(wire):x} CREATED for {debug_scope}")
             # We have to figure out the best way to splice the new wire into the junction topology.
             # This normally doesn't matter, but interfaces are sensitive to it: they insist on a straight
             # topology with no bifurcations as the reversed members don't know how to deal with that.
@@ -489,22 +489,25 @@ def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Mod
             # 7. junction is sub-level wire: this is not supported, so leave as-is, don't try to interfere <-- this is handled in the condition above
             if (is_input_port(junction) and same_level) or (is_output_port(junction) and sub_level) or (is_wire(junction) and same_level):
                 # splice after
-                old_sink = first(junction.sinks) if len(junction.sinks) > 0 else None
                 if debug_print_level > 1:
                     print(f"\tjunction {id(junction):x} connectivity:")
                     if junction.source is not None:
                         print(f"\t   source: {id(junction.source):x}")
                     sinks = "; ".join(f"{id(sink):x}" for sink in junction.sinks)
                     print(f"\t   sinks: {sinks}")
-                if old_sink is not None:
+                for old_sink in junction.sinks:
                     if debug_print_level > 1:
                         print(f"\t-- splice after SETTING SOURCE OF {id(old_sink):x} to {id(wire):x} (used to be {id(old_sink.source):x})")
-                    old_sink.set_source(wire, scope=parent_module)
-                if debug_print_level > 1:
-                    print(f"\t-- splice after SETTING SOURCE OF {id(wire):x} to {id(junction):x}")
+                    # We have to be careful here: junction could be a partial source for old_sink. If we simply called set_source, we would
+                    # override the key that we very carefully constructed. Even worse, junction might be a partial source several times over.
+                    # Better replacing it then overriding.
+                    old_sink.replace_source(junction, wire, scope=parent_module)
+                    if debug_print_level > 1:
+                        print(f"\t-- splice after SETTING SOURCE OF {id(wire):x} to {id(junction):x}")
                 wire.set_source(junction, scope=parent_module)
             else:
                 # splice before
+                assert len(junction._partial_sources) <= 1, "BUG: We can't splice naming wire before something with partial sources"
                 old_source = junction.source
                 if old_source is not None:
                     if debug_print_level > 1:
