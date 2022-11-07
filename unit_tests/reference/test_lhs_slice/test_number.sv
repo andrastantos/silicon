@@ -1,0 +1,44 @@
+////////////////////////////////////////////////////////////////////////////////
+// top
+////////////////////////////////////////////////////////////////////////////////
+module top (
+	input logic [4:0] in_a,
+	input logic in_b,
+	output logic [10:0] out_b
+);
+
+	logic c0;
+	logic u1_out_a;
+
+	assign out_b = {6'(1'h0), u1_out_a, in_a[2:0], c0};
+
+	and_gate u (
+		.in_a(in_b),
+		.in_b(in_b),
+		.out_a(c0)
+	);
+
+	and_gate u1 (
+		.in_a(in_a[3]),
+		.in_b(in_a[4]),
+		.out_a(u1_out_a)
+	);
+
+endmodule
+
+
+////////////////////////////////////////////////////////////////////////////////
+// and_gate
+////////////////////////////////////////////////////////////////////////////////
+module and_gate (
+	input logic in_a,
+	input logic in_b,
+	output logic out_a
+);
+	assign out_a = in_a & in_b;
+endmodule
+
+
+
+
+
