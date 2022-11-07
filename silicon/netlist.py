@@ -289,7 +289,7 @@ class Netlist(object):
                     xnets += create_xnets_for_junction(member_junction)
                 return xnets
             else:
-                if for_junction.source is not None:
+                if for_junction.has_source():
                     # Only create XNets for things that source something. Sinks will get added to existing XNets once the source is identified.
                     return []
                 else:

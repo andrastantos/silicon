@@ -460,7 +460,7 @@ def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Mod
             junction.set_parent_module(parent_module)
         same_level = junction_parent_module is parent_module
         sub_level = junction_parent_module._impl.parent is parent_module
-        is_unused_wire = is_wire(junction) and junction.source is None and len(junction.sinks) == 0
+        is_unused_wire = is_wire(junction) and not junction.has_source() and len(junction.sinks) == 0
         if junction._no_rtl:
             if debug_print_level > 0:
                 print(f"\tNO_RTL JUNCTION {name} {id(junction):x} SKIPPED for {debug_scope}")
@@ -491,13 +491,13 @@ def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Mod
                 # splice after
                 if debug_print_level > 1:
                     print(f"\tjunction {id(junction):x} connectivity:")
-                    if junction.source is not None:
-                        print(f"\t   source: {id(junction.source):x}")
+                    if junction.has_source():
+                        print(f"\t   sources: {', '.join((hex(id(src.far_end)) for _, src in junction._partial_sources))}")
                     sinks = "; ".join(f"{id(sink):x}" for sink in junction.sinks)
                     print(f"\t   sinks: {sinks}")
                 for old_sink in junction.sinks:
                     if debug_print_level > 1:
-                        print(f"\t-- splice after SETTING SOURCE OF {id(old_sink):x} to {id(wire):x} (used to be {id(old_sink.source):x})")
+                        print(f"\t-- splice after SETTING SOURCE OF {id(old_sink):x} to {id(wire):x}")
                     # We have to be careful here: junction could be a partial source for old_sink. If we simply called set_source, we would
                     # override the key that we very carefully constructed. Even worse, junction might be a partial source several times over.
                     # Better replacing it then overriding.
@@ -508,13 +508,14 @@ def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Mod
             else:
                 # splice before
                 assert len(junction._partial_sources) <= 1, "BUG: We can't splice naming wire before something with partial sources"
-                old_source = junction.source
-                if old_source is not None:
+                if junction.has_source():
+                    old_source = junction.get_source()
+                    if old_source is not None:
+                        if debug_print_level > 1:
+                            print(f"\t-- splice before SETTING SOURCE OF {id(wire):x} to {id(old_source):x}")
+                        wire.set_source(old_source, scope=parent_module)
                     if debug_print_level > 1:
-                        print(f"\t-- splice before SETTING SOURCE OF {id(wire):x} to {id(old_source):x}")
-                    wire.set_source(old_source, scope=parent_module)
-                if debug_print_level > 1:
-                    print(f"\t-- splice before SETTING SOURCE OF {id(junction):x} to {id(wire):x} (used to be {id(junction.source):x})")
+                        print(f"\t-- splice before SETTING SOURCE OF {id(junction):x} to {id(wire):x} (used to be {id(junction.get_source()):x})")
                 junction.set_source(wire, scope=parent_module)
         elif same_level and is_unused_wire:
             # This is an unused local wire.

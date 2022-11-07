@@ -539,7 +539,7 @@ class Module(object):
                 for (port_name, port_object) in ports(type(self._true_module)).items():
                     if port_name in get_reserved_names():
                         raise SyntaxErrorException(f"Class {self} uses reserved name as port definition {port_name}")
-                    if port_object.source is not None:
+                    if port_object.has_source():
                         raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with source already bound")
                     if len(port_object.sinks) != 0:
                         raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with sinks already bound")
@@ -954,7 +954,7 @@ class Module(object):
 
             remaining_local_wires = dict()
             for wire in self._local_wires.values():
-                if len(wire.sinks) == 0 and wire.source is None:
+                if len(wire.sinks) == 0 and not wire.has_source():
                     print(f"WARNING: deleting unused local wire: {wire}")
                 else:
                     remaining_local_wires[id(wire)] = wire
@@ -964,19 +964,20 @@ class Module(object):
 
             def propagate_net_types():
                 # First set net types on junctions where the source has a type, but the sink doesn't
-                #incomplete_junctions = set(junction for junction in chain(self.get_junctions()) if not junction.is_specialized() and junction.source is not None)
-                incomplete_junctions = set(junction for junction in self.get_all_junctions() if not junction.is_specialized() and junction.source is not None)
+                #incomplete_junctions = set(junction for junction in chain(self.get_junctions()) if not junction.is_specialized() and junction.has_source())
+                incomplete_junctions = set(junction for junction in self.get_all_junctions() if not junction.is_specialized() and junction.has_source(allow_partials=False))
                 changes = True
                 while len(incomplete_junctions) > 0 and changes:
                     changes = False
                     for junction in tuple(incomplete_junctions):
-                        if junction.source.is_specialized():
-                            junction.set_net_type(junction.source.get_net_type())
+                        source = junction.get_source()
+                        if source.is_specialized():
+                            junction.set_net_type(source.get_net_type())
                             changes = True
                             incomplete_junctions.remove(junction)
                 # Look through all junctions for incompatible source-sink types and insert adaptors as needed
                 for junction in tuple(self.get_all_junctions()):
-                    old_source = junction.source
+                    old_source = junction.get_source()
                     if junction.is_specialized() and old_source is not None and old_source.is_specialized():
                         if junction.get_net_type() is not old_source.get_net_type():
                             # Inserting an adaptor
@@ -1031,7 +1032,7 @@ class Module(object):
             for output in self.get_outputs().values():
                 if not output.is_specialized():
                     raise SyntaxErrorException(f"Output port {output} is not fully specialized after body call. Can't finalize interface")
-            assert all((output.is_specialized() or output.source is None) for output in self.get_outputs().values())
+            assert all((output.is_specialized() or not output.has_source()) for output in self.get_outputs().values())
 
         def is_top_level(self) -> bool:
             return self.netlist.top_level is self._true_module
@@ -1274,7 +1275,7 @@ class DecoratorModule(GenericModule):
         if len(return_values) != len(self._impl.get_outputs()):
             raise SyntaxErrorException(f"Modularized function returned {len(return_values)} values, where decorator declared {len(self._impl.get_outputs())} outputs. These two must match")
         for return_value, (name, output_port) in zip(return_values, self._impl.get_outputs().items()):
-            assert output_port.source is None
+            assert not output_port.has_source()
             try:
                 output_port <<= return_value
             except SyntaxErrorException:

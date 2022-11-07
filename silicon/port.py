@@ -317,11 +317,7 @@ class JunctionBase(object):
         return self._binary_op(other, gate, "__ge__")
 
     def ilshift__elab(self, other: Any) -> 'Junction':
-        if self.source is not None:
-            raise SyntaxErrorException(f"{self} is already bound to {self.source}.")
-        from .netlist import Netlist
-        self.set_source(other, Netlist.get_current_scope())
-        return self
+        assert False, "We shouldn't ever be here!!!"
 
     def ilshift__none(self, other: Any) -> 'Junction':
         assert False, "We shouldn't ever be here!!!"
@@ -423,6 +419,13 @@ class Junction(JunctionBase):
         ret_val += f" = {self._xnet.sim_state.value}"
         return ret_val
 
+    def ilshift__elab(self, other: Any) -> 'Junction':
+        if self.has_source():
+            raise SyntaxErrorException(f"{self} is already bound to {', '.join((str(src.far_end) for _, src in self._partial_sources))}.")
+        from .netlist import Netlist
+        self.set_source(other, Netlist.get_current_scope())
+        return self
+
     def get_underlying_junction(self) -> Optional['Junction']:
         """
         Returns the underlying port object. For most ports, it's just 'self', but for scoped ports and JunctionRefs, it's the underlying port
@@ -503,11 +506,15 @@ class Junction(JunctionBase):
         if self.is_composite():
             return False
         junction = self
-        while junction.source is not None:
-            if is_input_port(junction.source) and (allow_non_auto_inputs or junction.source._auto):
-                junction = junction.source
-            else:
-                return True
+        while junction.has_source():
+            for _, source_edge in self._partial_sources:
+                source = source_edge.far_end
+                if is_input_port(source) and (allow_non_auto_inputs or source._auto):
+                    src_has_driver = source.has_driver(allow_non_auto_inputs)
+                    if src_has_driver:
+                        return True
+                else:
+                    return True
         # There's no driver. However, we should assume that top level ports have drivers, no matter what
         if junction.get_parent_module()._impl.is_top_level():
             return True
@@ -524,9 +531,10 @@ class Junction(JunctionBase):
         # If called on an untyped port or on an edge with not yet resolved type incompatibilities, bail out
         if not self.is_specialized():
             return
-        source = self.source
-        if source is None:
+        if not self.has_source():
             return
+        source = self.get_source()
+        assert source is not None
         scope = self.source_scope
         if self.is_composite():
             if not source.is_specialized():
@@ -607,8 +615,21 @@ class Junction(JunctionBase):
             found_edge = source_edge
         return found_edge
 
-    @property
-    def source(self):
+    def has_source(self, allow_partials: bool = True) -> bool:
+        """
+        Returns True if Port has a source, False otherwise.
+
+        set allow_partials to False, to only count full sources.
+        """
+        if allow_partials:
+            return len(self._partial_sources) > 0
+        else:
+            for key, source_edge in self._partial_sources:
+                if key is None:
+                    return True
+            return False
+
+    def get_source(self) -> 'JunctionBase':
         # TODO: in fact this should die: we don't have a concept of a unique source anymore.
         source_edge = self._get_source_edge()
         if source_edge is None: return None
@@ -629,7 +650,6 @@ class Junction(JunctionBase):
                 raise SyntaxErrorException(f"couldn't convert '{passed_in_source}' to Junction.")
             assert isinstance(source, Junction)
 
-        old_source = f"{id(self.source):x}" if self.source is not None else "--NONE--"
         self._del_source()
         self._partial_sources.append((None, Junction.NetEdge(source, scope)))
         assert self not in source._sinks.keys()
@@ -791,7 +811,7 @@ class Junction(JunctionBase):
                     self_member._set_sim_val(None)
             elif is_junction_base(other):
                 # If something is connected to an otherwise unconnected port, we should support that.
-                if other.source is None:
+                if not other.has_source():
                     for self_member in self.get_all_member_junctions(add_self=False):
                         self_member._set_sim_val(None)
                 else:

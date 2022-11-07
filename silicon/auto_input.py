@@ -24,7 +24,7 @@ class AutoInputPort(InputPort):
         self._candidate = junction_ref(self.get_parent_module()._impl.get_auto_port_to_bind(self._auto_port_names))
     def auto_bind(self, scope: 'Module'):
         # If someone bound to this port, let's not override that
-        if self.source is not None:
+        if self.has_source():
             return
         if self._candidate is None and not self._optional:
             raise SyntaxErrorException(f"Can't auto-connect port {self}: none of the names {self._auto_port_names} could be found in the enclosing module")
