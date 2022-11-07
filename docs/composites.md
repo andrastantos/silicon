@@ -185,3 +185,5 @@ The trouble starts with type propagation: if we allowed multiple sources, what t
 As we merge `_source` and `_partial_sources`, we would need a key for each source, even if such keys are optional. We could say that type propagation is only supported through 'un-keyed' sources, that is sources with the key being None. If there are multiple source sources, we just can't propagate types and that's it. Maybe.
 
 What to do with cascaded slices though? I *think* they are not a bit problem, but I'm not sure. They should become a partial source as anything else. They don't participate in type propagation, and they get resolved in the end as a PHI node.
+
+The property `source` should die on `Port`, including `_get_source_edge` and `source_scope`
