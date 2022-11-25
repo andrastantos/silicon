@@ -509,23 +509,34 @@ class Junction(JunctionBase):
         """
         Returns True if the port can possibly have a driver (source-chain ends in a wire or an Output)
         """
-        # For compound types, we can't easily answer this question. It's the individual members that may or may not have drivers.
-        if self.is_composite():
-            return False
-        junction = self
-        while junction.has_source():
-            for _, source_edge in self._partial_sources:
-                source = source_edge.far_end
-                if is_input_port(source) and (allow_non_auto_inputs or source._auto):
-                    src_has_driver = source.has_driver(allow_non_auto_inputs)
-                    if src_has_driver:
+        def _has_driver(junction) -> bool:
+            # Deals with non-composite junctions only.
+            while junction.has_source():
+                for _, source_edge in self._partial_sources:
+                    source = source_edge.far_end
+                    if is_input_port(source) and (allow_non_auto_inputs or source._auto):
+                        src_has_driver = source.has_driver(allow_non_auto_inputs)
+                        if src_has_driver:
+                            return True
+                    else:
                         return True
-                else:
-                    return True
-        # There's no driver. However, we should assume that top level ports have drivers, no matter what
-        if junction.get_parent_module()._impl.is_top_level():
-            return True
+            # There's no driver. However, we should assume that top level ports have drivers, no matter what
+            if junction.get_parent_module()._impl.is_top_level():
+                return True
+            return False
+
+        # For composite types, we can't easily answer this question. It's the individual members that may or may not have drivers.
+        # However, if *any* of the members have a driver, we should consider the whole thing to have a driver.
+        # We have to be careful about reversed ports though: those can have drivers, but they don't count (logically they carry back-flow).
+        # There is even more trouble: a double-reversed port (a reversed member of a reversed member) does count!
+        # Luckily, get_all_member_junctions_with_names already deals with the recursion and the proper resolving of 'reversed'.
+        # It even handles non-composites, by just returning 'self' essentially.
+        for _, (junction, reverse) in self.get_all_member_junctions_with_names(add_self=False).items():
+            if not reverse and _has_driver(junction):
+                return True
         return False
+
+
 
     def get_net_type(self) -> Optional[NetType]:
         return self._net_type
@@ -933,7 +944,7 @@ class Junction(JunctionBase):
             elif add_self:
                 ret_val[base_names] = (junction, outer_reverse)
             return ret_val
-        return _get_all_member_junctions_with_names(self, add_self)
+        return _get_all_member_junctions_with_names(self, not self.is_composite())
 
     def get_lhs_name(self, back_end: 'BackEnd', target_namespace: 'Module', allow_implicit: bool=True) -> Optional[str]:
         return self.get_net_type().get_lhs_name(self, back_end, target_namespace, allow_implicit)

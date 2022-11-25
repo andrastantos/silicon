@@ -56,14 +56,13 @@ class Select(Module):
     def get_operation_str(self) -> str:
         return "SELECT"
 
-    @property
     def has_default(self) -> bool:
         return self.default_port.has_driver()
 
     def body(self) -> None:
         if len(self.value_ports) == 0:
             raise SyntaxErrorException(f"Select must have at least one value port")
-        if self.has_default:
+        if self.has_default():
             raise SyntaxErrorException("Default values for 'Select' modules are not supported: generation of inline verilog is rather difficult for them.")
         new_net_type = self.generate_output_type()
         assert not self.output_port.is_specialized() or self.output_port.get_net_type() is new_net_type
@@ -209,7 +208,7 @@ class _SelectOneHot(Module):
         if output_net_type is not None and has_port(self, "output_port"):
             raise SyntaxErrorException("Gate already has an output port defined. Can't redefine output_net_type")
         return super().__call__(*args, **kwargs)
-    @property
+
     def has_default(self) -> bool:
         return self.default_port.has_driver()
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
@@ -241,7 +240,7 @@ class _SelectOneHot(Module):
         if self.default_port.is_specialized():
             value_ports.append(self.default_port)
         all_inputs_specialized = all(tuple(input.is_specialized() for input in self.get_inputs().values()))
-        if self.has_default:
+        if self.has_default():
             all_inputs_specialized &= self.default_port.is_specialized()
         common_net_type = get_common_net_type(value_ports, not all_inputs_specialized)
         if common_net_type is None:
@@ -313,22 +312,30 @@ class SelectOne(_SelectOneHot):
         if self.output_port.is_composite():
             output_port_members = tuple(self.output_port.get_all_member_junctions(add_self=False))
             selector_to_value_member_map = []
+            default_member_map = []
             for idx in range(len(output_port_members)):
                 selector_to_value_member_map.append(OrderedDict())
             inline_block = InlineComposite(self.output_port)
             for selector, value_port in self.selector_to_value_map.items():
                 for idx, member_port in enumerate(value_port.get_all_member_junctions(add_self=False)):
                     selector_to_value_member_map[idx][selector] = member_port
+            if self.has_default():
+                for default_member_port in self.default_port.get_all_member_junctions(add_self=False):
+                    default_member_map.append(default_member_port)
+            else:
+                default_member_map = [None]*len(selector_to_value_member_map)
+                
 
             for idx, output_port in enumerate(output_port_members):
-                expression, precedence = self.generate_inline_expression(back_end, target_namespace, output_port_members[idx], selector_to_value_member_map[idx])
+                expression, precedence = self.generate_inline_expression(back_end, target_namespace, output_port_members[idx], selector_to_value_member_map[idx], default_member_map[idx])
                 sub_block = InlineExpression(output_port, expression, precedence)
                 inline_block.add_member_inlines((sub_block, ))
             yield inline_block
         else:
-            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace, self.output_port, self.selector_to_value_map))
+            default_member = self.default_port if self.has_default() else None
+            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace, self.output_port, self.selector_to_value_map, default_member))
 
-    def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module, output_port: Junction, selector_to_value_map: Dict[Junction, Junction]) -> Tuple[str, int]:
+    def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module, output_port: Junction, selector_to_value_map: Dict[Junction, Junction], default_member: Optional[Junction]) -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
         ret_val = ""
         zero = f"{output_port.get_net_type().length}'b0"
@@ -338,8 +345,9 @@ class SelectOne(_SelectOneHot):
             selector_expression, _ = selector.get_rhs_expression(back_end, target_namespace, None, op_precedence)
             value_expression, _ = value.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += f"{selector_expression} ? {value_expression} : {zero} | "
-        if self.default_port.is_specialized():
-            default_expression, _ = self.default_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
+        assert default_member is None or default_member.is_specialized()
+        if default_member is not None:
+            default_expression, _ = default_member.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             ret_val += default_expression
         else:
             ret_val = ret_val[:-2] # delete the last '|'

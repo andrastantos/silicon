@@ -43,6 +43,20 @@ def test_select_one_struct():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_select_one_struct_default():
+    class top(Module):
+        out_port = Output(Pixel)
+        in1 = Input(Pixel)
+        in2 = Input(Pixel)
+        in3 = Input(Pixel)
+        in4 = Input(Pixel)
+        sel_in = Input(Unsigned(4))
+
+        def body(self):
+            self.out_port <<= SelectOne(self.sel_in[0], self.in1, self.sel_in[1], self.in2, self.sel_in[2], self.in3, self.sel_in[3], self.in4, default_port=self.in2)
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 def test_select_first_struct(mode: str = "rtl"):
     class top(Module):
         out_port = Output(Pixel)
@@ -368,7 +382,7 @@ def test_interface_wire3(mode: str = "rtl"):
 
 if __name__ == "__main__":
     #test_select_struct()
-    #test_select_one_struct()
+    test_select_one_struct()
     #test_select_first_struct("rtl")
     #test_select_first_struct("sim")
     #test_reg_struct()
@@ -380,8 +394,9 @@ if __name__ == "__main__":
     #test_struct_sub_module("rtl")
     #test_number_to_struct("rtl")
     #test_number_to_struct("sim")
-    test_interface_wire("rtl")
+    #test_interface_wire("rtl")
     #test_interface_wire2("rtl")
     #test_interface_wire3("rtl")
     #test_number_to_struct_sim()
     #test_multi_assign("sim")
+    #test_select_one_struct_default()
