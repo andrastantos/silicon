@@ -43,14 +43,7 @@ class AutoInputPort(InputPort):
             assert self.is_deleted()
             return []
 
-        assert back_end.language == "SystemVerilog"
-        if not self.is_composite():
-            return [f"{self.get_net_type().generate_net_type_ref(self, back_end)} {port_name}"]
-        else:
-            ret_val = []
-            for member_name, (member_junction, _) in self._member_junctions.items():
-                ret_val += member_junction.generate_interface(back_end, f"{port_name}{MEMBER_DELIMITER}{member_name}")
-            return ret_val
+        return super().generate_interface(back_end, port_name)
 
 
 # Pre-defined port types for clk and rst as they are very commonly used
