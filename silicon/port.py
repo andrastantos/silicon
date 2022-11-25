@@ -458,19 +458,23 @@ class Junction(JunctionBase):
             member_junction.set_parent_module(parent_module)
 
     def finalize_slices(self, scope) -> None:
-        if len(self._partial_sources) > 0:
-            from silicon.member_access import PhiSlice
+        if self.is_composite():
+            for member, _ in self.get_member_junctions().values():
+                member.finalize_slices(scope)
+        else:
+            if len(self._partial_sources) > 0:
+                from silicon.member_access import PhiSlice
 
-            key_chains = tuple(partial_source[0] for partial_source in self._partial_sources if partial_source[0] is not None)
-            sources = tuple(partial_source[1].far_end for partial_source in self._partial_sources if partial_source[0] is not None)
-            scopes = tuple(partial_source[1].scope for partial_source in self._partial_sources if partial_source[0] is not None)
-            if len(key_chains) > 0:
-                # Make sure we don't have both full and partial assignments to the same junction
-                if len(key_chains) != len(self._partial_sources):
-                    raise SyntaxErrorException(f"You can't have both partial and full assignment to junction '{self}'")
-                self.phi_slice = PhiSlice(key_chains)
-                self._partial_sources = [] # Remove all sources: we're handling them in a PhySlice instance from now on
-                self.set_source(self.phi_slice(*sources), scope)
+                key_chains = tuple(partial_source[0] for partial_source in self._partial_sources if partial_source[0] is not None)
+                sources = tuple(partial_source[1].far_end for partial_source in self._partial_sources if partial_source[0] is not None)
+                #scopes = tuple(partial_source[1].scope for partial_source in self._partial_sources if partial_source[0] is not None)
+                if len(key_chains) > 0:
+                    # Make sure we don't have both full and partial assignments to the same junction
+                    if len(key_chains) != len(self._partial_sources):
+                        raise SyntaxErrorException(f"You can't have both partial and full assignment to junction '{self}'")
+                    self.phi_slice = PhiSlice(key_chains)
+                    self._partial_sources = [] # Remove all sources: we're handling them in a PhySlice instance from now on
+                    self.set_source(self.phi_slice(*sources), scope)
 
     def get_junction_type(self) -> type:
         if type(self) is Junction:

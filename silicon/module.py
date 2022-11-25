@@ -935,16 +935,9 @@ class Module(object):
                         self._sub_modules.append(sub_module)
                     del self._unordered_sub_modules # This will force all subsequent module instantiations (during type-propagation) to directly go to _sub_modules
 
-                    def finalize_slices(junction: Junction):
-                        if junction.is_composite():
-                            for member, _ in junction.get_member_junctions().values():
-                                finalize_slices(member)
-                        else:
-                            junction.finalize_slices(self._true_module)
-
                     # Go through each junction and make sure their PhiSlices are created if needed
                     for junction in self.get_junctions():
-                        finalize_slices(junction)
+                        junction.finalize_slices(self._true_module)
 
             for sub_module in self._sub_modules:
                 # handle any pending auto-binds
