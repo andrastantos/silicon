@@ -509,13 +509,13 @@ class Junction(JunctionBase):
         """
         Returns True if the port can possibly have a driver (source-chain ends in a wire or an Output)
         """
-        def _has_driver(junction) -> bool:
+        def _has_driver(junction: Junction, allow_non_auto_inputs: bool) -> bool:
             # Deals with non-composite junctions only.
             while junction.has_source():
-                for _, source_edge in self._partial_sources:
+                for _, source_edge in junction._partial_sources:
                     source = source_edge.far_end
                     if is_input_port(source) and (allow_non_auto_inputs or source._auto):
-                        src_has_driver = source.has_driver(allow_non_auto_inputs)
+                        src_has_driver = _has_driver(source, allow_non_auto_inputs)
                         if src_has_driver:
                             return True
                     else:
@@ -532,7 +532,7 @@ class Junction(JunctionBase):
         # Luckily, get_all_member_junctions_with_names already deals with the recursion and the proper resolving of 'reversed'.
         # It even handles non-composites, by just returning 'self' essentially.
         for _, (junction, reverse) in self.get_all_member_junctions_with_names(add_self=False).items():
-            if not reverse and _has_driver(junction):
+            if not reverse and _has_driver(junction, allow_non_auto_inputs):
                 return True
         return False
 
