@@ -935,7 +935,7 @@ class Module(object):
                         self._sub_modules.append(sub_module)
                     del self._unordered_sub_modules # This will force all subsequent module instantiations (during type-propagation) to directly go to _sub_modules
 
-                    def finalize_slices(junction):
+                    def finalize_slices(junction: Junction):
                         if junction.is_composite():
                             for member, _ in junction.get_member_junctions().values():
                                 finalize_slices(member)
