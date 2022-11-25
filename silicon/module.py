@@ -935,9 +935,10 @@ class Module(object):
                         self._sub_modules.append(sub_module)
                     del self._unordered_sub_modules # This will force all subsequent module instantiations (during type-propagation) to directly go to _sub_modules
 
-                    # Go through each junction and make sure their PhiSlices are created if needed
+                    # Go through each junction and make resolve their sources if needed
+                    #   This is where we create PhiSlice objects for partial assignments for instance.
                     for junction in self.get_junctions():
-                        junction.finalize_slices(self._true_module)
+                        junction.resolve_multiple_sources(self._true_module)
 
             for sub_module in self._sub_modules:
                 # handle any pending auto-binds

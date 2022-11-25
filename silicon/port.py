@@ -457,10 +457,10 @@ class Junction(JunctionBase):
         for member_junction, _ in self.get_member_junctions().values():
             member_junction.set_parent_module(parent_module)
 
-    def finalize_slices(self, scope) -> None:
+    def resolve_multiple_sources(self, scope) -> None:
         if self.is_composite():
             for member, _ in self.get_member_junctions().values():
-                member.finalize_slices(scope)
+                member.resolve_multiple_sources(scope)
         else:
             if len(self._partial_sources) > 0:
                 from silicon.member_access import PhiSlice
