@@ -333,7 +333,22 @@ def test_loop_finder(mode="rtl"):
 
 
 
+def test_mixed_sources(mode="rtl"):
+    class Top(si.Module):
+        a = si.Input(si.Unsigned(8))
+        o = si.Output(si.Unsigned(8))
 
+        def body(self):
+            self.o <<= self.a
+            self.o[0] <<= self.a[2]
+            self.o[7:1] <<= self.a[7:1]
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    with t.ExpectError(si.SyntaxErrorException):
+        if mode == "rtl":
+            t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+        else:
+            t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 def test_rhs_slice(mode="rtl"):
     class Top(si.Module):
@@ -397,7 +412,7 @@ if __name__ == "__main__":
     #test_empty_module()
     #test_module_with_io()
     #test_module_with_assigned_io()
-    test_pass_through()
+    #test_pass_through()
     #test_wire_names()
     #test_wire_array3()
     #test_wire_array2()
@@ -411,3 +426,4 @@ if __name__ == "__main__":
     #test_comb_loop_slice()
     #test_invalid_slice()
     #test_output_slice()
+    test_mixed_sources()
