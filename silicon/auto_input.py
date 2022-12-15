@@ -4,7 +4,7 @@ from .net_type import NetType
 from .exceptions import SyntaxErrorException, SimulationException
 from .module import Module
 from .back_end import BackEnd
-from .utils import MEMBER_DELIMITER
+from .utils import MEMBER_DELIMITER, ScopedAttr
 from .number import logic
 
 class AutoInputPort(InputPort):
@@ -15,10 +15,11 @@ class AutoInputPort(InputPort):
         super().__init__(net_type=net_type, parent_module=parent_module, keyword_only=keyword_only)
         if isinstance(auto_port_names, str):
             auto_port_names = (auto_port_names,)
-        self._auto_port_names = tuple(auto_port_names)
-        self._optional = optional
-        self._candidate = None
-        self._auto = True
+        with self._member_guard:
+            self._auto_port_names = tuple(auto_port_names)
+            self._optional = optional
+            self._candidate = None
+            self._auto = True
     def find_cadidates(self):
         assert self.get_parent_module() is not None
         self._candidate = junction_ref(self.get_parent_module()._impl.get_auto_port_to_bind(self._auto_port_names))

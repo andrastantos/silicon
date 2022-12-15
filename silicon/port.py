@@ -4,7 +4,7 @@ import inspect
 from .net_type import NetType, KeyKind, NetTypeMeta
 from .ordered_set import OrderedSet
 from .exceptions import SyntaxErrorException, SimulationException
-from .utils import convert_to_junction, is_iterable, is_junction_base, is_input_port, is_output_port, get_caller_local_junctions, is_module, MEMBER_DELIMITER, Context, is_net_type, first
+from .utils import ContextMarker, convert_to_junction, is_iterable, is_junction_base, is_input_port, is_output_port, get_caller_local_junctions, is_module, MEMBER_DELIMITER, Context, is_net_type, first, ScopedAttr
 from .port import KeyKind
 from collections import OrderedDict
 from enum import Enum
@@ -20,6 +20,33 @@ class JunctionBase(object):
     At this point, the only two things deriving from JunctionBase are
     Junction (d'uh) and ScopedPort.
     """
+    class MemberGuard(object):
+        """
+        This small helper class allows for creating new attributes within a with block,
+        while only allow the modification of already existing attributes outside.
+
+        It needs some cooperation from __setattr__ in JunctionBase
+        """
+        def __init__(self, parent_junction: 'JunctionBase', guard_name: str):
+            self.parent_junction = parent_junction
+            self.allowed_members = set()
+            self.allowed_members.add(guard_name)
+            self.allowed_members.add("sim_value")
+            self._create_is_allowed = False
+        def add_attr(self, name, value, *, force: bool = False):
+            if self._create_is_allowed or force or name in self.allowed_members or (name.startswith("__") and name.endswith("__")):
+                self.allowed_members.add(name)
+                return True
+            return False
+        def create_is_allowed(self, attr_name) -> bool:
+            return self._create_is_allowed
+        def __enter__(self) -> 'ScopedAttr':
+            self._create_is_allowed = True
+            return self
+        def __exit__(self, exception_type, exception_value, traceback):
+            self._create_is_allowed = False
+
+
     def __new__(cls, *args, **kwargs):
         # Clean up all arguments before passing down the __new__-chain.
         # This is important, because - for typed ports - we'll eventually
@@ -39,12 +66,14 @@ class JunctionBase(object):
         assert parent_module is None or is_module(parent_module)
 
         super().__init__()
-        self._parent_module = parent_module
-        self._allow_auto_bind = True
-        self._no_rtl = False # If set to true, we'll try to not generate RTL code for this junction, by not registering it in Tracer or in _body
-        self._scoped_ports = []
-        if parent_module is not None:
-            self._init_phase2(parent_module)
+        self._member_guard = self.MemberGuard(self, "_member_guard")
+        with self._member_guard:
+            self._parent_module = parent_module
+            self._allow_auto_bind = True
+            self._no_rtl = False # If set to true, we'll try to not generate RTL code for this junction, by not registering it in Tracer or in _body
+            self._scoped_ports = []
+            if parent_module is not None:
+                self._init_phase2(parent_module)
 
     def _init_phase2(self, parent_module: 'Module'):
         assert parent_module is not None
@@ -67,6 +96,49 @@ class JunctionBase(object):
     def __delitem__(self, key: Any) -> None:
         # I'm not sure what this even means in this context
         raise TypeError()
+
+    def get_underlying_junction(self) -> Optional['Junction']:
+        """
+        Returns the underlying port object. For most ports, it's just 'self', but for scoped ports and JunctionRefs, it's the underlying port
+        """
+        raise NotImplementedError()
+
+    def __getattr__(self, name: str) -> Any:
+        if Context.current() == Context.simulation:
+            # If we're getting here during simulation, that's bad: we should have types assigned and those types should have populated
+            # the member properties.
+            raise AttributeError()
+        else:
+            from .member_access import UniSlicer
+            if name.startswith("__") and name.endswith("__"):
+                raise AttributeError()
+            if name in ("convert_to_junction", "get_underlying_junction", "sim_value"):
+                raise AttributeError()
+            print(f"************** returning UniSlicer for {name}")
+            return UniSlicer(self, name, KeyKind.Member, self.get_parent_module())
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        # Under certain circumstances, we do allow attribute-setting. That is because of the following:
+        # A slice of a known type (an array of structs) is well known, but the attributes are not exposed
+        # on the UniSlicer. So, something like this should work, even though the attributes are not known:
+        #     a[0].bird <<= wings
+        # Of course in other cases, this is not well defined:
+        #     a[2:0].cat <<= dog
+        # Finally, of course it could just be a typo:
+        #     a[3].borken <== orken
+        # There are a lot of cases though when setting attributes on members needs to be supported, such as
+        # __init__ and many others.
+        if value is IgnoreMeAfterIlShift:
+            return
+        # Allow creation of attributes prior the creation of _member_guard
+        if "_member_guard" not in self.__dict__:
+            return super().__setattr__(name, value)
+        
+        if self._member_guard.add_attr(name, value):
+            return super().__setattr__(name, value)
+        else:
+            raise SyntaxErrorException("Assignment to composite members is not supported. Use the '<<=' operator instead")                
+
 
     def __enter__(self) -> 'Junction':
         self._allow_auto_bind = True
@@ -335,14 +407,15 @@ class JunctionBase(object):
         raise NotImplementedError()
 
     def _context_change(self, context: Context) -> None:
-        if context is None:
-            self.__ilshift__impl = self.ilshift__none
-        elif context == Context.simulation:
-            self.__ilshift__impl = self.ilshift__sim
-        elif context == Context.elaboration:
-            self.__ilshift__impl = self.ilshift__elab
-        else:
-            assert False
+        with self._member_guard:
+            if context is None:
+                self.__ilshift__impl = self.ilshift__none
+            elif context == Context.simulation:
+                self.__ilshift__impl = self.ilshift__sim
+            elif context == Context.elaboration:
+                self.__ilshift__impl = self.ilshift__elab
+            else:
+                assert False
 
     @abstractmethod
     def set_source(self, source: Any, scope: 'Module') -> None:
@@ -395,18 +468,20 @@ class Junction(JunctionBase):
         # will get called from '_init_phase2' of 'Module'.
         super().__init__(parent_module)
         from .module import Module
-        self._partial_sources: Sequence[Tuple[Optional[Sequence[Tuple[Any, KeyKind]]], 'Junction.NetEdge']] = [] # contains slice/member assignments
-        self._sinks: Dict['Junction', 'Module'] = {}
-        self._in_attr_access = False
-        self.keyword_only = keyword_only
-        self._member_junctions = OrderedDict() # Contains members for struct/interfaces/vectors
-        self._parent_junction = None # Reverences back to the container for struct/interface/vector members
-        self._net_type = None
-        self._xnet = None # This is set by Netlist to cache the result of Netlist.get_xnet_for_junction(self)
-        if net_type is not None:
-            if not is_net_type(net_type):
-                raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType.")
-            self.set_net_type(net_type)
+        with self._member_guard:
+            self._partial_sources: Sequence[Tuple[Optional[Sequence[Tuple[Any, KeyKind]]], 'Junction.NetEdge']] = [] # contains slice/member assignments
+            self._sinks: Dict['Junction', 'Module'] = {}
+            self._in_attr_access = False
+            self.keyword_only = keyword_only
+            self._member_junctions = OrderedDict() # Contains members for struct/interfaces/vectors
+            self._parent_junction = None # Reverences back to the container for struct/interface/vector members
+            self._net_type = None
+            self.phi_slice = None
+            self._xnet = None # This is set by Netlist to cache the result of Netlist.get_xnet_for_junction(self)
+            if net_type is not None:
+                if not is_net_type(net_type):
+                    raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType.")
+                self.set_net_type(net_type)
 
 
     def __str__(self) -> str:
@@ -909,7 +984,7 @@ class Junction(JunctionBase):
                 scope_table.add_soft_symbol(member, f"{parent_name}{MEMBER_DELIMITER}{name}")
         member._parent_junction = self
         self._member_junctions[name] = [member, reversed]
-        setattr(self.__class__, name, Junction.MemberJunctionProperty(name))
+        #setattr(self.__class__, name, Junction.MemberJunctionProperty(name))
 
     def is_composite(self) -> bool:
         return len(self._member_junctions) > 0
@@ -961,7 +1036,8 @@ class Port(Junction):
 
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False):
         super().__init__(net_type, parent_module, keyword_only=keyword_only)
-        self._auto = False # Set to true for auto-ports
+        with self._member_guard:
+            self._auto = False # Set to true for auto-ports
 
     def is_deleted(self) -> bool:
         """
@@ -1027,7 +1103,8 @@ class OutputPort(Port):
 
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None):
         super().__init__(net_type, parent_module)
-        self.rhs_expression: Optional[Tuple[str, int]] = None # Filled-in by the parent_module during the 'generation' phase to contain the expression for the right-hand-side value, if inline expressions are supported for this port.
+        with self._member_guard:
+            self.rhs_expression: Optional[Tuple[str, int]] = None # Filled-in by the parent_module during the 'generation' phase to contain the expression for the right-hand-side value, if inline expressions are supported for this port.
 
     @classmethod
     def generate_junction_ref(cls, back_end: 'BackEnd') -> str:
@@ -1083,7 +1160,8 @@ class WireJunction(Junction):
         super().__init__(net_type, parent_module)
         if parent_module is not None:
             parent_module._impl.register_wire(self)
-        self.rhs_expression: Optional[Tuple[str, int]] = None # Filled-in by the parent_module during the 'generation' phase to contain the expression for the right-hand-side value, if inline expressions are supported for this port.
+        with self._member_guard:
+            self.rhs_expression: Optional[Tuple[str, int]] = None # Filled-in by the parent_module during the 'generation' phase to contain the expression for the right-hand-side value, if inline expressions are supported for this port.
 
     def get_default_name(self, scope: object) -> str:
         return "unnamed_wire"
@@ -1117,7 +1195,8 @@ class ScopedPort(JunctionBase):
     """
     attributes = ("_real_junction")
     def __init__(self, real_junction: JunctionBase):
-        self._real_junction = real_junction
+        with self._member_guard:
+            self._real_junction = real_junction
     def _update_real_port(self, real_junction: Optional[JunctionBase]):
         self._real_junction = real_junction
     def __setattr__(self, name, value):

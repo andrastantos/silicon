@@ -16,8 +16,9 @@ from typing import Tuple, Sequence, Any, Generator
 from .module import GenericModule, Module, InlineBlock
 from .port import Junction, Input, Output, Port
 from .net_type import KeyKind
-from .exceptions import SyntaxErrorException, InvalidPortError
+from .exceptions import SimulationException, SyntaxErrorException, InvalidPortError
 from .netlist import Netlist
+from .utils import Context
 
 """
 There should be a generic (non type-specific) way of handling slicing, or even more generally accessing members.
@@ -111,10 +112,11 @@ from typing import Optional
 class UniSlicer(JunctionBase):
     def __init__(self, parent: JunctionBase, key: Any, key_kind: KeyKind, parent_module: Optional['Module']):
         super().__init__(parent_module)
-        self.parent = parent
-        self.key = key
-        self.key_kind = key_kind
-        self._slice = None
+        with self._member_guard:
+            self.parent = parent
+            self.key = key
+            self.key_kind = key_kind
+            self._slice = None
     
     def convert_to_junction(self, type_hint: Optional['NetType']=None) -> Optional[Junction]:
         # If this is called, we're in a RHS context, that is, we're binding to another port as its source.
@@ -137,6 +139,18 @@ class UniSlicer(JunctionBase):
         self.set_partial_source(tuple(), other, scope)
         return IgnoreMeAfterIlShift
 
+    def __getattr__(self, name: str) -> Any:
+        # If this is called, we're asked for a member, such as:
+        #     a[3].pink <<= blue 
+        #     blue <<= a[0].yellow
+        # We don't know if we're in a LHS or RHS context.
+        # It of course is also possible that it's simply an error in code:
+        #     something = a[0].kreffufle
+        if Context.current() == Context.simulation:
+            raise SimulationException("FIXME: member access during simulation is not yet supported")
+        else:
+            return UniSlicer(self, name, KeyKind.Member, self.get_parent_module())
+    
     def set_partial_source(self, key_chain: Sequence[Tuple[Any, KeyKind]], source: Any, scope: 'Module') -> None:
         key_chain = ((self.key, self.key_kind), ) + key_chain
         self.parent.set_partial_source(key_chain, source, scope)

@@ -88,9 +88,9 @@ It is not a `Wire` however in the sense that `__ilshift__` should start collecti
 
 Let's call this magical object `UniSlicer`
 
-- `finalize_slices` is the thing in a `Junction` at the moment that deals with the creation of what should be a `PhiSlice` instance.
+- `resolve_multiple_sources` is the thing in a `Junction` at the moment that deals with the creation of what should be a `PhiSlice` instance.
 - this dealt with `raw_input_map` which is a name that gets us to a lot of pieces of the old infrastructure.
-- `finalize_slices` assumed a net_type. We can probably call it earlier now. In fact it even called `_body`!!!!
+- `resolve_multiple_sources` assumed a net_type. We can probably call it earlier now. In fact it even called `_body`!!!!
 
 # OTHERS
 + `JunctionBase.__enter__` and `__exit__` should add tests for things, like:

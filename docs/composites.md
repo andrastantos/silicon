@@ -17,7 +17,7 @@ What's tricky is `reversed` members. Now, here's the trick though: `Composites` 
 
 What is curious is that `UniSlicer` decomposes into a `Slice` Module when used in a RHS context. It registers a partial source (through `set_partial_source`) when used in a LHS context.
 
-These partial sources eventually will be turned into a `PhiSlice` instance in `Junction.finalize_slices`.
+These partial sources eventually will be turned into a `PhiSlice` instance in `Junction.resolve_multiple_sources`.
 
 So, what about reversed members?
 
@@ -187,3 +187,58 @@ As we merge `_source` and `_partial_sources`, we would need a key for each sourc
 What to do with cascaded slices though? I *think* they are not a bit problem, but I'm not sure. They should become a partial source as anything else. They don't participate in type propagation, and they get resolved in the end as a PHI node.
 
 The property `source` should die on `Port`, including `_get_source_edge` and `source_scope`
+
+
+## More problems:
+
+1. Now that we have has_driver(), a lot of primitives break: they check if a default port has a driver for instance to know if they need to generate anything for the default statement. Well, for composites it's hard to tell of they have drivers or not.
+
+
+## Yet another approach:
+
+How about this idea? Instead of trying to make composites act as opaque types, why not support splitting of primitives?
+
+For that, we would need a way to get all the 'forward' and all the 'reverse' members (recursively) from a composite. These methods would return a list of non-composite junctions. Then, we could ask each primitive that has composites as inputs and outputs to split itself into a set of primitives, one in each direction. The primitive can refuse to do so.
+
+We already have something similar implemented on `ReadyValid`, so maybe we can lift it from there? That one is even better as it returns a new composite type
+
+## How things work at the moment?
+
+When a composite type is set on a junction, it's `setup_junction` method is called. This in turn calls `create_member_junction` on the junction in a loop for all its members. This method creates *actual properties* for each member-junction as well as inserting them into the `_member_junctions` dictionary of the junction.
+
+From then on, junctions are fully aware of their members and no `__getattr__` shananigans are needed to get to them: the properties take care of that.
+
+This is a completely different way of dealing with partial sources from what `Number` is doing. There might be a good reason for dealing with it this way though: members of composites are always named (is that true, that's really a hack in `Arrays` ??!!!).
+
+The problem with this approach is that type propagation for composite types doesn't work. This code fails:
+
+    class top(Module):
+        in1 = Input(Pixel)
+        out1 = Output(Unsigned(8))
+
+        def body(self):
+            w = Wire()
+            w <<= self.in1
+            self.out1 <<= w.r
+
+But, if we wanted to make it work, we would need to accept any old attribute in `__getattr__` which might not be want we want.
+
+
+
+
+Currently, I've implemented `__setattr__` and `__getattr__` to handle pre-type-propagation cases. This however hooks in UniSlicer
+into member handling. It's a good question whether we should remove the `@property` based member handling all together and delay member assignments to later when `PhiSlice` conversion happens. That was the original goal anyway...
+
+Now, RHS handling would need in that world be done by beefing up `Slice`.
+
+## TODO:
+
+- We should not dole out carte-blanche UniSlicers anymore after a net type is assigned. In fact, we should hold on to previously assigned UniSlicers and verify their validity (or maybe later??)
+- We should also make sure that []-style members are not supported on composites. Even after the fact.
+- Should we support enumeration of composites?
+    for name, field in struct.items():
+        ...
+    for field in struct.values():
+        ...
+    for name in struct: # or struct.keys():
+        ...
