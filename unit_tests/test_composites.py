@@ -91,6 +91,18 @@ def test_select_first_struct(mode: str = "rtl"):
     else:
         test.simulation(top, "test_select_first_struct")
 
+def test_type_propagation():
+    class top(Module):
+        in1 = Input(Pixel)
+        out1 = Output(Unsigned(8))
+
+        def body(self):
+            w = Wire()
+            w <<= self.in1
+            self.out1 <<= w.r
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 def test_reg_struct():
     class top(Module):
         sout1 = Output(Pixel)
@@ -382,7 +394,7 @@ def test_interface_wire3(mode: str = "rtl"):
 
 if __name__ == "__main__":
     #test_select_struct()
-    test_select_one_struct()
+    #test_select_one_struct()
     #test_select_first_struct("rtl")
     #test_select_first_struct("sim")
     #test_reg_struct()
@@ -400,3 +412,13 @@ if __name__ == "__main__":
     #test_number_to_struct_sim()
     #test_multi_assign("sim")
     #test_select_one_struct_default()
+    test_type_propagation()
+
+"""
+Additional tests needed:
+
+    a[3].pink <<= blue 
+    blue <<= a[0].yellow
+
+Simulation has different behavior, so that needs to be tested as well
+"""
