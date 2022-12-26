@@ -91,6 +91,7 @@ def test_select_first_struct(mode: str = "rtl"):
     else:
         test.simulation(top, "test_select_first_struct")
 
+@pytest.mark.skip(reason="This is a test for something that only the new Composite infrastructure can handle well")
 def test_type_propagation():
     class top(Module):
         in1 = Input(Pixel)
@@ -417,7 +418,7 @@ if __name__ == "__main__":
 """
 Additional tests needed:
 
-    a[3].pink <<= blue 
+    a[3].pink <<= blue
     blue <<= a[0].yellow
 
 Simulation has different behavior, so that needs to be tested as well
