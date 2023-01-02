@@ -142,6 +142,7 @@ class Fifo(GenericModule):
     output_port = Output()
     clock_port = ClkPort()
     reset_port = RstPort()
+    clear = Input(logic, default_value = 0)
 
     def construct(self, depth:int):
         try:
@@ -204,11 +205,11 @@ class Fifo(GenericModule):
             next_empty <<= Select(next_empty_or_full, 0, ~next_looped)
             next_full <<= Select(next_empty_or_full, 0, next_looped)
 
-            push_addr <<= Reg(next_push_addr)
-            pop_addr <<= Reg(next_pop_addr)
-            empty <<= Reg(next_empty, reset_value_port = 1)
-            full <<= Reg(next_full)
-            looped <<= Reg(next_looped)
+            push_addr <<= Reg(Select(self.clear, next_push_addr, 0))
+            pop_addr <<= Reg(Select(self.clear, next_pop_addr, 0))
+            empty <<= Reg(Select(self.clear, next_empty, 1), reset_value_port = 1)
+            full <<= Reg(Select(self.clear, next_full, 0))
+            looped <<= Reg(Select(self.clear, next_looped, 0))
 
             # Buffer memory
             mem_config = MemoryConfig((
