@@ -511,7 +511,7 @@ class Junction(JunctionBase):
         """
         def _has_driver(junction: Junction, allow_non_auto_inputs: bool) -> bool:
             # Deals with non-composite junctions only.
-            while junction.has_source():
+            if junction.has_source():
                 for _, source_edge in junction._partial_sources:
                     source = source_edge.far_end
                     if is_input_port(source) and (allow_non_auto_inputs or source._auto):
