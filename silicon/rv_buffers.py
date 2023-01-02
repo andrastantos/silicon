@@ -2,7 +2,7 @@ from .module import Module, GenericModule
 from .rv_interface import ReadyValid
 from .port import Input, Output, Wire
 from .auto_input import ClkPort, RstPort
-from .primitives import Select, Reg, SelectOne
+from .primitives import Select, Reg, RegEn, SelectOne
 from .exceptions import SyntaxErrorException
 from .utils import is_input_port, is_output_port
 from .number import Number, logic
@@ -10,11 +10,45 @@ from .utils import get_composite_member_name
 from collections import OrderedDict
 from .memory import MemoryPortConfig, MemoryConfig, Memory
 
+class ForwardBufLogic(Module):
+    clock_port = ClkPort()
+    reset_port = RstPort()
+
+    input_valid = Input(logic)
+    input_ready = Output(logic)
+    output_valid = Output(logic)
+    output_ready = Input(logic)
+
+    out_reg_en = Output(logic)
+
+    def body(self):
+        in_ready = self.input_ready
+        in_valid = self.input_valid
+
+        out_ready = Wire(logic)
+        buf_valid = Wire(logic)
+
+        self.out_reg_en <<= in_valid & in_ready
+        buf_valid <<= Reg(Select(in_valid & in_ready, Select(out_ready & buf_valid, buf_valid, 0), 1))
+
+        self.output_valid <<= buf_valid
+        out_ready <<= self.output_ready
+        in_ready <<= ~buf_valid | out_ready
+
+        # Clean up the namespace
+        del(out_ready)
+        del(in_valid)
+        del(in_ready)
+
 class ForwardBuf(Module):
     input_port = Input()
     output_port = Output()
     clock_port = ClkPort()
     reset_port = RstPort()
+
+    '''
+    This old implementation generates better RTL at the moment.
+    This will continue to be the case until full module inlining starts working...
 
     def body(self):
         in_ready = self.input_port.ready
@@ -41,6 +75,27 @@ class ForwardBuf(Module):
         del(out_ready)
         del(in_valid)
         del(data)
+    '''
+    def body(self):
+        self.output_port.set_net_type(self.input_port.get_net_type())
+
+        fsm = ForwardBufLogic()
+        self.input_port.ready <<= fsm.input_ready
+        fsm.input_valid <<= self.input_port.valid
+        fsm.output_ready <<= self.output_port.ready
+        self.output_port.valid <<= fsm.output_valid
+
+        data = self.input_port.get_data_members()
+
+        buf_data = Wire(data.get_net_type()) # At this point we have to create a typed wire. TODO: can we make it so that we don't?
+
+        buf_data <<= RegEn(data, clock_en=fsm.out_reg_en)
+
+        self.output_port.set_data_members(buf_data)
+
+        # Clean up the namespace
+        del(data)
+
 
 
 class ReverseBuf(Module):
