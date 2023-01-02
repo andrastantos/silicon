@@ -25,7 +25,7 @@ class JunctionBase(object):
         # This is important, because - for typed ports - we'll eventually
         # end up in NetType.__new__ which is tricky. It uses the number of
         # arguments passed in to determine if we wanted a type-cast or a new
-        # type instance. 
+        # type instance.
         return super().__new__(cls)
 
     def __init__(self, parent_module: Optional['Module'] = None):
@@ -694,7 +694,7 @@ class Junction(JunctionBase):
                 source_edge.scope = scope
                 del old_source._sinks[self]
                 new_source._sinks[self] = scope
-        
+
     def set_partial_source(self, key_chain: Sequence[Tuple[Any, KeyKind]], source: Any, scope: 'Module') -> None:
         passed_in_source = source
         if source is not None:
@@ -959,16 +959,23 @@ class Junction(JunctionBase):
 
 class Port(Junction):
 
-    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False):
+    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False, default_value = None):
         super().__init__(net_type, parent_module, keyword_only=keyword_only)
         self._auto = False # Set to true for auto-ports
+        self._default_value = default_value
 
     def is_deleted(self) -> bool:
         """
         Returns True if the port (an optional auto-port with no driver) got deleted from the interface
         """
         return False
-    
+
+    def is_optional(self) -> bool:
+        """
+        Returns True if port is optional, that is, it has a default value to use, if not connected.
+        """
+        return self._default_value is not None and not self.get_parent_module()._impl.is_top_level()
+
     def get_default_name(self, scope: object) -> str:
         if scope is not self.get_parent_module()._impl.parent:
             raise SyntaxErrorException(f"Can't generate default name for port except for its parent scope. Did you end up referencing a port in a different scope?")
@@ -992,12 +999,31 @@ class Port(Junction):
         for member_name, (member_junction, _) in self.get_member_junctions().items():
             member_junction.del_interface_name()
 
+    def generate_default_definition(self, back_end: 'BackEnd', port_name: str) -> Sequence[str]:
+        assert back_end.language == "SystemVerilog"
+        assert not self.is_composite(), "FIXME: default values for composite ports are not supported at the moment"
+        if not self.is_composite():
+            return [f"{self.get_net_type().generate_type_ref(back_end)} {port_name};\n"]
+        else:
+            ret_val = []
+            for member_name, (member_junction, _) in self._member_junctions.items():
+                ret_val += member_junction.generate_default_definition(back_end, f"{port_name}{MEMBER_DELIMITER}{member_name}")
+            return ret_val
+
+    def generate_default_assignment(self, back_end: 'BackEnd', port_name: str) -> Sequence[str]:
+        assert back_end.language == "SystemVerilog"
+        assert not self.is_composite(), "FIXME: default values for composite ports are not supported at the moment"
+        return [f"assign {port_name} = {self._default_value};\n"]
+
 
 
 
 
 
 class InputPort(Port):
+    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False, default_value = None):
+        super().__init__(net_type, parent_module, keyword_only=keyword_only, default_value=default_value)
+
     @classmethod
     def generate_junction_ref(cls, back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog"
@@ -1024,6 +1050,8 @@ class InputPort(Port):
 
 
 class OutputPort(Port):
+    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False):
+        super().__init__(net_type, parent_module, keyword_only=keyword_only)
 
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None):
         super().__init__(net_type, parent_module)
@@ -1113,7 +1141,7 @@ class ScopedPort(JunctionBase):
     as a name still exists within 'locals' after __exit__ is called. What ScopedPort does
     is it disallows automatic binding after __exit__ is executed. This way, while the name
     technically still exists, and can be used explicitly, it won't automatically bind to
-    ports anymore. 
+    ports anymore.
     """
     attributes = ("_real_junction")
     def __init__(self, real_junction: JunctionBase):

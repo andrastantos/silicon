@@ -153,7 +153,7 @@ class Module(object):
             raise SyntaxErrorException(f"Can't use call-style instantiation with port-bindings of top level module")
         if Context.current() != Context.elaboration:
             raise SyntaxErrorException(f"Can't bind module using call-syntax outside of elaboration context")
-        
+
         def do_call() -> Union[Port, Tuple[Port]]:
             my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
             if self._impl.is_interface_frozen():
@@ -362,7 +362,7 @@ class Module(object):
                     sub_module_ports = sub_module.get_ports()
                     last_port_idx = len(sub_module_ports) - 1
                     for idx, (sub_module_port_name, sub_module_port) in enumerate(sub_module_ports.items()):
-                        if sub_module_port.is_deleted():
+                        if sub_module_port.is_deleted() or (sub_module_port.is_optional() and ~sub_module_port.has_driver(allow_non_auto_inputs=True)):
                             continue
                         if sub_module_port.is_composite():
                             members = sub_module_port.get_all_member_junctions(False)
@@ -409,6 +409,17 @@ class Module(object):
                     if names is not None:
                         for name in names:
                             rtl_wire_assignments += f"{xnet.generate_assign(name, xnet_rhs_expression, back_end)}\n"
+            # Add wire definitions for all the optional inputs with no source
+            ports = self.get_ports()
+            first_port = True
+            is_composite = False
+            for port_name, port in ports.items():
+                if port.is_optional() and ~port.has_driver(allow_non_auto_inputs=True):
+                    port_definition_strs = port.generate_default_definition(back_end, port_name)
+                    port_assignment_strs = port.generate_default_assignment(back_end, port_name)
+                    for port_definition_str, port_assignment_str in zip(port_definition_strs, port_assignment_strs):
+                        rtl_wire_definitions += port_definition_str
+                        rtl_wire_assignments += port_assignment_str
 
         ret_val = (
             str_block(rtl_header, "", "\n\n") +
@@ -745,7 +756,7 @@ class Module(object):
                 value.set_parent_module(self._true_module)
             # Finally set the actual attribute
             self.supersetattr(name, value)
-        
+
         def register_wire(self, wire: Wire) -> None:
             assert id(wire) not in self._local_wires
             self._local_wires[id(wire)] = wire
@@ -895,7 +906,7 @@ class Module(object):
         def get_all_junctions(self) -> Sequence[Junction]:
             """
             Returns all junctions that are in the scope of this module.
-            
+
             This includes ports and wires of the module itself, plus all the ports of all sub-modules
             """
             return chain(
@@ -1128,7 +1139,7 @@ class Module(object):
             first_port = True
             is_composite = False
             for port_name, port in ports.items():
-                if not port.is_deleted():
+                if not (port.is_deleted() or (port.is_optional() and ~port.has_driver(allow_non_auto_inputs=True))):
                     port_interface_strs = port.generate_interface(back_end, port_name)
                     after_composite = is_composite
                     is_composite = len(port_interface_strs) > 1
@@ -1160,7 +1171,7 @@ class Module(object):
             Makes sure that every xnet within the modules body have at least one name.
 
             At this point, all junction names are populated and made unique.
-            
+
             TODO: I'm not sure if this should happen before or after braking up composites.
                   If it happens before, that means that new XNets (and names) will be created
                   and as a consequence, there could be new name-collisions.
@@ -1283,7 +1294,7 @@ class DecoratorModule(GenericModule):
         # Named arguments are easy: we know what to bind them to and we know their name as well, so we need no magic
         for name, arg in kwargs.items():
             if scope is None:
-                raise SyntaxErrorException("Can't instantiate top level module with call-syntax and port-bindings") 
+                raise SyntaxErrorException("Can't instantiate top level module with call-syntax and port-bindings")
             if is_junction_base(arg):
                 with ScopedAttr(self, "_allow_port_creation", True):
                     my_arg = self.create_named_port(name)
@@ -1318,7 +1329,7 @@ class DecoratorModule(GenericModule):
                     self.idx = idx
 
             if scope is None:
-                raise SyntaxErrorException("Can't instantiate top level module with call-syntax and port-bindings") 
+                raise SyntaxErrorException("Can't instantiate top level module with call-syntax and port-bindings")
             if is_junction_base(arg):
                 placeholder = PlaceHolder(arg, idx)
                 ports_needing_name.add(placeholder)

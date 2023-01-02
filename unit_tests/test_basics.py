@@ -132,7 +132,7 @@ def test_scoped_bind():
         in_b = si.Input(si.Unsigned(8))
         in_c = si.Input(si.Unsigned(8))
         in_d = si.Input(si.Unsigned(8))
-    
+
         def body(self):
             a = self.in_a
             with self.in_a as a:
@@ -333,6 +333,30 @@ def test_loop_finder(mode="rtl"):
 
 
 
+def test_default_port(mode="rtl"):
+    class Sub(si.Module):
+        a = si.Input(si.Unsigned(8), default_value = 123)
+        o = si.Output(si.Unsigned(8))
+
+        def body(self):
+            self.o <<= self.a
+    class Top(si.Module):
+        a = si.Input(si.Unsigned(8), default_value = 123) # At the top level, optional ports must stay in the interface
+        o = si.Output(si.Unsigned(8))
+        o2 = si.Output(si.Unsigned(8))
+
+        def body(self):
+            self.o <<= self.a
+            self.o2 <<= Sub()()
+
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+
+
 def test_mixed_sources(mode="rtl"):
     class Top(si.Module):
         a = si.Input(si.Unsigned(8))
@@ -426,4 +450,5 @@ if __name__ == "__main__":
     #test_comb_loop_slice()
     #test_invalid_slice()
     #test_output_slice()
-    test_mixed_sources()
+    #test_mixed_sources()
+    test_default_port()
