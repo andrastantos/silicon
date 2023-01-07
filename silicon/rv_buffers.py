@@ -1,14 +1,17 @@
+from typing import Any
 from .module import Module, GenericModule
 from .rv_interface import ReadyValid
-from .port import Input, Output, Wire
-from .auto_input import ClkPort, RstPort
-from .primitives import Select, Reg, RegEn, SelectOne
+from .port import Input, Output, Wire, Junction
+from .auto_input import ClkPort, RstPort, RstValPort
+from .primitives import Select, Reg, SelectOne
 from .exceptions import SyntaxErrorException
 from .utils import is_input_port, is_output_port
 from .number import Number, logic
 from .utils import get_composite_member_name
 from collections import OrderedDict
 from .memory import MemoryPortConfig, MemoryConfig, Memory
+from .fsm import FSM
+from .net_type import NetType
 
 class ForwardBufLogic(Module):
     clock_port = ClkPort()
@@ -89,7 +92,7 @@ class ForwardBuf(Module):
 
         buf_data = Wire(data.get_net_type()) # At this point we have to create a typed wire. TODO: can we make it so that we don't?
 
-        buf_data <<= RegEn(data, clock_en=fsm.out_reg_en)
+        buf_data <<= Reg(data, clock_en=fsm.out_reg_en)
 
         self.output_port.set_data_members(buf_data)
 

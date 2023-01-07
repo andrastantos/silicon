@@ -24,9 +24,6 @@ lines for 'refresh', 'io access' and 'm1'.
 
 """
 
-'''
-RegEn = Reg
-'''
 
 class Z80MemIf(Module):
     clk = ClkPort()
@@ -65,12 +62,12 @@ class Z80MemIf(Module):
         self.wr_not_rd_reg = Wire(logic)
         self.data_out_reg = Wire(TByte)
 
-        self.addr_reg       <<= RegEn(Select(self.start, self.addr_reg      , self.addr))
-        self.m1_reg         <<= RegEn(Select(self.start, self.m1_reg        , self.m1))
-        self.rfsh_reg       <<= RegEn(Select(self.start, self.rfsh_reg      , self.rfsh))
-        self.io_not_mem_reg <<= RegEn(Select(self.start, self.io_not_mem_reg, self.io_not_mem))
-        self.wr_not_rd_reg  <<= RegEn(Select(self.start, self.wr_not_rd_reg , self.wr_not_rd))
-        self.data_out_reg   <<= RegEn(Select(self.start, self.data_out_reg  , self.data_out))
+        self.addr_reg       <<= Reg(Select(self.start, self.addr_reg      , self.addr))
+        self.m1_reg         <<= Reg(Select(self.start, self.m1_reg        , self.m1))
+        self.rfsh_reg       <<= Reg(Select(self.start, self.rfsh_reg      , self.rfsh))
+        self.io_not_mem_reg <<= Reg(Select(self.start, self.io_not_mem_reg, self.io_not_mem))
+        self.wr_not_rd_reg  <<= Reg(Select(self.start, self.wr_not_rd_reg , self.wr_not_rd))
+        self.data_out_reg   <<= Reg(Select(self.start, self.data_out_reg  , self.data_out))
 
         phase_idle = 0
         phase_addr = 1
@@ -84,7 +81,7 @@ class Z80MemIf(Module):
             phase_data, # ADDR
             Select(self.pready, phase_data, self.start) # DATA
         )
-        self.phase <<= RegEn(self.phase_next)
+        self.phase <<= Reg(self.phase_next)
 
         self.paddr   <<= Select(self.phase == phase_idle, self.addr_reg, self.addr)
         self.pm1     <<= Select(self.phase == phase_idle, self.m1_reg, self.m1)

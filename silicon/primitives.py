@@ -1,4 +1,4 @@
-from .module import Module, InlineBlock, InlineExpression, InlineStatement, InlineComposite, has_port
+from .module import Module, InlineBlock, InlineExpression, InlineStatement, InlineComposite, has_port, GenericModule
 from typing import Dict, Optional, Tuple, Any, Generator, Union
 from .port import Junction, Input, Output, Port, EdgeType, Wire
 from .auto_input import ClkPort, ClkEnPort, RstPort, RstValPort
@@ -516,15 +516,19 @@ class Concatenator(Module):
 def concat(*args, **kwargs):
     return Concatenator(*args, **kwargs)
 
-class Reg(Module):
+class GenericReg(GenericModule):
     output_port = Output()
     input_port = Input()
     clock_port = ClkPort()
     reset_port = RstPort()
     reset_value_port = RstValPort()
+    clock_en = ClkEnPort()
 
-    def construct(self) -> None:
+    def construct(self, clk_edge: EdgeType) -> None:
         self.sync_reset = True
+        self.clk_edge = clk_edge
+        if self.clk_edge not in (EdgeType.Negative, EdgeType.Positive):
+            raise SyntaxErrorException(f"Unsupported clock edge: {self.edge}")
 
 
     def body(self) -> None:
@@ -569,26 +573,37 @@ class Reg(Module):
     def generate_inline_statement(self, back_end: 'BackEnd', target_namespace: Module, output_port: Junction, input_port: Junction, reset_value_port: Junction) -> str:
         assert back_end.language == "SystemVerilog"
         assert is_module(target_namespace)
-        netlist = target_namespace._impl.netlist
         output_name = output_port.get_lhs_name(back_end, target_namespace)
         assert output_name is not None
         clk, _ = self.clock_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("()")) # Get parenthesis around the expression if it's anything complex
+        input_expression, input_precedence = input_port.get_rhs_expression(back_end, target_namespace)
+        if (self.clk_edge == EdgeType.Negative):
+            edge = "negedge"
+        elif (self.clk_edge == EdgeType.Positive):
+            edge = "posedge"
+        else:
+            raise SyntaxErrorException(f"Unsupported clock edge: {self.edge}")
+        if self.clock_en.has_driver():
+            enable_expression, _ = self.clock_en.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("?:"))
+            input_expression, input_precedence = back_end.wrap_expression(input_expression, input_precedence, back_end.get_operator_precedence("?:"))
+            input_expression = f"{enable_expression} ? {input_expression} : {output_name}"
+            input_precedence = back_end.get_operator_precedence("?:")
         if not self.reset_port.has_driver():
-            input_expression, _ = input_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("<="))
-            ret_val = f"always_ff @(posedge {clk}) {output_name} <= {input_expression};\n"
+            input_expression, _ = back_end.wrap_expression(input_expression, input_precedence, back_end.get_operator_precedence("<="))
+            ret_val = f"always_ff @({edge} {clk}) {output_name} <= {input_expression};\n"
         else:
             rst_expression, rst_precedence = self.reset_port.get_rhs_expression(back_end, target_namespace)
             if reset_value_port.has_driver():
                 rst_val_expression, _ = reset_value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), back_end.get_operator_precedence("?:"))
             else:
                 rst_val_expression = output_port.get_net_type().get_default_value(back_end)
-            input_expression, _ = input_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("?:"))
-            rst_sensitivty_expression, _ = back_end.wrap_expression(rst_expression, rst_precedence, back_end.get_operator_precedence("()"))
+            input_expression, _ = back_end.wrap_expression(input_expression, input_precedence, back_end.get_operator_precedence("?:"))
+            rst_sensitivity_expression, _ = back_end.wrap_expression(rst_expression, rst_precedence, back_end.get_operator_precedence("()"))
             rst_test_expression, _ = back_end.wrap_expression(rst_expression, rst_precedence, back_end.get_operator_precedence("?:"))
             if self.sync_reset:
-                ret_val = f"always_ff @(posedge {clk})"
+                ret_val = f"always_ff @({edge} {clk})"
             else:
-                ret_val = f"always_ff @(posedge {clk} or {rst_sensitivty_expression})"
+                ret_val = f"always_ff @({edge} {clk} or {rst_sensitivity_expression})"
             ret_val += f" {output_name} <= {rst_test_expression} ? {rst_val_expression} : {input_expression};\n"
         return ret_val
 
@@ -606,6 +621,7 @@ class Reg(Module):
 
         has_reset = self.reset_port.has_driver()
         has_async_reset = not self.sync_reset and has_reset
+        has_clk_en = self.clock_en.has_driver()
         while True:
             if has_async_reset:
                 yield (self.reset_port, self.clock_port)
@@ -616,41 +632,38 @@ class Reg(Module):
                 reset()
             else:
                 edge_type = self.clock_port.get_sim_edge()
-                if edge_type == EdgeType.Positive:
+                if edge_type == self.clk_edge:
                     if has_reset and self.reset_port.sim_value == 1:
                         # This branch is never taken for async reset
                         reset()
                     else:
-                        if self.output_port.is_composite():
-                            out_members = self.output_port.get_all_member_junctions(add_self=False)
-                            in_members = self.input_port.get_all_member_junctions(add_self=False)
-                            for out_member, in_member in zip(out_members, in_members):
-                                if in_member.get_sim_edge() != EdgeType.NoEdge:
-                                    out_member <<= None
-                                else:
-                                    out_member <<= in_member
-                        else:
-                            if self.input_port.get_sim_edge() != EdgeType.NoEdge:
-                                self.output_port <<= None
+                        if not has_clk_en or self.clock_en.sim_value == 1:
+                            if self.output_port.is_composite():
+                                out_members = self.output_port.get_all_member_junctions(add_self=False)
+                                in_members = self.input_port.get_all_member_junctions(add_self=False)
+                                for out_member, in_member in zip(out_members, in_members):
+                                    if in_member.get_sim_edge() != EdgeType.NoEdge:
+                                        out_member <<= None
+                                    else:
+                                        out_member <<= in_member
                             else:
-                                self.output_port <<= self.input_port
+                                if self.input_port.get_sim_edge() != EdgeType.NoEdge:
+                                    self.output_port <<= None
+                                else:
+                                    self.output_port <<= self.input_port
                 elif edge_type == EdgeType.Undefined:
                     self.output_port <<= None
 
-class RegEn(Module):
-    output_port = Output()
-    input_port = Input()
-    clock_port = ClkPort()
-    reset_port = RstPort()
-    reset_value_port = RstValPort()
-    clock_en = ClkEnPort()
+class PosReg(GenericReg):
+    def __new__(cls, *args, **kwargs):
+        return Module.__new__(cls, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(EdgeType.Positive)
 
-    def body(self):
-        value = Wire(self.input_port.get_net_type())
-        value <<= Reg(Select(self.clock_en, value, self.input_port))
-        self.output_port <<= value
+class NegReg(GenericReg):
+    def __new__(cls, *args, **kwargs):
+        return Module.__new__(cls, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(EdgeType.Negative)
 
-
-
-
-
+Reg = PosReg

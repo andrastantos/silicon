@@ -4,8 +4,8 @@
 # Below, I spelled things out using SelectOne though...
 
 from .module import GenericModule, Module
-from .port import Input, Output, Wire, Junction, Port
-from .auto_input import ClkPort, RstPort, RstValPort
+from .port import Input, Output, Wire, Junction
+from .auto_input import ClkPort, RstPort, RstValPort, ClkEnPort
 from .primitives import SelectOne, Reg
 from .exceptions import SyntaxErrorException
 from .utils import is_junction_base
@@ -108,6 +108,7 @@ class FSM(GenericModule):
     reset_value = RstValPort()
     state = Output()
     next_state = Output()
+    clock_en = ClkEnPort()
     default_state = Input(default_value=None)
 
     def construct(self, reg: Module = Reg) -> None:

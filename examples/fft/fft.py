@@ -54,21 +54,6 @@ class ComplexSub(Module):
         self.output_port.real <<= self.input1_port.real - self.input2_port.real
         self.output_port.img  <<= self.input1_port.img  - self.input2_port.img
 
-'''
-class RegEn(Module):
-    output_port = Output()
-    input_port = Input()
-    clock_port = ClkPort()
-    reset_port = RstPort()
-    reset_value_port = RstValPort()
-    clock_en = ClkEnPort()
-
-    def body(self):
-        value = Wire(self.input_port.get_net_type())
-        value <<= Reg(Select(self.clock_en, value, self.input_port))
-        self.output_port <<= value
-'''
-
 def inc(i: Wire) -> Wire:
     return (i+1)[i.get_net_type().length-1:0]
 class Butterfly(Module):

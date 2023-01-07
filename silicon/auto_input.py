@@ -11,8 +11,8 @@ class AutoInputPort(InputPort):
     """
     An input port variant that supports automatic binding to a set of named nets in the enclosing namespace.
     """
-    def __init__(self, net_type: Optional[NetType] = None, parent_module: Module = None, *, keyword_only: bool = False, auto_port_names: Union[str, Sequence[str]], optional: bool = True):
-        super().__init__(net_type=net_type, parent_module=parent_module, keyword_only=keyword_only)
+    def __init__(self, net_type: Optional[NetType] = None, parent_module: Module = None, *, keyword_only: bool = False, auto_port_names: Union[str, Sequence[str]], optional: bool = True, **kwargs):
+        super().__init__(net_type=net_type, parent_module=parent_module, keyword_only=keyword_only, **kwargs)
         if isinstance(auto_port_names, str):
             auto_port_names = (auto_port_names,)
         self._auto_port_names = tuple(auto_port_names)
@@ -26,7 +26,7 @@ class AutoInputPort(InputPort):
         # If someone bound to this port, let's not override that
         if self.has_source():
             return
-        if self._candidate is None and not self._optional:
+        if self._candidate is None and not self._optional and not self.is_optional():
             raise SyntaxErrorException(f"Can't auto-connect port {self}: none of the names {self._auto_port_names} could be found in the enclosing module")
         if self._candidate is not None:
             self.set_source(self._candidate.junction, scope)
@@ -68,7 +68,7 @@ def ClkEnPort(
     parent_module: 'Module' = None, *,
     keyword_only: bool = True,
     auto_port_names: Union[str, Sequence[str]] = ("clk_en", "clk_en_port", "clock_enable", "clock_enable_port"),
-    optional: bool = False
+    optional: bool = True
 ):
     return create_junction(AutoInputPort,
         net_type=net_type,

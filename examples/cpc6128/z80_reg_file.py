@@ -59,22 +59,6 @@ Can we get away with a single-ported RF? Probably not. Especially since we need 
 That pretty much means the reg-file to be done in flops (yuck), but then port-config and what not is much less of an issue.
 """
 
-class RegEn(Module):
-    output_port = Output()
-    input_port = Input()
-    clock_port = ClkPort()
-    reset_port = RstPort()
-    reset_value_port = RstValPort()
-    clock_en = ClkEnPort()
-
-    def body(self):
-        value = Wire(self.input_port.get_net_type())
-        value <<= Reg(Select(self.clock_en, value, self.input_port))
-        self.output_port <<= value
-'''
-RegEn = Reg
-'''
-
 class Z80RegFile(Module):
     clk = ClkPort()
     clk_en = Input(logic)
@@ -166,46 +150,46 @@ class Z80RegFile(Module):
         self.dehl_swap = Wire(logic)
         self.dehl_swap_prime = Wire(logic)
 
-        self.af_prime <<= RegEn(Select(self.exchange_af, self.af_prime, ~self.af_prime))
-        self.bcdehl_prime <<= RegEn(Select(self.exchange_bcdehl, self.bcdehl_prime, ~self.bcdehl_prime))
-        self.dehl_swap <<= RegEn(Select(self.exchange_de_hl & ~self.bcdehl_prime, self.dehl_swap, ~self.dehl_swap))
-        self.dehl_swap_prime <<= RegEn(Select(self.exchange_de_hl & self.bcdehl_prime, self.dehl_swap_prime, ~self.dehl_swap_prime))
+        self.af_prime <<= Reg(Select(self.exchange_af, self.af_prime, ~self.af_prime))
+        self.bcdehl_prime <<= Reg(Select(self.exchange_bcdehl, self.bcdehl_prime, ~self.bcdehl_prime))
+        self.dehl_swap <<= Reg(Select(self.exchange_de_hl & ~self.bcdehl_prime, self.dehl_swap, ~self.dehl_swap))
+        self.dehl_swap_prime <<= Reg(Select(self.exchange_de_hl & self.bcdehl_prime, self.dehl_swap_prime, ~self.dehl_swap_prime))
 
         self.swap_de_hl = Wire(logic)
         self.swap_de_hl <<= Select(self.bcdehl_prime, self.dehl_swap, self.dehl_swap_prime)
 
-        self.rB   <<= RegEn(Select((self.wr_a == Z80RegFile.wrBC                                          )  & self.wr_h_valid & ~self.bcdehl_prime, self.rB  , self.wr_h))
-        self.rC   <<= RegEn(Select((self.wr_a == Z80RegFile.wrBC                                          )  & self.wr_l_valid & ~self.bcdehl_prime, self.rC  , self.wr_l))
-        self.rD   <<= RegEn(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrDE, Z80RegFile.wrHL))  & self.wr_h_valid & ~self.bcdehl_prime, self.rD  , self.wr_h))
-        self.rE   <<= RegEn(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrDE, Z80RegFile.wrHL))  & self.wr_l_valid & ~self.bcdehl_prime, self.rE  , self.wr_l))
-        self.rH   <<= RegEn(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrHL, Z80RegFile.wrDE))  & self.wr_h_valid & ~self.bcdehl_prime, self.rH  , self.wr_h))
-        self.rL   <<= RegEn(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrHL, Z80RegFile.wrDE))  & self.wr_l_valid & ~self.bcdehl_prime, self.rL  , self.wr_l))
-        self.rZ   <<= RegEn(Select((self.wr_a == Z80RegFile.wrZA                                          )  & self.wr_h_valid & ~self.bcdehl_prime, self.rZ  , self.wr_h))
-        self.rA   <<= RegEn(Select((self.wr_a == Z80RegFile.wrZA                                          )  & self.wr_l_valid & ~self.af_prime,     self.rA  , self.wr_l))
-        self.rF   <<= RegEn(Select(self.wr_f_valid & ~self.af_prime, Select((self.wr_a == Z80RegFile.wrFW)   & self.wr_h_valid & ~self.af_prime,     self.rF  , self.wr_h), self.wr_f))
-        self.rW   <<= RegEn(Select((self.wr_a == Z80RegFile.wrFW                                          )  & self.wr_l_valid & ~self.bcdehl_prime, self.rW  , self.wr_l))
+        self.rB   <<= Reg(Select((self.wr_a == Z80RegFile.wrBC                                          )  & self.wr_h_valid & ~self.bcdehl_prime, self.rB  , self.wr_h))
+        self.rC   <<= Reg(Select((self.wr_a == Z80RegFile.wrBC                                          )  & self.wr_l_valid & ~self.bcdehl_prime, self.rC  , self.wr_l))
+        self.rD   <<= Reg(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrDE, Z80RegFile.wrHL))  & self.wr_h_valid & ~self.bcdehl_prime, self.rD  , self.wr_h))
+        self.rE   <<= Reg(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrDE, Z80RegFile.wrHL))  & self.wr_l_valid & ~self.bcdehl_prime, self.rE  , self.wr_l))
+        self.rH   <<= Reg(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrHL, Z80RegFile.wrDE))  & self.wr_h_valid & ~self.bcdehl_prime, self.rH  , self.wr_h))
+        self.rL   <<= Reg(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrHL, Z80RegFile.wrDE))  & self.wr_l_valid & ~self.bcdehl_prime, self.rL  , self.wr_l))
+        self.rZ   <<= Reg(Select((self.wr_a == Z80RegFile.wrZA                                          )  & self.wr_h_valid & ~self.bcdehl_prime, self.rZ  , self.wr_h))
+        self.rA   <<= Reg(Select((self.wr_a == Z80RegFile.wrZA                                          )  & self.wr_l_valid & ~self.af_prime,     self.rA  , self.wr_l))
+        self.rF   <<= Reg(Select(self.wr_f_valid & ~self.af_prime, Select((self.wr_a == Z80RegFile.wrFW)   & self.wr_h_valid & ~self.af_prime,     self.rF  , self.wr_h), self.wr_f))
+        self.rW   <<= Reg(Select((self.wr_a == Z80RegFile.wrFW                                          )  & self.wr_l_valid & ~self.bcdehl_prime, self.rW  , self.wr_l))
 
-        self.rBp  <<= RegEn(Select((self.wr_a == Z80RegFile.wrBC                                          ) & self.wr_h_valid & self.bcdehl_prime, self.rBp  , self.wr_h))
-        self.rCp  <<= RegEn(Select((self.wr_a == Z80RegFile.wrBC                                          ) & self.wr_l_valid & self.bcdehl_prime, self.rCp  , self.wr_l))
-        self.rDp  <<= RegEn(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrDE, Z80RegFile.wrHL)) & self.wr_h_valid & self.bcdehl_prime, self.rDp  , self.wr_h))
-        self.rEp  <<= RegEn(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrDE, Z80RegFile.wrHL)) & self.wr_l_valid & self.bcdehl_prime, self.rEp  , self.wr_l))
-        self.rHp  <<= RegEn(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrHL, Z80RegFile.wrDE)) & self.wr_h_valid & self.bcdehl_prime, self.rHp  , self.wr_h))
-        self.rLp  <<= RegEn(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrHL, Z80RegFile.wrDE)) & self.wr_l_valid & self.bcdehl_prime, self.rLp  , self.wr_l))
-        self.rZp  <<= RegEn(Select((self.wr_a == Z80RegFile.wrZA                                          ) & self.wr_h_valid & self.bcdehl_prime, self.rZp  , self.wr_h))
-        self.rAp  <<= RegEn(Select((self.wr_a == Z80RegFile.wrZA                                          ) & self.wr_l_valid & self.af_prime,     self.rAp  , self.wr_l))
-        self.rFp  <<= RegEn(Select(self.wr_f_valid & self.af_prime,  Select((self.wr_a == Z80RegFile.wrFW)  & self.wr_h_valid & self.af_prime,     self.rFp  , self.wr_h), self.wr_f))
-        self.rWp  <<= RegEn(Select((self.wr_a == Z80RegFile.wrFW                                          ) & self.wr_l_valid & self.bcdehl_prime, self.rWp  , self.wr_l))
+        self.rBp  <<= Reg(Select((self.wr_a == Z80RegFile.wrBC                                          ) & self.wr_h_valid & self.bcdehl_prime, self.rBp  , self.wr_h))
+        self.rCp  <<= Reg(Select((self.wr_a == Z80RegFile.wrBC                                          ) & self.wr_l_valid & self.bcdehl_prime, self.rCp  , self.wr_l))
+        self.rDp  <<= Reg(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrDE, Z80RegFile.wrHL)) & self.wr_h_valid & self.bcdehl_prime, self.rDp  , self.wr_h))
+        self.rEp  <<= Reg(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrDE, Z80RegFile.wrHL)) & self.wr_l_valid & self.bcdehl_prime, self.rEp  , self.wr_l))
+        self.rHp  <<= Reg(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrHL, Z80RegFile.wrDE)) & self.wr_h_valid & self.bcdehl_prime, self.rHp  , self.wr_h))
+        self.rLp  <<= Reg(Select((self.wr_a == Select(self.swap_de_hl, Z80RegFile.wrHL, Z80RegFile.wrDE)) & self.wr_l_valid & self.bcdehl_prime, self.rLp  , self.wr_l))
+        self.rZp  <<= Reg(Select((self.wr_a == Z80RegFile.wrZA                                          ) & self.wr_h_valid & self.bcdehl_prime, self.rZp  , self.wr_h))
+        self.rAp  <<= Reg(Select((self.wr_a == Z80RegFile.wrZA                                          ) & self.wr_l_valid & self.af_prime,     self.rAp  , self.wr_l))
+        self.rFp  <<= Reg(Select(self.wr_f_valid & self.af_prime,  Select((self.wr_a == Z80RegFile.wrFW)  & self.wr_h_valid & self.af_prime,     self.rFp  , self.wr_h), self.wr_f))
+        self.rWp  <<= Reg(Select((self.wr_a == Z80RegFile.wrFW                                          ) & self.wr_l_valid & self.bcdehl_prime, self.rWp  , self.wr_l))
 
-        self.rI   <<= RegEn(Select((self.wr_a == Z80RegFile.wrIR) & self.wr_h_valid, self.rI  , self.wr_h))
-        self.rR   <<= RegEn(Select((self.wr_a == Z80RegFile.wrIR) & self.wr_l_valid, self.rR  , self.wr_l))
-        self.rIXh <<= RegEn(Select((self.wr_a == Z80RegFile.wrIX) & self.wr_h_valid, self.rIXh, self.wr_h))
-        self.rIXl <<= RegEn(Select((self.wr_a == Z80RegFile.wrIX) & self.wr_l_valid, self.rIXl, self.wr_l))
-        self.rIYh <<= RegEn(Select((self.wr_a == Z80RegFile.wrIY) & self.wr_h_valid, self.rIYh, self.wr_h))
-        self.rIYl <<= RegEn(Select((self.wr_a == Z80RegFile.wrIY) & self.wr_l_valid, self.rIYl, self.wr_l))
-        self.rSPh <<= RegEn(Select((self.wr_a == Z80RegFile.wrSP) & self.wr_h_valid, self.rSPh, self.wr_h))
-        self.rSPl <<= RegEn(Select((self.wr_a == Z80RegFile.wrSP) & self.wr_l_valid, self.rSPl, self.wr_l))
-        self.rPCh <<= RegEn(Select((self.wr_a == Z80RegFile.wrPC) & self.wr_h_valid, self.rPCh, self.wr_h))
-        self.rPCl <<= RegEn(Select((self.wr_a == Z80RegFile.wrPC) & self.wr_l_valid, self.rPCl, self.wr_l))
+        self.rI   <<= Reg(Select((self.wr_a == Z80RegFile.wrIR) & self.wr_h_valid, self.rI  , self.wr_h))
+        self.rR   <<= Reg(Select((self.wr_a == Z80RegFile.wrIR) & self.wr_l_valid, self.rR  , self.wr_l))
+        self.rIXh <<= Reg(Select((self.wr_a == Z80RegFile.wrIX) & self.wr_h_valid, self.rIXh, self.wr_h))
+        self.rIXl <<= Reg(Select((self.wr_a == Z80RegFile.wrIX) & self.wr_l_valid, self.rIXl, self.wr_l))
+        self.rIYh <<= Reg(Select((self.wr_a == Z80RegFile.wrIY) & self.wr_h_valid, self.rIYh, self.wr_h))
+        self.rIYl <<= Reg(Select((self.wr_a == Z80RegFile.wrIY) & self.wr_l_valid, self.rIYl, self.wr_l))
+        self.rSPh <<= Reg(Select((self.wr_a == Z80RegFile.wrSP) & self.wr_h_valid, self.rSPh, self.wr_h))
+        self.rSPl <<= Reg(Select((self.wr_a == Z80RegFile.wrSP) & self.wr_l_valid, self.rSPl, self.wr_l))
+        self.rPCh <<= Reg(Select((self.wr_a == Z80RegFile.wrPC) & self.wr_h_valid, self.rPCh, self.wr_h))
+        self.rPCl <<= Reg(Select((self.wr_a == Z80RegFile.wrPC) & self.wr_l_valid, self.rPCl, self.wr_l))
 
         def read_logic(addr):
             return Select(addr,

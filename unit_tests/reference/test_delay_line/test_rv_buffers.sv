@@ -47,20 +47,20 @@ module DelayLine (
 );
 
 	logic intermediate_ready;
-	logic u_output_port_valid;
 	logic [7:0] u_output_port_data;
+	logic u_output_port_valid;
+	logic [7:0] u1_output_port_data;
 	logic u1_output_port_valid;
 	logic u_output_port_ready;
-	logic [7:0] u1_output_port_data;
+	logic [7:0] u2_output_port_data;
 	logic u2_output_port_valid;
 	logic u1_output_port_ready;
-	logic [7:0] u2_output_port_data;
+	logic [7:0] u3_output_port_data;
 	logic u3_output_port_valid;
 	logic u2_output_port_ready;
-	logic [7:0] u3_output_port_data;
+	logic [7:0] intermediate_data;
 	logic intermediate_valid;
 	logic u3_output_port_ready;
-	logic [7:0] intermediate_data;
 
 	ForwardBuf u (
 		.input_port_data(input_port_data),
@@ -128,8 +128,8 @@ module DelayLine (
 	);
 
 	assign intermediate_ready = output_port_ready;
-	assign output_port_valid = intermediate_valid;
 	assign output_port_data = intermediate_data;
+	assign output_port_valid = intermediate_valid;
 endmodule
 
 
@@ -149,8 +149,10 @@ module ForwardBuf_5 (
 	input logic reset_port
 );
 
-	logic fsm_out_reg_en;
 	logic [7:0] buf_data_data;
+	logic fsm_out_reg_en;
+
+	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 8'h0 : fsm_out_reg_en ? input_port_data : buf_data_data;
 
 	ForwardBufLogic_5 fsm (
 		.clock_port(clock_port),
@@ -160,16 +162,6 @@ module ForwardBuf_5 (
 		.output_valid(output_port_valid),
 		.output_ready(output_port_ready),
 		.out_reg_en(fsm_out_reg_en)
-	);
-
-	RegEn_5 u (
-		.output_port_data(buf_data_data),
-
-		.input_port_data(input_port_data),
-
-		.clock_port(clock_port),
-		.reset_port(reset_port),
-		.clock_en(fsm_out_reg_en)
 	);
 
 	assign output_port_data = buf_data_data;
@@ -192,8 +184,10 @@ module ForwardBuf_4 (
 	input logic reset_port
 );
 
-	logic fsm_out_reg_en;
 	logic [7:0] buf_data_data;
+	logic fsm_out_reg_en;
+
+	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 8'h0 : fsm_out_reg_en ? input_port_data : buf_data_data;
 
 	ForwardBufLogic_4 fsm (
 		.clock_port(clock_port),
@@ -203,16 +197,6 @@ module ForwardBuf_4 (
 		.output_valid(output_port_valid),
 		.output_ready(output_port_ready),
 		.out_reg_en(fsm_out_reg_en)
-	);
-
-	RegEn_4 u (
-		.output_port_data(buf_data_data),
-
-		.input_port_data(input_port_data),
-
-		.clock_port(clock_port),
-		.reset_port(reset_port),
-		.clock_en(fsm_out_reg_en)
 	);
 
 	assign output_port_data = buf_data_data;
@@ -235,8 +219,10 @@ module ForwardBuf_3 (
 	input logic reset_port
 );
 
-	logic fsm_out_reg_en;
 	logic [7:0] buf_data_data;
+	logic fsm_out_reg_en;
+
+	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 8'h0 : fsm_out_reg_en ? input_port_data : buf_data_data;
 
 	ForwardBufLogic_3 fsm (
 		.clock_port(clock_port),
@@ -246,16 +232,6 @@ module ForwardBuf_3 (
 		.output_valid(output_port_valid),
 		.output_ready(output_port_ready),
 		.out_reg_en(fsm_out_reg_en)
-	);
-
-	RegEn_3 u (
-		.output_port_data(buf_data_data),
-
-		.input_port_data(input_port_data),
-
-		.clock_port(clock_port),
-		.reset_port(reset_port),
-		.clock_en(fsm_out_reg_en)
 	);
 
 	assign output_port_data = buf_data_data;
@@ -278,8 +254,10 @@ module ForwardBuf_2 (
 	input logic reset_port
 );
 
-	logic fsm_out_reg_en;
 	logic [7:0] buf_data_data;
+	logic fsm_out_reg_en;
+
+	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 8'h0 : fsm_out_reg_en ? input_port_data : buf_data_data;
 
 	ForwardBufLogic_2 fsm (
 		.clock_port(clock_port),
@@ -289,16 +267,6 @@ module ForwardBuf_2 (
 		.output_valid(output_port_valid),
 		.output_ready(output_port_ready),
 		.out_reg_en(fsm_out_reg_en)
-	);
-
-	RegEn_2 u (
-		.output_port_data(buf_data_data),
-
-		.input_port_data(input_port_data),
-
-		.clock_port(clock_port),
-		.reset_port(reset_port),
-		.clock_en(fsm_out_reg_en)
 	);
 
 	assign output_port_data = buf_data_data;
@@ -321,8 +289,10 @@ module ForwardBuf (
 	input logic reset_port
 );
 
-	logic fsm_out_reg_en;
 	logic [7:0] buf_data_data;
+	logic fsm_out_reg_en;
+
+	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 8'h0 : fsm_out_reg_en ? input_port_data : buf_data_data;
 
 	ForwardBufLogic fsm (
 		.clock_port(clock_port),
@@ -334,112 +304,7 @@ module ForwardBuf (
 		.out_reg_en(fsm_out_reg_en)
 	);
 
-	RegEn u (
-		.output_port_data(buf_data_data),
-
-		.input_port_data(input_port_data),
-
-		.clock_port(clock_port),
-		.reset_port(reset_port),
-		.clock_en(fsm_out_reg_en)
-	);
-
 	assign output_port_data = buf_data_data;
-endmodule
-
-
-////////////////////////////////////////////////////////////////////////////////
-// RegEn_5
-////////////////////////////////////////////////////////////////////////////////
-module RegEn_5 (
-	output logic [7:0] output_port_data,
-	input logic [7:0] input_port_data,
-	input logic clock_port,
-	input logic reset_port,
-	input logic clock_en
-);
-
-	logic [7:0] value_data;
-
-	always_ff @(posedge clock_port) value_data <= reset_port ? 8'h0 : clock_en ? input_port_data : value_data;
-
-	assign output_port_data = value_data;
-endmodule
-
-
-////////////////////////////////////////////////////////////////////////////////
-// RegEn_4
-////////////////////////////////////////////////////////////////////////////////
-module RegEn_4 (
-	output logic [7:0] output_port_data,
-	input logic [7:0] input_port_data,
-	input logic clock_port,
-	input logic reset_port,
-	input logic clock_en
-);
-
-	logic [7:0] value_data;
-
-	always_ff @(posedge clock_port) value_data <= reset_port ? 8'h0 : clock_en ? input_port_data : value_data;
-
-	assign output_port_data = value_data;
-endmodule
-
-
-////////////////////////////////////////////////////////////////////////////////
-// RegEn_3
-////////////////////////////////////////////////////////////////////////////////
-module RegEn_3 (
-	output logic [7:0] output_port_data,
-	input logic [7:0] input_port_data,
-	input logic clock_port,
-	input logic reset_port,
-	input logic clock_en
-);
-
-	logic [7:0] value_data;
-
-	always_ff @(posedge clock_port) value_data <= reset_port ? 8'h0 : clock_en ? input_port_data : value_data;
-
-	assign output_port_data = value_data;
-endmodule
-
-
-////////////////////////////////////////////////////////////////////////////////
-// RegEn_2
-////////////////////////////////////////////////////////////////////////////////
-module RegEn_2 (
-	output logic [7:0] output_port_data,
-	input logic [7:0] input_port_data,
-	input logic clock_port,
-	input logic reset_port,
-	input logic clock_en
-);
-
-	logic [7:0] value_data;
-
-	always_ff @(posedge clock_port) value_data <= reset_port ? 8'h0 : clock_en ? input_port_data : value_data;
-
-	assign output_port_data = value_data;
-endmodule
-
-
-////////////////////////////////////////////////////////////////////////////////
-// RegEn
-////////////////////////////////////////////////////////////////////////////////
-module RegEn (
-	output logic [7:0] output_port_data,
-	input logic [7:0] input_port_data,
-	input logic clock_port,
-	input logic reset_port,
-	input logic clock_en
-);
-
-	logic [7:0] value_data;
-
-	always_ff @(posedge clock_port) value_data <= reset_port ? 8'h0 : clock_en ? input_port_data : value_data;
-
-	assign output_port_data = value_data;
 endmodule
 
 

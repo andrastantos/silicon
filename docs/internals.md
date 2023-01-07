@@ -10,7 +10,6 @@ primitives.py:class Select(Module):
 primitives.py:class _SelectOneHot(Module):
 primitives.py:class Concatenator(Module):
 primitives.py:class Reg(Module):
-primitives.py:class RegEn(Module):
 rv_buffers.py:class ForwardBuf(Module):
 rv_buffers.py:class ReverseBuf(Module):
 tantos@dell-laptop:~/silicon/silicon$ grep "(GenericModule" *

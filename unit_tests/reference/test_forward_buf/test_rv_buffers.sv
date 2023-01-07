@@ -46,8 +46,10 @@ module ForwardBuf (
 	input logic reset_port
 );
 
-	logic fsm_out_reg_en;
 	logic [7:0] buf_data_data;
+	logic fsm_out_reg_en;
+
+	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 8'h0 : fsm_out_reg_en ? input_port_data : buf_data_data;
 
 	ForwardBufLogic fsm (
 		.clock_port(clock_port),
@@ -59,36 +61,7 @@ module ForwardBuf (
 		.out_reg_en(fsm_out_reg_en)
 	);
 
-	RegEn u (
-		.output_port_data(buf_data_data),
-
-		.input_port_data(input_port_data),
-
-		.clock_port(clock_port),
-		.reset_port(reset_port),
-		.clock_en(fsm_out_reg_en)
-	);
-
 	assign output_port_data = buf_data_data;
-endmodule
-
-
-////////////////////////////////////////////////////////////////////////////////
-// RegEn
-////////////////////////////////////////////////////////////////////////////////
-module RegEn (
-	output logic [7:0] output_port_data,
-	input logic [7:0] input_port_data,
-	input logic clock_port,
-	input logic reset_port,
-	input logic clock_en
-);
-
-	logic [7:0] value_data;
-
-	always_ff @(posedge clock_port) value_data <= reset_port ? 8'h0 : clock_en ? input_port_data : value_data;
-
-	assign output_port_data = value_data;
 endmodule
 
 
