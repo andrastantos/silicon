@@ -108,7 +108,7 @@ class FSM(GenericModule):
     reset_value = RstValPort()
     state = Output()
     next_state = Output()
-    default_state = Input()
+    default_state = Input(default_value=None)
 
     def construct(self, reg: Module = Reg) -> None:
         self._reg = reg

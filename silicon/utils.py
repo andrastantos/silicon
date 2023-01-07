@@ -299,7 +299,8 @@ def common_superclass(*args, **kwargs) -> object:
     return candidates[0]
 
 def get_common_net_type(junctions: Sequence['Junction'], partial_results: bool = False) -> Optional[object]:
-    net_types = tuple(junction.get_net_type() for junction in junctions if junction.is_specialized() or not partial_results)
+    from .constant import NoneNetType
+    net_types = tuple(junction.get_net_type() for junction in junctions if (junction.is_specialized() or not partial_results) and junction.get_net_type() is not NoneNetType)
     # If any of the types
     if (any(net_type is None for net_type in net_types) or len(net_types) == 0) and not partial_results:
         return None
@@ -420,7 +421,7 @@ def get_verbosity_level() -> int:
 
 def vprint(verbosity_level: int, *args, **kwargs):
     """
-    Same as 'print', except it is printing only at certain verbosity levels, and always targets STDERR 
+    Same as 'print', except it is printing only at certain verbosity levels, and always targets STDERR
     """
     if verbose_enough(verbosity_level):
         print(*args, **kwargs, file=sys.stderr)

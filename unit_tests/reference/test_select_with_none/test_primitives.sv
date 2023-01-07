@@ -10,7 +10,7 @@ module top (
 	input logic [1:0] sel_in
 );
 
-	assign sout1 = sel_in == 0 ? uin1 : 5'b0 | sel_in == 1 ? uin2 : 5'b0 | sel_in == 2 ? sin1 : 5'b0 | sel_in == 3 ? sin2 : 5'b0 | sel_in == 4 ? 5'hx : 5'b0;
+	assign sout1 = sel_in == 0 ? uin1 : 5'b0 | sel_in == 1 ? uin2 : 5'b0 | sel_in == 2 ? sin1 : 5'b0 | sel_in == 3 ? sin2 : 5'b0 | sel_in == 4 ? signed'(1'bX) : 5'b0;
 
 endmodule
 

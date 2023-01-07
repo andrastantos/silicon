@@ -169,8 +169,7 @@ class Module(object):
                     except InvalidPortError:
                         raise SyntaxErrorException(f"Module {self} doesn't support dynamic creation of more positional ports")
                     my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
-                if arg is not None:
-                    my_positional_inputs[idx].set_source(arg, scope)
+                my_positional_inputs[idx].set_source(convert_to_junction(arg), scope)
             for arg_name, arg_value in kwargs.items():
                 if not has_port(self, arg_name):
                     self.create_named_port(arg_name)
@@ -362,7 +361,10 @@ class Module(object):
                     sub_module_ports = sub_module.get_ports()
                     last_port_idx = len(sub_module_ports) - 1
                     for idx, (sub_module_port_name, sub_module_port) in enumerate(sub_module_ports.items()):
-                        if sub_module_port.is_deleted() or (sub_module_port.is_optional() and ~sub_module_port.has_driver(allow_non_auto_inputs=True)):
+                        if (
+                            sub_module_port.is_deleted() or
+                            (sub_module_port.is_optional() and not sub_module_port.has_driver(allow_non_auto_inputs=True))
+                        ):
                             continue
                         if sub_module_port.is_composite():
                             members = sub_module_port.get_all_member_junctions(False)
@@ -414,7 +416,7 @@ class Module(object):
             first_port = True
             is_composite = False
             for port_name, port in ports.items():
-                if port.is_optional() and ~port.has_driver(allow_non_auto_inputs=True):
+                if port.is_optional() and not port.has_driver(allow_non_auto_inputs=True):
                     port_definition_strs = port.generate_default_definition(back_end, port_name)
                     port_assignment_strs = port.generate_default_assignment(back_end, port_name)
                     for port_definition_str, port_assignment_str in zip(port_definition_strs, port_assignment_strs):
@@ -1011,7 +1013,7 @@ class Module(object):
 
                     changes = False
                     for sub_module in tuple(incomplete_sub_modules):
-                        all_inputs_specialized = all(tuple(input.is_specialized() or not input.has_driver() for input in sub_module.get_inputs().values()))
+                        all_inputs_specialized = all(tuple(input.is_specialized() or (not input.has_driver() and input.is_optional()) or input.is_deleted() for input in sub_module.get_inputs().values()))
                         if all_inputs_specialized:
                             with Module.Context(sub_module._impl):
                                 sub_module._impl._elaborate(trace)
@@ -1026,7 +1028,7 @@ class Module(object):
                 # Collect all nets that don't have a type, but must to continue
                 input_list = []
                 for sub_module in tuple(incomplete_sub_modules):
-                    input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or not input.has_driver()))
+                    input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or (not input.has_driver() and input.is_optional()) or input.is_deleted()))
                 if len(input_list) > 10:
                     list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list[:5]) + "\n    ...\n    " + "\n    ".join(i.get_diagnostic_name() for i in input_list[-5:])
                 else:
@@ -1139,7 +1141,7 @@ class Module(object):
             first_port = True
             is_composite = False
             for port_name, port in ports.items():
-                if not (port.is_deleted() or (port.is_optional() and ~port.has_driver(allow_non_auto_inputs=True))):
+                if not (port.is_deleted() or (port.is_optional() and not port.has_driver(allow_non_auto_inputs=True))):
                     port_interface_strs = port.generate_interface(back_end, port_name)
                     after_composite = is_composite
                     is_composite = len(port_interface_strs) > 1

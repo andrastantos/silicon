@@ -767,7 +767,7 @@ class Number(NetTypeFactory):
         @staticmethod
         def get_lhs_slicer(key_chains: Sequence[Sequence[Tuple[Any, KeyKind]]]) -> 'Module':
             return Number.Instance.PhiSlice(key_chains)
-            
+
         class PhiSlice(GenericModule):
             """
             This class handles the case of member-wise assignment to Numbers. Things, like:
@@ -826,7 +826,7 @@ class Number(NetTypeFactory):
                 # This piece of code should not elaborate. However, if PhiSlice
                 # auto-determines its output type, it'll think it's a 1-bit output.
                 # Then auto-type-conversion simply zero-extends that to the rest of the bits.
-                # Even if made that OK, the following would clearly be an error, 
+                # Even if made that OK, the following would clearly be an error,
                 # confusing for the user even further:
                 #     w = Wire(Unsigned(8))
                 #     w[1] = 1
@@ -1104,6 +1104,9 @@ class Number(NetTypeFactory):
                 NEG
                 ABS
             """
+            # Remove all NoneNetTypes (explicitly unconnected inputs)
+            from .constant import NoneNetType
+            net_types = tuple(net_type for net_type in net_types if net_type is not NoneNetType)
             def check_all_types_valid():
                 if any(net_type is None for net_type in net_types):
                     raise SyntaxErrorException("Can't determine union type unless all input types are specified")

@@ -959,10 +959,13 @@ class Junction(JunctionBase):
 
 class Port(Junction):
 
-    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False, default_value = None):
+    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False, **kwargs):
         super().__init__(net_type, parent_module, keyword_only=keyword_only)
         self._auto = False # Set to true for auto-ports
-        self._default_value = default_value
+        self._has_default_value = "default_value" in kwargs
+        if self._has_default_value:
+            self._default_value = kwargs["default_value"]
+
 
     def is_deleted(self) -> bool:
         """
@@ -974,7 +977,7 @@ class Port(Junction):
         """
         Returns True if port is optional, that is, it has a default value to use, if not connected.
         """
-        return self._default_value is not None and not self.get_parent_module()._impl.is_top_level()
+        return self._has_default_value and not self.get_parent_module()._impl.is_top_level()
 
     def get_default_name(self, scope: object) -> str:
         if scope is not self.get_parent_module()._impl.parent:
@@ -1021,8 +1024,8 @@ class Port(Junction):
 
 
 class InputPort(Port):
-    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False, default_value = None):
-        super().__init__(net_type, parent_module, keyword_only=keyword_only, default_value=default_value)
+    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False, **kwargs):
+        super().__init__(net_type, parent_module, keyword_only=keyword_only, **kwargs)
 
     @classmethod
     def generate_junction_ref(cls, back_end: 'BackEnd') -> str:

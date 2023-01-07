@@ -14,7 +14,7 @@ class Select(Module):
     """
     output_port = Output()
     selector_port = Input()
-    default_port = Input(keyword_only=True)
+    default_port = Input(keyword_only=True, default_value=None)
     def construct(self):
         self.value_ports = OrderedDict()
 
@@ -174,7 +174,7 @@ class _SelectOneHot(Module):
     One-hot encoded selector base-class
     """
     output_port = Output()
-    default_port = Input(keyword_only=True)
+    default_port = Input(keyword_only=True, default_value=None)
     def construct(self):
         self.value_ports = OrderedDict()
         self.selector_ports = OrderedDict()
@@ -324,7 +324,7 @@ class SelectOne(_SelectOneHot):
                     default_member_map.append(default_member_port)
             else:
                 default_member_map = [None]*len(selector_to_value_member_map)
-                
+
 
             for idx, output_port in enumerate(output_port_members):
                 expression, precedence = self.generate_inline_expression(back_end, target_namespace, output_port_members[idx], selector_to_value_member_map[idx], default_member_map[idx])

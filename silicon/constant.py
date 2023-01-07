@@ -76,12 +76,27 @@ def _const(value: Any, type_hint: Optional[NetType] = None) -> Optional[Constant
 def const(value: Any) -> Constant:
     return _const(value, type_hint=None)
 
-class NoneType(NetType):
+class NoneNetType(NetType):
     @staticmethod
     def Key():
         raise SyntaxErrorException("None type cannot be used as key")
+    @classmethod
+    def generate_const_val(cls, value: Optional[int], back_end: 'BackEnd') -> str:
+        assert back_end.language == "SystemVerilog"
+        # This is a hack. According to IEEE Std 1800-2012, the value of a signed expression where the sign-bit is X gets
+        # sign-extended with X-es to however many bits needed.
+        return "signed'(1'bX)"
 
-#def None_to_const(value: None) -> Tuple[None, None]:
-#    return None, None
+    @classmethod
+    def get_rhs_expression(cls, for_junction: 'Junction', back_end: 'BackEnd', target_namespace: Module, outer_precedence: Optional[int] = None, allow_expression: bool = True) -> Tuple[str, int]:
+        xnet = target_namespace._impl.netlist.get_xnet_for_junction(for_junction)
+        expr, prec = xnet.get_rhs_expression(target_namespace, back_end, allow_expression)
+        if outer_precedence is not None and prec > outer_precedence:
+            return f"({expr})", back_end.get_operator_precedence("()")
+        else:
+            return expr, prec
 
-#const_convert_lookup[type(None)] = None_to_const
+def None_to_const(value: None, type_hint: Optional[NetType] = None) -> Tuple[NetType, None]:
+    return NoneNetType, None
+
+const_convert_lookup[type(None)] = None_to_const
