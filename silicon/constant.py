@@ -85,7 +85,7 @@ class NoneNetType(NetType):
         assert back_end.language == "SystemVerilog"
         # This is a hack. According to IEEE Std 1800-2012, the value of a signed expression where the sign-bit is X gets
         # sign-extended with X-es to however many bits needed.
-        return "signed'(1'bX)"
+        return "$signed(1'bX)"
 
     @classmethod
     def get_rhs_expression(cls, for_junction: 'Junction', back_end: 'BackEnd', target_namespace: Module, outer_precedence: Optional[int] = None, allow_expression: bool = True) -> Tuple[str, int]:

@@ -300,9 +300,14 @@ def common_superclass(*args, **kwargs) -> object:
 
 def get_common_net_type(junctions: Sequence['Junction'], partial_results: bool = False) -> Optional[object]:
     from .constant import NoneNetType
-    net_types = tuple(junction.get_net_type() for junction in junctions if (junction.is_specialized() or not partial_results) and junction.get_net_type() is not NoneNetType)
-    # If any of the types
-    if (any(net_type is None for net_type in net_types) or len(net_types) == 0) and not partial_results:
+
+    # All inputs are None, our output is None as well (this is a case where all inputs are explicitly unconnected)
+    if all(junction.get_net_type is NoneNetType for junction in junctions):
+        return NoneNetType
+    # Only consider the connected inputs: None is just X, which can be of any type
+    net_types = tuple(junction.get_net_type() for junction in junctions if junction.get_net_type() is not NoneNetType)
+    # If any ports have unassigned type, we can't determine the common type.
+    if any(net_type is None for net_type in net_types):
         return None
     if len(net_types) == 0:
         return None

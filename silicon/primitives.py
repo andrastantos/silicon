@@ -44,11 +44,8 @@ class Select(Module):
         return (name, self.create_named_port_callback(name, net_type))
 
     def generate_output_type(self) -> Optional['NumberMeta']:
-        value_ports = list(self.value_ports.values())
-        if self.default_port.is_specialized():
-            value_ports.append(self.default_port)
-        all_inputs_specialized = all(tuple(input.is_specialized() for input in self.get_inputs().values()))
-        common_net_type = get_common_net_type(value_ports, not all_inputs_specialized)
+        value_ports = self.value_ports.values()
+        common_net_type = get_common_net_type(value_ports)
         if common_net_type is None:
             raise SyntaxErrorException(f"Can't figure out output port type for Select")
         output_type = common_net_type.result_type(tuple(port.get_net_type() for port in value_ports), self.get_operation_str())
