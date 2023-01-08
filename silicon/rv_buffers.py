@@ -296,3 +296,55 @@ class Pacer(GenericModule):
         wait_cnt <<= Reg(next_wait_cnt)
 
         self.output_port.set_data_members(input_data)
+
+class Stage(Module):
+    input_port = Input()
+    output_valid = Output(logic)
+    output_ready = Input(logic)
+
+    state = Output()
+    next_state = Output()
+    idle_state = Input()
+    default_state = Input(default_value=None)
+
+    clock_port = ClkPort()
+    reset_port = RstPort()
+    reset_value = RstValPort()
+
+    advance = Output()
+    stage_input = Output()
+    stage_output = Input()
+
+    def construct(self):
+        self._transitions = []
+
+    def add_transition(self, current_state: Any, condition: Junction, new_state: Any) -> None:
+        self._transitions.append((current_state, condition, new_state))
+
+    def body(self):
+        self.fsm = FSM()
+
+        reg_stage_out = Wire(self.input_port.get_net_type())
+        reg_stage_out <<= ForwardBuf(self.input_port)
+
+        advance = reg_stage_out.valid # (reg_stage_out.valid | (self.fsm.state != self.idle_state)
+
+        # Hook up the FSM to pass-through ports
+        self.fsm.default_state <<= self.default_state
+        self.next_state <<= self.fsm.next_state
+        self.state <<= self.fsm.state
+
+        # Populate all the FSM state-transitions
+        for (current_state, condition, new_state) in self._transitions:
+            self.fsm.add_transition(current_state, condition, new_state)
+        delattr(self, "_transitions") # This makes sure that any add_transition calls afterwords blow up
+
+        self.fsm.clock_en <<= advance
+
+        going_to_idle = (self.fsm.next_state == self.idle_state)
+
+        self.output_valid <<= going_to_idle & reg_stage_out.valid
+        reg_stage_out.ready <<= going_to_idle & (self.output_ready | ~reg_stage_out.valid)
+
+        self.advance <<= advance
+        self.stage_input <<= reg_stage_out.get_data_members()
