@@ -19,7 +19,6 @@ module top (
 		.input_port_ready(in1_ready),
 		.input_port_valid(in1_valid),
 
-		.output_port_data(in1_data),
 		.output_port_ready(out1_ready),
 		.output_port_valid(out1_valid),
 

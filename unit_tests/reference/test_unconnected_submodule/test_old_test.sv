@@ -7,12 +7,9 @@ module top (
 	output logic out_1
 );
 
-	logic A_out_a;
-
 	and_gate A (
 		.in_a(1'hx),
-		.in_b(1'hx),
-		.out_a(A_out_a)
+		.in_b(1'hx)
 	);
 
 	assign out_1 = 1'hx;

@@ -14,6 +14,8 @@ module top (
 	input logic rst
 );
 
+	logic u_output_port;
+
 	Fifo dut (
 		.input_port_data(in1_data),
 		.input_port_ready(in1_ready),
@@ -24,9 +26,11 @@ module top (
 		.output_port_valid(out1_valid),
 
 		.clock_port(clk),
-		.reset_port(rst)
+		.reset_port(rst),
+		.clear(u_output_port)
 	);
 
+	assign u_output_port = 1'h0;
 endmodule
 
 
@@ -43,7 +47,8 @@ module Fifo (
 	output logic output_port_valid,
 
 	input logic clock_port,
-	input logic reset_port
+	input logic reset_port,
+	input logic clear
 );
 
 	logic [7:0] input_data_data;
@@ -65,7 +70,6 @@ module Fifo (
 	logic [7:0] u93_output_port_data;
 	logic [7:0] output_data_data;
 	logic [7:0] buffer_mem_port2_data_out_data;
-	logic clear;
 
 	assign input_port_ready =  ~ full;
 	assign output_port_valid =  ~ empty;
@@ -100,7 +104,6 @@ module Fifo (
 
 	assign input_data_data = input_port_data;
 	assign output_port_data = output_data_data;
-	assign clear = 0;
 endmodule
 
 

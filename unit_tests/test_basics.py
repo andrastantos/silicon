@@ -335,19 +335,19 @@ def test_loop_finder(mode="rtl"):
 
 def test_default_port(mode="rtl"):
     class Sub(si.Module):
-        a = si.Input(si.Unsigned(8), default_value = 123)
-        o = si.Output(si.Unsigned(8))
+        a_sub = si.Input(si.Unsigned(7), default_value = 123)
+        o_sub = si.Output(si.Unsigned(8))
 
         def body(self):
-            self.o <<= self.a
+            self.o_sub <<= self.a_sub
     class Top(si.Module):
-        a = si.Input(si.Unsigned(8), default_value = 123) # At the top level, optional ports must stay in the interface
-        o = si.Output(si.Unsigned(8))
-        o2 = si.Output(si.Unsigned(8))
+        a_top = si.Input(si.Unsigned(7), default_value = 42) # At the top level, optional ports must stay in the interface
+        o_top = si.Output(si.Unsigned(7))
+        o2_top = si.Output(si.Unsigned(8))
 
         def body(self):
-            self.o <<= self.a
-            self.o2 <<= Sub()()
+            self.o_top <<= self.a_top
+            self.o2_top <<= Sub()()
 
     if mode == "rtl":
         t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)

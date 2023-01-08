@@ -2,16 +2,18 @@
 // Top
 ////////////////////////////////////////////////////////////////////////////////
 module Top (
-	input logic [7:0] a,
-	output logic [7:0] o,
-	output logic [7:0] o2
+	input logic [6:0] a_top,
+	output logic [6:0] o_top,
+	output logic [7:0] o2_top
 );
 
+	assign o2_top = 7'h7b;
+
 	Sub u (
-		.o(o2)
+		.a_sub(o2_top)
 	);
 
-	assign o = a;
+	assign o_top = a_top;
 endmodule
 
 
@@ -19,13 +21,11 @@ endmodule
 // Sub
 ////////////////////////////////////////////////////////////////////////////////
 module Sub (
-	output logic [7:0] o
+	input logic [6:0] a_sub,
+	output logic [7:0] o_sub
 );
 
-	logic [7:0] a;
-
-	assign o = a;
-	assign a = 123;
+	assign o_sub = a_sub;
 endmodule
 
 

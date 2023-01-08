@@ -14,7 +14,7 @@ class Select(Module):
     """
     output_port = Output()
     selector_port = Input()
-    default_port = Input(keyword_only=True, default_value=None)
+    default_port = Input(keyword_only=True, can_be_deleted=True)
     def construct(self):
         self.value_ports = OrderedDict()
 
@@ -129,37 +129,6 @@ class Select(Module):
 
         return ret_val, final_precedence
 
-    def generate_inline_statement(self, back_end: 'BackEnd', target_namespace: Module, output_port: Junction, value_ports: Dict[Any, Junction]) -> str:
-        assert back_end.language == "SystemVerilog"
-        output_type = output_port.get_net_type()
-
-        ret_val = "always_comb begin"
-        eq_precedence = back_end.get_operator_precedence("==",None)
-        selector_expression, _ = self.selector_port.get_rhs_expression(back_end, target_namespace, None, eq_precedence)
-        output_str = output_port.get_lhs_name(back_end, target_namespace, allow_implicit=True)
-
-        first = True
-        if len(value_ports) == 2 and self.selector_port.get_net_type().length == 1:
-            false_expression, _ = value_ports[0].get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
-            true_expression,  _ = value_ports[0].get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
-            ret_val += back_end.indent(f"if {selector_expression} begin")
-            ret_val += bace_end.indent(f"? {true_expression} : {false_expression}")
-        else:
-            for selector_idx in sorted(value_ports.keys()):
-                if not first:
-                    ret_val += " | "
-                first = False
-                value_port = value_ports[selector_idx]
-                value_expression, _ = value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
-                ret_val += f"{selector_expression} == {selector_idx} ? {value_expression} : {zero}"
-            # We don't add the default expression, because that's not the right thing to do: we would have to guard it with an 'else' clause, but that doesn't really exist in a series of and-or gates
-            #default_expression, _ = self.default_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
-            #ret_val += default_expression
-
-        ret_val += "end"
-        return ret_val
-
-
     def is_combinational(self) -> bool:
         """
         Returns True if the module is purely combinational, False otherwise
@@ -171,7 +140,7 @@ class _SelectOneHot(Module):
     One-hot encoded selector base-class
     """
     output_port = Output()
-    default_port = Input(keyword_only=True, default_value=None)
+    default_port = Input(keyword_only=True, can_be_deleted=True)
     def construct(self):
         self.value_ports = OrderedDict()
         self.selector_ports = OrderedDict()

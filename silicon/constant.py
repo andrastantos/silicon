@@ -3,7 +3,7 @@ from typing import Tuple, Union, Any, Dict, Set, Optional, Callable, Type, Gener
 from .net_type import NetType
 from .module import Module, GenericModule, InlineBlock, InlineExpression
 from .port import Input, Output
-from .utils import TSimEvent
+from .utils import TSimEvent, Context
 from .exceptions import SyntaxErrorException
 from inspect import getmro
 
@@ -95,6 +95,43 @@ class NoneNetType(NetType):
             return f"({expr})", back_end.get_operator_precedence("()")
         else:
             return expr, prec
+
+    class ToType(GenericModule):
+        input_port = Input()
+        output_port = Output()
+        def construct(self, output_type: NetType):
+            self.output_port.set_net_type(output_type)
+
+        def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
+            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+
+        def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
+            assert back_end.language == "SystemVerilog"
+
+            return self.output_port.get_net_type().get_unconnected_value(back_end), 0
+
+        def simulate(self) -> TSimEvent:
+            self.output_port <<= None
+
+        def is_combinational(self) -> bool:
+            """
+            Returns True if the module is purely combinational, False otherwise
+            """
+            return True
+
+    @classmethod
+    def adapt_to(cls, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool) -> Optional['Junction']:
+        assert input.get_net_type() is cls
+        if output_type is cls:
+            return input
+
+        context = Context.current()
+
+        if context == Context.simulation:
+            return None
+        elif context == Context.elaboration:
+            return NoneNetType.ToType(output_type)(input)
+
 
 def None_to_const(value: None, type_hint: Optional[NetType] = None) -> Tuple[NetType, None]:
     return NoneNetType, None

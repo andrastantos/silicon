@@ -169,7 +169,7 @@ class Module(object):
                     except InvalidPortError:
                         raise SyntaxErrorException(f"Module {self} doesn't support dynamic creation of more positional ports")
                     my_positional_inputs = tuple(self._impl.get_positional_inputs().values())
-                my_positional_inputs[idx].set_source(convert_to_junction(arg), scope)
+                my_positional_inputs[idx].set_source(arg, scope)
             for arg_name, arg_value in kwargs.items():
                 if not has_port(self, arg_name):
                     self.create_named_port(arg_name)
@@ -371,6 +371,10 @@ class Module(object):
                             last_sub_idx = len(members)
                             for sub_idx, sub_module_port_member in enumerate(members):
                                 if is_output_port(sub_module_port_member):
+                                    # We only generate bindings for output ports if they drive their XNet in this scope
+                                    my_xnet = netlist.get_xnet_for_junction(sub_module_port_member)
+                                    if sub_module_port_member is not my_xnet.source and (my_xnet.source is None or self in my_xnet.source.get_sink_scopes()):
+                                        continue
                                     source_str = sub_module_port_member.get_lhs_name(back_end, self)
                                 elif is_input_port(sub_module_port_member):
                                     source_str, _ = sub_module_port_member.get_rhs_expression(back_end, self)
@@ -383,6 +387,10 @@ class Module(object):
                             rtl_instantiations += "\n"
                         else:
                             if is_output_port(sub_module_port):
+                                # We only generate bindings for output ports if they drive their XNet in this scope
+                                my_xnet = netlist.get_xnet_for_junction(sub_module_port)
+                                if sub_module_port is not my_xnet.source and (my_xnet.source is None or self in my_xnet.source.get_sink_scopes()):
+                                    continue
                                 source_str = sub_module_port.get_lhs_name(back_end, self)
                             elif is_input_port(sub_module_port):
                                 source_str, _ = sub_module_port.get_rhs_expression(back_end, self)
@@ -411,17 +419,6 @@ class Module(object):
                     if names is not None:
                         for name in names:
                             rtl_wire_assignments += f"{xnet.generate_assign(name, xnet_rhs_expression, back_end)}\n"
-            # Add wire definitions for all the optional inputs with no source
-            ports = self.get_ports()
-            first_port = True
-            is_composite = False
-            for port_name, port in ports.items():
-                if port.is_optional() and not port.has_driver(allow_non_auto_inputs=True):
-                    port_definition_strs = port.generate_default_definition(back_end, port_name)
-                    port_assignment_strs = port.generate_default_assignment(back_end, port_name)
-                    for port_definition_str, port_assignment_str in zip(port_definition_strs, port_assignment_strs):
-                        rtl_wire_definitions += port_definition_str
-                        rtl_wire_assignments += port_assignment_str
 
         ret_val = (
             str_block(rtl_header, "", "\n\n") +
@@ -922,8 +919,17 @@ class Module(object):
             self.freeze_interface()
             if len(self._wires) != 0:
                 raise SyntaxErrorException("A module can only have Inputs and Outputs before it's body gets called")
-
             assert len(self._local_wires) == 0
+
+            # Go through all our inputs: if they are optional and have no driver, assign NoneNetType to them
+            # NOTE: This is only needed for the top level really. We insert constant drivers for unconnected
+            #       optional ports on sub-modules
+            for name, input_port in self.get_inputs().items():
+                if input_port.is_optional() and not input_port.has_driver():
+                    if input_port.get_net_type() is None and not input_port.is_deleted():
+                        assert self is self.netlist.top_level
+                        from .constant import NoneNetType
+                        input_port.set_net_type(NoneNetType)
 
             # Let's call 'body' which will create all the sub-modules
             with ScopedAttr(self, "setattr__impl", self._setattr__elaboration):
@@ -1013,7 +1019,14 @@ class Module(object):
 
                     changes = False
                     for sub_module in tuple(incomplete_sub_modules):
-                        all_inputs_specialized = all(tuple(input.is_specialized() or (not input.has_driver() and input.is_optional()) or input.is_deleted() for input in sub_module.get_inputs().values()))
+                        #all_inputs_specialized = all(tuple(input.is_specialized() or (not input.has_driver() and input.is_optional()) or input.is_deleted() for input in sub_module.get_inputs().values()))
+                        input: Port
+                        for name, input in sub_module.get_inputs().items():
+                            if not input.has_driver() and input.is_optional() and not input.is_deleted():
+                                # This is an unconnected optional input that can't be deleted:
+                                # create and insert a constant source for it in ourselves
+                                input.assign_default_value(self._true_module)
+                        all_inputs_specialized = all(tuple(input.is_specialized() or input.is_deleted() for input in sub_module.get_inputs().values()))
                         if all_inputs_specialized:
                             with Module.Context(sub_module._impl):
                                 sub_module._impl._elaborate(trace)
@@ -1028,7 +1041,8 @@ class Module(object):
                 # Collect all nets that don't have a type, but must to continue
                 input_list = []
                 for sub_module in tuple(incomplete_sub_modules):
-                    input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or (not input.has_driver() and input.is_optional()) or input.is_deleted()))
+                    #input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or (not input.has_driver() and input.is_optional()) or input.is_deleted()))
+                    input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or input.is_deleted()))
                 if len(input_list) > 10:
                     list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list[:5]) + "\n    ...\n    " + "\n    ".join(i.get_diagnostic_name() for i in input_list[-5:])
                 else:
@@ -1141,7 +1155,7 @@ class Module(object):
             first_port = True
             is_composite = False
             for port_name, port in ports.items():
-                if not (port.is_deleted() or (port.is_optional() and not port.has_driver(allow_non_auto_inputs=True))):
+                if not port.is_deleted():
                     port_interface_strs = port.generate_interface(back_end, port_name)
                     after_composite = is_composite
                     is_composite = len(port_interface_strs) > 1

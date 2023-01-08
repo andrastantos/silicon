@@ -624,6 +624,9 @@ class Junction(JunctionBase):
     def sinks(self):
         return tuple(self._sinks.keys())
 
+    def get_sink_scopes(self):
+        return tuple(self._sinks.values())
+
     def _get_source_edge(self):
         found_edge = None
         for key, source_edge in self._partial_sources:
@@ -660,13 +663,25 @@ class Junction(JunctionBase):
         return source_edge.scope
 
     def set_source(self, source: Any, scope: 'Module') -> None:
+        """
+        Converts 'source' into a Junction (if not one already) and binds it to 'self' as a source.
+
+        Args:
+            source (Any):
+                Source junction or constant. Even 'None' is considered a source: it get's converted into
+                a ConstantModule that that supplies 'None' as it's value and eventually generates an X-assignment.
+            scope (Module):
+                The encompassing module where the binding should take place
+
+        Raises:
+            SyntaxErrorException: Raised if 'source' cannot be converted into a Junction
+        """
         passed_in_source = source
-        if source is not None:
-            source = convert_to_junction(source, type_hint=None)
-            if source is None:
-                # We couldn't create a port out of the value:
-                raise SyntaxErrorException(f"couldn't convert '{passed_in_source}' to Junction.")
-            assert isinstance(source, Junction)
+        source = convert_to_junction(source, type_hint=None)
+        if source is None:
+            # We couldn't create a port out of the value:
+            raise SyntaxErrorException(f"couldn't convert '{passed_in_source}' to Junction.")
+        assert isinstance(source, Junction)
 
         self._del_source()
         self._partial_sources.append((None, Junction.NetEdge(source, scope)))
@@ -687,7 +702,7 @@ class Junction(JunctionBase):
         """
         Replace all references of old_source to new_source within our sources (partial or otherwise)
         """
-        # TODO: is there a faster way than iterating all sources? Seems it scaled poorly, but maybe it doesn't matter.
+        # TODO: is there a faster way than iterating all sources? Seems it scales poorly, but maybe it doesn't matter.
         for key, source_edge in self._partial_sources:
             if source_edge.far_end is old_source:
                 source_edge.far_end = new_source
@@ -959,9 +974,10 @@ class Junction(JunctionBase):
 
 class Port(Junction):
 
-    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False, **kwargs):
+    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False, can_be_deleted: bool = False, **kwargs):
         super().__init__(net_type, parent_module, keyword_only=keyword_only)
         self._auto = False # Set to true for auto-ports
+        self._can_be_deleted = can_be_deleted
         self._has_default_value = "default_value" in kwargs
         if self._has_default_value:
             self._default_value = kwargs["default_value"]
@@ -971,13 +987,18 @@ class Port(Junction):
         """
         Returns True if the port (an optional auto-port with no driver) got deleted from the interface
         """
-        return False
+        return self._can_be_deleted and not self.has_driver()
 
     def is_optional(self) -> bool:
         """
         Returns True if port is optional, that is, it has a default value to use, if not connected.
         """
         return self._has_default_value and not self.get_parent_module()._impl.is_top_level()
+
+    def assign_default_value(self, scope: object) -> None:
+        assert self.is_optional()
+        assert not self.has_driver()
+        self.set_source(self._default_value, scope)
 
     def get_default_name(self, scope: object) -> str:
         if scope is not self.get_parent_module()._impl.parent:
