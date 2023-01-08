@@ -1019,7 +1019,6 @@ class Module(object):
 
                     changes = False
                     for sub_module in tuple(incomplete_sub_modules):
-                        #all_inputs_specialized = all(tuple(input.is_specialized() or (not input.has_driver() and input.is_optional()) or input.is_deleted() for input in sub_module.get_inputs().values()))
                         input: Port
                         for name, input in sub_module.get_inputs().items():
                             if not input.has_driver() and input.is_optional() and not input.is_deleted():
@@ -1041,7 +1040,6 @@ class Module(object):
                 # Collect all nets that don't have a type, but must to continue
                 input_list = []
                 for sub_module in tuple(incomplete_sub_modules):
-                    #input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or (not input.has_driver() and input.is_optional()) or input.is_deleted()))
                     input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or input.is_deleted()))
                 if len(input_list) > 10:
                     list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list[:5]) + "\n    ...\n    " + "\n    ".join(i.get_diagnostic_name() for i in input_list[-5:])
