@@ -7,6 +7,7 @@ from .exceptions import SimulationException, SyntaxErrorException, AdaptTypeErro
 from .netlist import Netlist
 from .module import Module, InlineBlock, InlineExpression
 from .port import Input, Output, Junction
+from .constant import NoneNetType
 
 # Python Enums are weird to say the least: Even though you inherit from Enum, the actual enum *type* is EnumMeta. The *values* of the enum become
 # the type of the class you subclass from Enum. As such, it's not possible (or at least very hard) to mix-in NetType with EnumMeta. So, for now
@@ -169,7 +170,7 @@ class EnumNet(Number):
             # If we're SELECT-ing from all EnumNet junctions of the same type, go with that, otherwise revert to Number.
             if operation == "SELECT":
                 first_type = first(net_types)
-                if all(net_type is first_type for net_type in net_types[1:]):
+                if all(net_type is first_type or net_type is NoneNetType for net_type in net_types[1:]):
                     return first_type
             return super().result_type(net_types, operation)
 

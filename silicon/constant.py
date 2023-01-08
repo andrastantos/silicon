@@ -4,7 +4,7 @@ from .net_type import NetType
 from .module import Module, GenericModule, InlineBlock, InlineExpression
 from .port import Input, Output
 from .utils import TSimEvent, Context
-from .exceptions import SyntaxErrorException
+from .exceptions import SyntaxErrorException, AdaptTypeError
 from inspect import getmro
 
 const_to_rtl_lookup: Dict[NetType, Callable] = {}
@@ -96,6 +96,21 @@ class NoneNetType(NetType):
         else:
             return expr, prec
 
+    @classmethod
+    def adapt_from(cls, input: Any, implicit: bool, force: bool) -> Any:
+        context = Context.current()
+
+        if context == Context.simulation:
+            if input is None:
+                return None
+            raise AdaptTypeError
+        elif context == Context.elaboration:
+            raise AdaptTypeError
+
+    @classmethod
+    def get_num_bits(cls) -> int:
+        return 1
+
     class ToType(GenericModule):
         input_port = Input()
         output_port = Output()
@@ -132,6 +147,21 @@ class NoneNetType(NetType):
         elif context == Context.elaboration:
             return NoneNetType.ToType(output_type)(input)
 
+    vcd_type: str = 'wire'
+
+    @classmethod
+    def convert_to_vcd_type(cls, value: Any) -> Any:
+        return 'X'
+
+    @classmethod
+    def get_iterator(cls, parent_junction: 'Junction') -> Any:
+        class Iterator(object):
+            def __init__(self):
+                pass
+            def __next__(self):
+                raise StopIteration
+
+        return Iterator()
 
 def None_to_const(value: None, type_hint: Optional[NetType] = None) -> Tuple[NetType, None]:
     return NoneNetType, None
