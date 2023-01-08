@@ -38,16 +38,44 @@ class XNet(object):
 
     def __init__(self):
         from .port import Port, Wire
-        self.source: Junction = None
-        self.sinks: Set[Port] = OrderedSet()
-        self.transitions: Set[Port] = OrderedSet()
-        self.aliases: Set[Wire] = OrderedSet()
+        self._source: Junction = None
+        self._sinks: Set[Port] = OrderedSet()
+        self._transitions: Set[Port] = OrderedSet()
+        self._aliases: Set[Wire] = OrderedSet()
         self.scoped_names: Dict['Module', Dict[str, 'XNet.NameStatus']] = OrderedDict()
         self.rhs_expressions: Dict['Module', Tuple[str, int]] = OrderedDict()
         self.assigned_names: Dict['Module', str] = OrderedDict()
 
+    def add_source(self, junction: 'Junction') -> None:
+        assert self._source is None
+        self._source = junction
+    
+    def add_sink(self, junction: 'Junction') -> None:
+        self._sinks.add(junction)
+
+    def add_transition(self, junction: 'Junction') -> None:
+        self._transitions.add(junction)
+
+    def add_alias(self, junction: 'Junction') -> None:
+        self._aliases.add(junction)
+
+    def is_source(self, junction: 'Junction') -> bool:
+        return junction is self._source
+
+    def is_sink(self, junction: 'Junction') -> bool:
+        return junction in self._sinks
+        
+    def is_transition(self, junction: 'Junction') -> bool:
+        return junction in self._transitions
+        
+    def is_alias(self, junction: 'Junction') -> bool:
+        return junction in self._aliases
+        
+    def get_source(self) -> Optional['Junction']:
+        return self._source
+
     def num_junctions(self, *, include_source: bool) -> int:
-        return len(self.sinks) + len(self.aliases) + len(self.transitions) + int(self.source is not None and include_source)
+        return len(self._sinks) + len(self._aliases) + len(self._transitions) + int(self._source is not None and include_source)
 
     def add_rhs_expression(self, scope: 'Module', expr: str, precedence: int) -> None:
         assert scope is None or is_module(scope)
@@ -56,7 +84,7 @@ class XNet(object):
     def get_rhs_expression(self, scope: 'Module', back_end: 'BackEnd', allow_expression: bool = True) -> Tuple[str, int]:
         assert scope is None or is_module(scope)
         # We should return the unconnected value if there's no source for this XNet at all.
-        if self.source is None:
+        if self._source is None:
             net_type = self.get_net_type()
             if net_type is None:
                 raise SyntaxErrorException(f"Can't determine unconnected value for unconnected XNet")
@@ -72,13 +100,13 @@ class XNet(object):
         # If we're asked to return the name in the source context, we should return the unconnected value.
         # That is because an XNet is either sourced by a primitive (which would never ask for the RHS name of its output)
         # or it's unconnected, in which case we should return the unconnected value.
-        if scope == self.source.get_parent_module():
+        if scope == self._source.get_parent_module():
             name = None
         else:
             name = self.get_lhs_name(scope, allow_implicit=True, mark_assigned=False)
         if name is None:
             # We end up here with an unconnected input in the instantiation scope, if that input feeds other sub-module inputs within the instance.
-            port = self.source
+            port = self._source
             if not port.is_specialized():
                 return back_end.get_unconnected_value(), 0
             return port.get_net_type().get_unconnected_value(back_end), 0
@@ -89,7 +117,8 @@ class XNet(object):
 
     def get_lhs_name(self, scope: 'Module', *, allow_implicit: bool = True, mark_assigned: bool = True) -> Optional[str]:
         assert scope is None or is_module(scope)
-        name = self.get_best_name(scope, allow_implicit=allow_implicit)
+        # If we are going to mark the name assigned, get a name that's not already is so.
+        name = self.get_best_name(scope, allow_implicit=allow_implicit, exclude_assigned=mark_assigned)
         if name is not None and mark_assigned:
             self.assign_name(scope, name)
         return name
@@ -184,13 +213,13 @@ class XNet(object):
         return best_name
 
     def get_net_type(self) -> 'NetType':
-        if self.source is not None:
-            return self.source.get_net_type()
-        for port in self.transitions:
+        if self._source is not None:
+            return self._source.get_net_type()
+        for port in self._transitions:
             return port.get_net_type()
-        for sink in self.sinks:
+        for sink in self._sinks:
             return sink.get_net_type()
-        for alias in self.aliases:
+        for alias in self._aliases:
             return alias.get_net_type()
         assert False
 
@@ -238,7 +267,7 @@ class Netlist(object):
     def set_current_scope(self, module: 'Module') -> Stack.Context:
         """
         Sets the current scope to 'module'.
-        
+
         Returns an context manager that can be used in a 'with' block to control the lifetime of the scope safely.
         """
         return self._parent_modules.push(module)
@@ -254,7 +283,7 @@ class Netlist(object):
         if self.enter_depth == 1:
             del globals()["netlist"]
         self.enter_depth -= 1
-    
+
     def _register_net_type(self, net_type: 'NetType'):
         type_name = net_type.get_type_name()
         if type_name is not None:
@@ -298,13 +327,13 @@ class Netlist(object):
                     def trace_x_net(current_junction: Junction):
                         for sink in current_junction.sinks:
                             if is_wire(sink):
-                                x_net.aliases.add(sink)
+                                x_net.add_alias(sink)
                             else:
                                 if len(sink.sinks) == 0:
                                     # No sinks of this junction: this is a terminal node.
-                                    x_net.sinks.add(sink)
+                                    x_net.add_sink(sink)
                                 else:
-                                    x_net.transitions.add(sink)
+                                    x_net.add_transition(sink)
                             self.junction_to_xnet_map[sink] = x_net
                             sink._xnet = x_net
                             trace_x_net(sink)
@@ -316,11 +345,11 @@ class Netlist(object):
                     if x_net.num_junctions(include_source=True) == 0:
                         # XNet contains only this single junction --> Determine if it's a source-only XNet or a source-less one
                         if is_wire(for_junction):
-                            x_net.aliases.add(for_junction)
+                            x_net.add_aliase(for_junction)
                         elif is_input_port(for_junction):
                             # This is an XNet with a single input on it. That is: it's an unconnected input.
-                            x_net.transitions.add(for_junction)
-                            #x_net.source = for_junction
+                            x_net.add_transition(for_junction)
+                            #x_net.add_source(for_junction)
                         else:
                             assert is_output_port(for_junction)
                             # This is difficult: An output can be unconnected because no one drives it or because
@@ -331,9 +360,9 @@ class Netlist(object):
                             # Since we can't determine which of the two cases it is, we'll list this output as a sink
                             # and will make special accommodations in the simulator so that the values are dumped as
                             # needed
-                            x_net.sinks.add(for_junction)
+                            x_net.add_sink(for_junction)
                     else:
-                        x_net.source = for_junction
+                        x_net.add_source(for_junction)
                     return [x_net]
 
         from .port import Junction, Wire, Input, Output
@@ -373,14 +402,13 @@ class Netlist(object):
         from .module import Module
         rank_map: Dict[Module, int] = OrderedDict()
         rank_list: List[Set[Module]] = []
-        visited_xnets: Set[XNet] = set()
         xnet_trace: List[XNet] = []
 
         def get_sourced_xnets(module: Module) -> Set[XNet]:
             xnets = OrderedSet()
             for port in module.get_ports().values():
                 xnet = self.junction_to_xnet_map[port]
-                if xnet.source == port:
+                if xnet.is_source(port):
                     xnets.add(xnet)
             return xnets
 
@@ -389,7 +417,7 @@ class Netlist(object):
             for port in module.get_ports().values():
                 for member in port.get_all_member_junctions(add_self=True):
                     xnet = self.junction_to_xnet_map[member]
-                    if member in xnet.sinks:
+                    if xnet.is_sink(member):
                         xnets.add(xnet)
             return xnets
 
@@ -427,7 +455,7 @@ class Netlist(object):
                 if len(source_xnets) == 0:
                     rank = 0
                 else:
-                    sources = OrderedSet((source_xnet.source, source_xnet) for source_xnet in source_xnets if source_xnet.source is not None)
+                    sources = OrderedSet((source_xnet.get_source(), source_xnet) for source_xnet in source_xnets if source_xnet.get_source() is not None)
                     source_modules = OrderedSet((source[0].get_parent_module(), source[1]) for source in sources if source[0].get_parent_module() is not None)
                     if len(source_modules) == 0:
                         rank = 0
@@ -443,7 +471,6 @@ class Netlist(object):
             return rank
 
         for module in self.modules:
-            from .primitives import SelectOne
             visited_modules = set()
             _rank_module(module)
         for module in self.modules:
@@ -504,7 +531,7 @@ class Netlist(object):
             finally:
                 self.marker.__exit__(exception_type, exception_value, traceback)
                 self.netlist.__exit__(exception_type, exception_value, traceback)
-    
+
     def elaborate(self) -> 'Netlist.Elaborator':
         return Netlist.Elaborator(self)
 
@@ -512,7 +539,7 @@ class Netlist(object):
         from .module import Module
 
         top_impl: Module.Impl = self.top_level._impl
-        
+
         # Give top level a name and mark it as user-assigned.
         scope_table = self.symbol_table[None]
         if scope_table.is_auto_symbol(self.top_level):
@@ -525,7 +552,7 @@ class Netlist(object):
             top_impl._elaborate(trace=True)
 
         # Deal with all the cleanup after elaboration.
-        # 
+        #
         # For now, it consists of:
         # - Generate module and net names
         # - Creation of XNets
@@ -649,7 +676,7 @@ class Netlist(object):
 
     def simulate(
         self,
-        vcd_file_name: Union[Path,str], 
+        vcd_file_name: Union[Path,str],
         *,
         end_time: Optional[int] = None,
         timescale='1ns',

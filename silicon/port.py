@@ -880,12 +880,13 @@ class Junction(JunctionBase):
             from .utils import adapt
             new_sim_value = adapt(value, self.get_net_type(), implicit=False, force=False)
 
-        if self._xnet.source is not self and self._xnet.source is not None:
-            is_transition = self in self._xnet.transitions
-            is_sink = self in self._xnet.sinks
+        xnet_source = self._xnet.get_source()
+        if xnet_source is not self and xnet_source is not None:
+            is_transition = self._xnet.is_transition(self)
+            is_sink = self._xnet.is_sink(self)
             assert is_transition or is_sink
             raise SimulationException(f"Can't assigned to net that has a driver during simulation. This net is a {'transition, which means it both has a driver and sink(s)' if is_transition else 'sink, which means it does not drive anything'}", self)
-        if self._xnet.source is self:
+        if xnet_source is self:
             self._xnet.sim_state.sim_context.schedule_value_change(self._xnet, new_sim_value, when)
 
 

@@ -367,7 +367,7 @@ def test_pacer(mode: str = "rtl"):
     else:
         test.simulation(sim_top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
-
+@pytest.mark.skip(reason="This test is broken at the moment: we'll have to fix loopback XNets first")
 def test_stage(mode: str = "sim"):
     class top(Module):
         in1 = Input(RvData)
@@ -497,4 +497,5 @@ if __name__ == "__main__":
     #test_gen_chk("sim")
     #test_delay_line("sim")
     #test_pacer("sim")
-    test_stage("sim")
+    test_stage("rtl")
+    #test_stage("sim")

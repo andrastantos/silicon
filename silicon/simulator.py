@@ -61,7 +61,7 @@ class SimXNetState(object):
         #print(f"--- at {self.sim_context.now} {self.parent_xnet.get_diagnostic_name()} setting value to {new_value}")
         #assert self._last_changed != self.sim_context.now, "Combinational loop detected???"
 
-        new_value = self.value_validator(new_value, self.parent_xnet.source)
+        new_value = self.value_validator(new_value, self.parent_xnet.get_source())
         if self._last_changed != now:
             self.previous_value = self.value
         self.value = new_value
@@ -76,7 +76,7 @@ class SimXNetState(object):
 
     def record_change(self, when: int):
         if self._vcd_value_converter is None:
-            self._vcd_value_converter = self.parent_xnet.source.get_net_type().convert_to_vcd_type
+            self._vcd_value_converter = self.parent_xnet.get_source().get_net_type().convert_to_vcd_type
         vcd_val = self._vcd_value_converter(self.value)
         writer = self.sim_context.vcd_writer
         for vcd_var in self.vcd_vars:
@@ -214,7 +214,7 @@ class Simulator(object):
             from re import compile
             filter = compile(signal_pattern)
             for xnet in self.simulator.netlist.xnets:
-                port = xnet.source #if xnet.source is not None else first(xnet.sinks)
+                port = xnet.get_source() #if xnet.get_source() is not None else first(xnet._sinks)
                 if port is None:
                     continue
                 if not port.is_specialized():

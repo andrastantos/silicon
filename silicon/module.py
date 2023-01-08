@@ -373,7 +373,8 @@ class Module(object):
                                 if is_output_port(sub_module_port_member):
                                     # We only generate bindings for output ports if they drive their XNet in this scope
                                     my_xnet = netlist.get_xnet_for_junction(sub_module_port_member)
-                                    if sub_module_port_member is not my_xnet.source and (my_xnet.source is None or self in my_xnet.source.get_sink_scopes()):
+                                    xnet_source = my_xnet.get_source()
+                                    if not my_xnet.is_source(sub_module_port_member) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
                                         continue
                                     source_str = sub_module_port_member.get_lhs_name(back_end, self)
                                 elif is_input_port(sub_module_port_member):
@@ -389,7 +390,8 @@ class Module(object):
                             if is_output_port(sub_module_port):
                                 # We only generate bindings for output ports if they drive their XNet in this scope
                                 my_xnet = netlist.get_xnet_for_junction(sub_module_port)
-                                if sub_module_port is not my_xnet.source and (my_xnet.source is None or self in my_xnet.source.get_sink_scopes()):
+                                xnet_source = my_xnet.get_source()
+                                if not my_xnet.is_source(sub_module_port) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
                                     continue
                                 source_str = sub_module_port.get_lhs_name(back_end, self)
                             elif is_input_port(sub_module_port):
@@ -1236,7 +1238,7 @@ class Module(object):
                     xnets = netlist.get_xnets_for_junction(sub_module_port, "")
                     for name_suffix, (xnet, sub_port) in xnets.items():
                         if xnet.get_names(self._true_module) is None:
-                            source_port = xnet.source
+                            source_port = xnet.get_source()
                             if source_port is None:
                                 source_port = sub_port
                                 source_module = sub_module
