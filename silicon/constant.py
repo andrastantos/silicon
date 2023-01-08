@@ -163,6 +163,16 @@ class NoneNetType(NetType):
 
         return Iterator()
 
+    @classmethod
+    def generate_type_ref(cls, back_end: 'BackEnd') -> str:
+        assert back_end.language == "SystemVerilog"
+        return "/*X*/ logic"
+
+    @classmethod
+    def generate_net_type_ref(cls, for_junction: 'Junction', back_end: 'BackEnd') -> str:
+        assert back_end.language == "SystemVerilog"
+        return f"{for_junction.generate_junction_ref(back_end)} {cls.generate_type_ref(back_end)}"
+
 def None_to_const(value: None, type_hint: Optional[NetType] = None) -> Tuple[NetType, None]:
     return NoneNetType, None
 
