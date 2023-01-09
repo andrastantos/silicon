@@ -378,7 +378,7 @@ class Netlist(object):
                         f"Can't create XNet for port {port}.\n"\
                         "Possible reasons:\n"\
                         "    - Port is connected to itself somehow, creating a trivial combinatorial loop\n"\
-                        "    - Port is driven by an unassigned junction"
+                        "    - Port is driven by an unassigned junction\n"
                         "    - Port is driven by local wire that accidentally assigned to (=) instead of bound (<<=)"
                     )
 
