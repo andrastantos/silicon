@@ -240,6 +240,8 @@ class NetType(object, metaclass=NetTypeMeta):
         Should raise AdaptTypeError if conversion is not supported.
         Should support trivial conversion where input is of the same type as the current type.
         In these cases, should simply return input.
+        If 'force' is set, an adaptor should be created even even if the conversion looses
+        some bits or precision..
 
         It's possible that 'input' is a constant (such as 42) or a sim_value in case of simulation context
         """
@@ -251,6 +253,8 @@ class NetType(object, metaclass=NetTypeMeta):
         Should raise AdaptTypeError if conversion is not supported.
         Should support trivial conversion where output_type is of the same type as the current type.
         In these cases, should simply return input.
+        If 'force' is set, an adaptor should be created even even if the conversion looses
+        some bits or precision..
         """
         raise AdaptTypeError
     @classmethod
