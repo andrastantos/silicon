@@ -613,6 +613,32 @@ class Number(NetTypeFactory):
 
 
     from .module import GenericModule
+
+    class TrivialAdaptor(GenericModule):
+        input_port = Input()
+        output_port = Output()
+        def construct(self, in_net_type: 'NetType', out_net_type: 'NetType'):
+            # We have to be careful: we insert this adaptor late enough in elaboration that type
+            # propagation for the ports is not taking place: we'll have to set the net types
+            # manually.
+            self.output_port.set_net_type(out_net_type)
+            self.input_port.set_net_type(in_net_type)
+        def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
+            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+        def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
+            assert back_end.language == "SystemVerilog"
+            rhs_name, precedence = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
+            return rhs_name, precedence
+        def simulate(self) -> TSimEvent:
+            while True:
+                yield self.input_port
+                self.output_port <<= self.input_port.sim_value
+        def is_combinational(self) -> bool:
+            """
+            Returns True if the module is purely combinational, False otherwise
+            """
+            return True
+            
     class SizeAdaptor(GenericModule):
         def construct(self, input_type: 'NumberMeta', output_type: 'NumberMeta') -> None:
             if not is_number(input_type):
@@ -1078,8 +1104,9 @@ class Number(NetTypeFactory):
                         raise AdaptTypeError
                     else:
                         return Number.SizeAdaptor(input_type = input_type, output_type = cls)(input)
+                # Even if the input is a sub-set of the output, insert an adaptor: Connected ports *must* have the same type.
                 if cls.length >= input_type.length and cls.signed == input_type.signed and cls.precision == input_type.precision:
-                    return input
+                    return Number.TrivialAdaptor(in_net_type = input_type, out_net_type = cls)(input)
                 output = Number.SizeAdaptor(input_type = input_type, output_type = cls)(input)
                 #output.get_parent_module()._impl._elaborate(hier_level=0, trace=False)
                 return output

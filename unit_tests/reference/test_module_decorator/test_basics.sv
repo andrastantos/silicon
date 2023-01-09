@@ -12,28 +12,34 @@ module Top (
 	input logic signed in_b
 );
 
+	logic signed [1:0] u_output_port;
+	logic signed [1:0] u1_output_port;
+	logic signed [1:0] u2_output_port;
 	logic u3_output_port;
 	logic [1:0] u4_output_port;
 	logic [1:0] u5_output_port;
 
+	assign out_a = u_output_port;
+	assign out_b = u1_output_port;
+	assign out_c = u2_output_port;
 	assign out_d = u3_output_port;
 	assign out_e = u4_output_port;
 	assign out_f = u5_output_port;
 
 	DecoratorModule u (
-		.output_port(out_a),
+		.output_port(u_output_port),
 		.a(in_a),
 		.b(in_b)
 	);
 
 	DecoratorModule_2 u1 (
-		.output_port(out_b),
+		.output_port(u1_output_port),
 		.b(in_b),
 		.a(in_a)
 	);
 
 	DecoratorModule u2 (
-		.output_port(out_c),
+		.output_port(u2_output_port),
 		.a(in_a),
 		.b(in_b)
 	);

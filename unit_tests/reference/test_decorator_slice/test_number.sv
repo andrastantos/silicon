@@ -8,13 +8,19 @@ module Top (
 	input logic [2:0] in_b
 );
 
+	logic u_output_port;
+	logic [3:0] u1_output_port;
+
+	assign out_a = u_output_port;
+	assign out_b = u1_output_port;
+
 	DecoratorModule u (
-		.output_port(out_a),
+		.output_port(u_output_port),
 		.a(in_a)
 	);
 
 	DecoratorModule_2 u1 (
-		.output_port(out_b),
+		.output_port(u1_output_port),
 		.a(in_a[2:0]),
 		.b(in_b[1])
 	);

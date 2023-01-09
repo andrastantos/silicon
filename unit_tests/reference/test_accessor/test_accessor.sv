@@ -8,14 +8,20 @@ module Test (
 	output logic [7:0] out_3
 );
 
+	logic u_output_port;
+	logic u1_output_port;
+
+	assign out_1 = u_output_port;
+	assign out_2 = u1_output_port;
+
 	Parity u (
 		.input_port(in_a),
-		.output_port(out_1)
+		.output_port(u_output_port)
 	);
 
 	Parity u1 (
 		.input_port(in_a),
-		.output_port(out_2)
+		.output_port(u1_output_port)
 	);
 
 	assign out_3 = 8'hx;

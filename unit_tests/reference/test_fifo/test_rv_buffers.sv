@@ -14,7 +14,7 @@ module top (
 	input logic rst
 );
 
-	logic u_output_port;
+	logic u1_output_port;
 
 	Fifo dut (
 		.input_port_data(in1_data),
@@ -27,10 +27,10 @@ module top (
 
 		.clock_port(clk),
 		.reset_port(rst),
-		.clear(u_output_port)
+		.clear(u1_output_port)
 	);
 
-	assign u_output_port = 1'h0;
+	assign u1_output_port = 1'h0;
 endmodule
 
 

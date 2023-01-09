@@ -1022,6 +1022,7 @@ class Module(object):
                             #        else:
                             #            insert_adaptor(source_member, sink_member, sink_member.get_net_type(), scope, force)
                             #    return
+                            assert source.get_net_type() is sink.get_net_type()
                             new_source = TrivialAdaptor(source.get_net_type())(source)
                         else:
                             new_source = implicit_adapt(source, sink_type)
@@ -1104,11 +1105,18 @@ class Module(object):
                 # 1. a submodule output (through a chain of junctions) driving *the same submodules* input port.
                 # 2. one of my inputs (through a chain of junctions) driving one of *my* output ports.
                 # Not only that, but we'll have to be careful about composites and their reversed members
+                # Another point: we don't want to insert TrivialAdaptors, unless the net-types are already
+                # resolved. So, we'll bail if there's any mismatch.
                 insertion_points = OrderedSet()
                 for sub_module in self._sub_modules:
                     for sub_module_output in sub_module.get_outputs().values():
+                        if sub_module_output.get_net_type() is None:
+                            continue
+                        # Deal with full assignments
                         local_sinks = sub_module_output.get_local_sinks()
                         for (local_sink, first_in_path) in local_sinks:
+                            if sub_module_output.get_net_type() is not first_in_path.get_net_type():
+                                continue
                             if local_sink.get_parent_module() is sub_module:
                                 assert is_input_port(local_sink)
                                 for \
@@ -1121,28 +1129,37 @@ class Module(object):
                                     assert sub_reversed == first_reversed
                                     if not sub_reversed:
                                         insertion_points.add((sub_port, first_sub))
-
+                        # Deal with member-only assignments
                         if sub_module_output.is_composite():
                             for sub_port, sub_reversed in sub_module_output.get_all_member_junctions_with_names(add_self=False).values():
                                 if not sub_reversed:
                                     local_sinks = sub_port.get_local_sinks()
                                     for (local_sink, first_in_path) in local_sinks:
+                                        if sub_port.get_net_type() is not first_in_path.get_net_type():
+                                            continue
                                         if local_sink.get_parent_module() is sub_module:
                                             assert is_input_port(local_sink)
-                                            insertion_points.add((sub_module_output, first_in_path))
+                                            insertion_points.add((sub_port, first_in_path))
                     for sub_module_input in sub_module.get_inputs().values():
+                        if sub_module_input.get_net_type() is None:
+                            continue
                         if sub_module_input.is_composite():
                             for sub_port, sub_reversed in sub_module_input.get_all_member_junctions_with_names(add_self=False).values():
                                 if sub_reversed:
                                     local_sinks = sub_port.get_local_sinks()
                                     for (local_sink, first_in_path) in local_sinks:
+                                        if sub_port.get_net_type() is not first_in_path.get_net_type():
+                                            continue
                                         if local_sink.get_parent_module() is sub_module:
                                             assert is_input_port(local_sink)
-                                            insertion_points.add((sub_module_input, first_in_path))
+                                            insertion_points.add((sub_port, first_in_path))
 
                 for my_input in self._true_module.get_inputs().values():
                     local_sinks = my_input.get_local_sinks()
+                    # Deal with full assignments
                     for (local_sink, first_in_path) in local_sinks:
+                        if my_input.get_net_type() is not first_in_path.get_net_type():
+                            continue
                         if is_output_port(local_sink) and local_sink.get_parent_module() is self._true_module:
                             for \
                                 (sub_port, sub_reversed), (first_sub, first_reversed) \
@@ -1159,6 +1176,8 @@ class Module(object):
                             if not sub_reversed:
                                 local_sinks = sub_port.get_local_sinks()
                                 for (local_sink, first_in_path) in local_sinks:
+                                    if sub_port.get_net_type() is not first_in_path.get_net_type():
+                                        continue
                                     if is_output_port(local_sink) and local_sink.get_parent_module() is self._true_module:
                                         insertion_points.add((sub_port, first_in_path))
                 for my_output in self._true_module.get_outputs().values():
@@ -1167,6 +1186,8 @@ class Module(object):
                             if sub_reversed:
                                 local_sinks = sub_port.get_local_sinks()
                                 for (local_sink, first_in_path) in local_sinks:
+                                    if sub_port.get_net_type() is not first_in_path.get_net_type():
+                                        continue
                                     if is_output_port(local_sink) and local_sink.get_parent_module() is self._true_module:
                                         insertion_points.add((sub_port, first_in_path))
                 for (insertion_source, insertion_sink) in insertion_points:

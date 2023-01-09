@@ -7,8 +7,12 @@ module Top (
 	input logic signed [2:0] in_b
 );
 
+	logic signed [3:0] u_output_port;
+
+	assign out_a = u_output_port;
+
 	DecoratorModule u (
-		.output_port(out_a),
+		.output_port(u_output_port),
 		.a(in_a),
 		.b(in_b)
 	);

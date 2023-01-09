@@ -7,16 +7,16 @@ module Top (
 	output logic [7:0] o2_top
 );
 
-	logic [6:0] u2_output_port;
+	logic [6:0] u3_output_port;
 
 	assign o_top = a_top;
 
 	Sub u (
-		.a_sub(u2_output_port),
+		.a_sub(u3_output_port),
 		.o_sub(o2_top)
 	);
 
-	assign u2_output_port = 7'h7b;
+	assign u3_output_port = 7'h7b;
 endmodule
 
 

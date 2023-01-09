@@ -6,9 +6,13 @@ module Test (
 	output logic [7:0] out_h
 );
 
+	logic u_output_port;
+
+	assign out_h = u_output_port;
+
 	Parity u (
 		.input_port(in_a),
-		.output_port(out_h)
+		.output_port(u_output_port)
 	);
 
 endmodule

@@ -57,21 +57,21 @@ module top (
 	assign sout5 = (sin1 | sin3) & sin1;
 	assign uout7 = uin1 & (uin2 | uin3);
 	assign uout8 = uin1 | uin2 & uin3;
-	assign sout2 = sin1 + sin2;
-	assign sout3 = sin1 - sin2;
 	assign lt_out = sin1 < sin2;
 	assign le_out = sin1 <= sin2;
 	assign eq_out = sin1 == sin2;
 	assign ne_out = sin1 != sin2;
 	assign gt_out = sin1 > sin2;
 	assign ge_out = sin1 >= sin2;
+	assign uout9 = {uin1[3] & (uin2[0] | uin5[3]), uin1[2] & (uin2[1] | uin5[2]), uin1[1] & (uin2[2] | uin5[1]), uin1[0] & (uin2[3] | uin5[0])};
+	assign uout10 = {u57_output_port[3], u46_output_port[2], u35_output_port[1], u24_output_port[0]};
+	assign uout11 = {u27_output_port[0], u38_output_port[1], u49_output_port[2], u60_output_port[3]};
+	assign sout2 = sin1 + sin2;
+	assign sout3 = sin1 - sin2;
 	assign slsh_out = sin1 <<< uin1;
 	assign ulsh_out = uin1 << uin1;
 	assign srsh_out = sin1 >>> uin1;
 	assign ursh_out = uin1 >> uin1;
-	assign uout9 = {uin1[3] & (uin2[0] | uin5[3]), uin1[2] & (uin2[1] | uin5[2]), uin1[1] & (uin2[2] | uin5[1]), uin1[0] & (uin2[3] | uin5[0])};
-	assign uout10 = {u57_output_port[3], u46_output_port[2], u35_output_port[1], u24_output_port[0]};
-	assign uout11 = {u27_output_port[0], u38_output_port[1], u49_output_port[2], u60_output_port[3]};
 
 	assign uout5 = 4'hx;
 	assign uout6 = 4'hx;
