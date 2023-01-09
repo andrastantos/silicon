@@ -19,6 +19,7 @@ module top (
 		.input_port_ready(in1_ready),
 		.input_port_valid(in1_valid),
 
+		.output_port_data(out1_data),
 		.output_port_ready(out1_ready),
 		.output_port_valid(out1_valid),
 
@@ -26,7 +27,6 @@ module top (
 		.reset_port(rst)
 	);
 
-	assign out1_data = in1_data;
 endmodule
 
 
@@ -57,8 +57,8 @@ module Pacer (
 	assign transfer = input_port_valid & output_port_ready & wait_done;
 	assign next_wait_cnt = transfer ? 1'h0 : wait_done ? 2'h2 : wait_cnt + 1'h1;
 	always_ff @(posedge clock_port) wait_cnt <= reset_port ? 2'h0 : next_wait_cnt;
-
 	assign output_port_data = input_port_data;
+
 endmodule
 
 

@@ -15,14 +15,15 @@ module top (
 	logic bb;
 	logic b;
 
-	assign out_a = in_a;
-	assign out_aa = in_a;
-	assign aa = in_a;
 	assign a = in_a;
-	assign out_b = in_b;
-	assign out_bb = in_b;
-	assign bb = in_b;
 	assign b = in_b;
+
+	assign out_a = a;
+	assign out_aa = a;
+	assign aa = a;
+	assign out_b = b;
+	assign out_bb = b;
+	assign bb = b;
 endmodule
 
 

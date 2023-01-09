@@ -417,6 +417,99 @@ def test_lhs_slice(mode="rtl"):
         t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 
+def test_external_loopback(mode="rtl"):
+    class Inner(si.Module):
+        inner_in = si.Input(si.logic)
+        inner_out = si.Output(si.logic)
+
+        def body(self):
+            self.inner_out <<= 1
+
+    class Outer(si.Module):
+
+        def body(self):
+            loopback = si.Wire(si.logic)
+
+            loopback <<= Inner(loopback)
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Outer, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Outer, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+
+def test_internal_loopback(mode="rtl"):
+    class Inner(si.Module):
+        inner_in = si.Input(si.logic)
+        inner_out = si.Output(si.logic)
+
+        def body(self):
+            self.inner_out <<= self.inner_in
+
+    class Outer(si.Module):
+        outer_in = si.Input(si.logic)
+        outer_out = si.Output(si.logic)
+
+        def body(self):
+            self.outer_out <<= Inner(self.outer_in)
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Outer, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Outer, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+
+#
+#    +-----------------------------------------+
+#    |                OUTER                    |
+#    |                                         |
+#    |   +-----------------------------+       |
+#    |   |                             |       |
+#    |   |     +------------------+    |       |
+#    |   |     |                  |    |       |
+#    |   |     |                  |    |       |
+#    | +-\/----/\-+           +---\/---/\---+  |
+#    | |          |           |   |    |    |  |
+#    | |          |           |   +----+    |  |
+#    | |          |           |             |  |
+#    | |  INNER1  |           |    INNER2   |  |
+#    | +----------+           +-------------+  |
+#    |                                         |
+#    +-----------------------------------------+
+#
+
+def test_complex_loopback(mode="rtl"):
+    class Inner2(si.Module):
+        inner2_in = si.Input(si.logic)
+        inner2_out = si.Output(si.logic)
+
+        def body(self):
+            self.inner2_out <<= self.inner2_in
+    class Inner1(si.Module):
+        inner1_in = si.Input(si.logic)
+        inner1_out = si.Output(si.logic)
+
+        def body(self):
+            pass
+
+
+    class Outer(si.Module):
+        def body(self):
+            inner1 = Inner1()
+            inner2 = Inner2()
+            inner1.inner1_in <<= inner2.inner2_out
+            inner2.inner2_in <<= inner1.inner1_out
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Outer, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Outer, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
 
 
 
@@ -452,3 +545,6 @@ if __name__ == "__main__":
     #test_output_slice()
     #test_mixed_sources()
     test_default_port()
+    #test_external_loopback()
+    #test_internal_loopback()
+    #test_complex_loopback()

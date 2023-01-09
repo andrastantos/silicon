@@ -17,6 +17,7 @@ module top (
 	assign out_port_element_1 = in1_element_1;
 	assign out_port_element_2 = in1_element_2;
 	assign out_port_element_3 = in1_element_3;
+
 endmodule
 
 

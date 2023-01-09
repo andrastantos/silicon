@@ -372,10 +372,14 @@ class Module(object):
                             for sub_idx, sub_module_port_member in enumerate(members):
                                 if is_output_port(sub_module_port_member):
                                     # We only generate bindings for output ports if they drive their XNet in this scope
-                                    my_xnet = netlist.get_xnet_for_junction(sub_module_port_member)
-                                    xnet_source = my_xnet.get_source()
-                                    if not my_xnet.is_source(sub_module_port_member) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
-                                        continue
+                                    # !!!!!!!!!
+                                    # Actually, this is not needed. I keep the code in here as it might be used
+                                    # To clean the generated RTL up a bit, but that's all it's purpose now that
+                                    # TransparentAdaptors are added
+                                    #my_xnet = netlist.get_xnet_for_junction(sub_module_port_member)
+                                    #xnet_source = my_xnet.get_source()
+                                    #if not my_xnet.is_source(sub_module_port_member) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
+                                    #    continue
                                     source_str = sub_module_port_member.get_lhs_name(back_end, self)
                                 elif is_input_port(sub_module_port_member):
                                     source_str, _ = sub_module_port_member.get_rhs_expression(back_end, self)
@@ -389,10 +393,14 @@ class Module(object):
                         else:
                             if is_output_port(sub_module_port):
                                 # We only generate bindings for output ports if they drive their XNet in this scope
-                                my_xnet = netlist.get_xnet_for_junction(sub_module_port)
-                                xnet_source = my_xnet.get_source()
-                                if not my_xnet.is_source(sub_module_port) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
-                                    continue
+                                # !!!!!!!!!
+                                # Actually, this is not needed. I keep the code in here as it might be used
+                                # To clean the generated RTL up a bit, but that's all it's purpose now that
+                                # TransparentAdaptors are added
+                                #my_xnet = netlist.get_xnet_for_junction(sub_module_port)
+                                #xnet_source = my_xnet.get_source()
+                                #if not my_xnet.is_source(sub_module_port) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
+                                #    continue
                                 source_str = sub_module_port.get_lhs_name(back_end, self)
                             elif is_input_port(sub_module_port):
                                 source_str, _ = sub_module_port.get_rhs_expression(back_end, self)
@@ -553,7 +561,7 @@ class Module(object):
                         raise SyntaxErrorException(f"Class {self} uses reserved name as port definition {port_name}")
                     if port_object.has_source():
                         raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with source already bound")
-                    if len(port_object.sinks) != 0:
+                    if port_object.has_sinks():
                         raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with sinks already bound")
                     if port_object.get_parent_module() is not None:
                         raise SyntaxErrorException(f"Class {self} has a port definition {port_name} with parent module already assigned")
@@ -969,7 +977,7 @@ class Module(object):
 
             remaining_local_wires = dict()
             for wire in self._local_wires.values():
-                if len(wire.sinks) == 0 and not wire.has_source():
+                if not wire.has_sinks() and not wire.has_source():
                     print(f"WARNING: deleting unused local wire: {wire}")
                 else:
                     remaining_local_wires[id(wire)] = wire
@@ -977,7 +985,59 @@ class Module(object):
 
             # Go through each sub-module in a loop, and finalize their interface until everything every Input port type is known
 
+            class TrivialAdaptor(GenericModule):
+                input_port = Input()
+                output_port = Output()
+                def construct(self, net_type: 'NetType'):
+                    # We have to be careful: we insert this adaptor late enough in elaboration that type
+                    # propagation for the ports is not taking place: we'll have to set the net types
+                    # manually.
+                    self.output_port.set_net_type(net_type)
+                    self.input_port.set_net_type(net_type)
+                def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
+                    yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+                def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
+                    assert back_end.language == "SystemVerilog"
+                    rhs_name, precedence = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
+                    return rhs_name, precedence
+                def simulate(self) -> TSimEvent:
+                    while True:
+                        yield self.input_port
+                        self.output_port <<= self.input_port.sim_value
+                def is_combinational(self) -> bool:
+                    """
+                    Returns True if the module is purely combinational, False otherwise
+                    """
+                    return True
+
             def propagate_net_types():
+                def insert_adaptor(source: 'Junction', sink: 'Junction', sink_type: 'NetType', scope: 'Module', force: bool) -> None:
+                    with self.netlist.set_current_scope(scope):
+                        if force and source.get_net_type() is sink_type:
+                            #if source.is_composite():
+                            #    for (source_member, source_reversed), (sink_member, sink_reversed) in zip(source.get_member_junctions().values(), sink.get_member_junctions().values()):
+                            #        assert sink_reversed == sink_reversed
+                            #        if source_reversed:
+                            #            insert_adaptor(sink_member, source_member, sink_member.get_net_type(), scope, force)
+                            #        else:
+                            #            insert_adaptor(source_member, sink_member, sink_member.get_net_type(), scope, force)
+                            #    return
+                            new_source = TrivialAdaptor(source.get_net_type())(source)
+                        else:
+                            new_source = implicit_adapt(source, sink_type)
+                        # If an adaptor was created, fix up connectivity, including inserting a naming wire, if needed
+                        if new_source is not source:
+                            parent_module = source.get_parent_module()
+                            names = self.netlist.symbol_table[parent_module._impl.parent].get_names(source)
+                            if len(names) > 0:
+                                name = names[0]
+                                naming_wire = Wire(new_source.get_net_type(), scope)
+                                self.netlist.symbol_table[scope].add_soft_symbol(naming_wire, name) # This creates duplicates of course, but that will be resolved later on
+                                naming_wire.set_source(new_source, scope=scope)
+                                sink.set_source(naming_wire, scope)
+                            else:
+                                sink.set_source(new_source, scope)
+
                 # First set net types on junctions where the source has a type, but the sink doesn't
                 #incomplete_junctions = set(junction for junction in chain(self.get_junctions()) if not junction.is_specialized() and junction.has_source())
                 incomplete_junctions = set(junction for junction in self.get_all_junctions() if not junction.is_specialized() and junction.has_source(allow_partials=False))
@@ -995,22 +1055,123 @@ class Module(object):
                     old_source = junction.get_source()
                     if junction.is_specialized() and old_source is not None and old_source.is_specialized():
                         if junction.get_net_type() is not old_source.get_net_type():
-                            # Inserting an adaptor
-                            scope = junction.source_scope
-                            with self.netlist.set_current_scope(scope):
-                                source = implicit_adapt(old_source, junction.get_net_type())
-                                # If an adaptor was created, fix up connectivity, including inserting a naming wire, if needed
-                                if source is not old_source:
-                                    parent_module = old_source.get_parent_module()
-                                    names = self.netlist.symbol_table[parent_module._impl.parent].get_names(old_source)
-                                    if len(names) > 0:
-                                        name = names[0]
-                                        naming_wire = Wire(source.get_net_type(), scope)
-                                        self.netlist.symbol_table[scope].add_soft_symbol(naming_wire, name) # This creates duplicates of course, but that will be resolved later on
-                                        naming_wire.set_source(source, scope=scope)
-                                        junction.set_source(naming_wire, scope)
-                                    else:
-                                        junction.set_source(source, scope)
+                            insert_adaptor(old_source, junction, junction.get_net_type(), junction.source_scope, force=False)
+                # We also need to insert adaptors for loopbacks: This forces XNets with loopbacks to be broken up into
+                # multiple pieces thus generating proper RTL and simulation.
+                # Consider the following cenario:
+                #
+                # Inner module has an input and the output, and an outer module connects the input to the output.
+                #
+                # When generating RTL, we would see that the driver within inner (though the external loopback)
+                # would drive the input port. However the input port is also a driver!
+                #
+                # An inverted scenario when a sub-module loops its input to its output. In this case the outer module
+                # sees it's local driver driving something that it's submodule output also drives. This is already
+                # handled in RTL generation though by excluding the output port from the port-binding.
+                #
+                # The reason we can't handle the first situation in a similar way is that would mean that the use
+                # (exnteral loopback or not) influeces the way we would generate RTL for the sub-module.
+                #
+                # Consider something more complex though:
+                #
+                #    +-----------------------------------------+
+                #    |                OUTER                    |
+                #    |                                         |
+                #    |   +-----------------------------+       |
+                #    |   |                             |       |
+                #    |   |     +------------------+    |       |
+                #    |   |     |                  |    |       |
+                #    |   |     |                  |    |       |
+                #    | +-\/----/\-+           +---\/---/\---+  |
+                #    | |          |           |   |    |    |  |
+                #    | |          |           |   +----+    |  |
+                #    | |          |           |             |  |
+                #    | |  INNER1  |           |    INNER2   |  |
+                #    | +----------+           +-------------+  |
+                #    |                                         |
+                #    +-----------------------------------------+
+                #
+                # Now, OUTER will not see a loopback, for all it's concerned, it's just connecting two modules together.
+                # It can't even know that there's a loopback in INNER2 as INNER2.body wasn't even called.
+                #
+                # When it comes to RTL generation though, INNER1 will still see it's output driving it's input, resulting
+                # in problems.
+                #
+                # To fix this, we must make sure that we don't merge these loopback scenarios into a signle XNet.
+                # We do that by inserting an adaptor (that adapts from the same type to the same type).
+                #
+                # The signature we're looking for is:
+                # 1. a submodule output (through a chain of junctions) driving *the same submodules* input port.
+                # 2. one of my inputs (through a chain of junctions) driving one of *my* output ports.
+                # Not only that, but we'll have to be careful about composites and their reversed members
+                insertion_points = OrderedSet()
+                for sub_module in self._sub_modules:
+                    for sub_module_output in sub_module.get_outputs().values():
+                        local_sinks = sub_module_output.get_local_sinks()
+                        for (local_sink, first_in_path) in local_sinks:
+                            if local_sink.get_parent_module() is sub_module:
+                                assert is_input_port(local_sink)
+                                for \
+                                    (sub_port, sub_reversed), (first_sub, first_reversed) \
+                                in \
+                                    zip(
+                                        sub_module_output.get_all_member_junctions_with_names(add_self=True).values(),
+                                        first_in_path.get_all_member_junctions_with_names(add_self=True).values(),
+                                    ):
+                                    assert sub_reversed == first_reversed
+                                    if not sub_reversed:
+                                        insertion_points.add((sub_port, first_sub))
+
+                        if sub_module_output.is_composite():
+                            for sub_port, sub_reversed in sub_module_output.get_all_member_junctions_with_names(add_self=False).values():
+                                if not sub_reversed:
+                                    local_sinks = sub_port.get_local_sinks()
+                                    for (local_sink, first_in_path) in local_sinks:
+                                        if local_sink.get_parent_module() is sub_module:
+                                            assert is_input_port(local_sink)
+                                            insertion_points.add((sub_module_output, first_in_path))
+                    for sub_module_input in sub_module.get_inputs().values():
+                        if sub_module_input.is_composite():
+                            for sub_port, sub_reversed in sub_module_input.get_all_member_junctions_with_names(add_self=False).values():
+                                if sub_reversed:
+                                    local_sinks = sub_port.get_local_sinks()
+                                    for (local_sink, first_in_path) in local_sinks:
+                                        if local_sink.get_parent_module() is sub_module:
+                                            assert is_input_port(local_sink)
+                                            insertion_points.add((sub_module_input, first_in_path))
+
+                for my_input in self._true_module.get_inputs().values():
+                    local_sinks = my_input.get_local_sinks()
+                    for (local_sink, first_in_path) in local_sinks:
+                        if is_output_port(local_sink) and local_sink.get_parent_module() is self._true_module:
+                            for \
+                                (sub_port, sub_reversed), (first_sub, first_reversed) \
+                            in \
+                                zip(
+                                    my_input.get_all_member_junctions_with_names(add_self=True).values(),
+                                    first_in_path.get_all_member_junctions_with_names(add_self=True).values(),
+                                ):
+                                assert sub_reversed == first_reversed
+                                if not sub_reversed:
+                                    insertion_points.add((sub_port, first_sub))
+                    if my_input.is_composite():
+                        for sub_port, sub_reversed in my_input.get_all_member_junctions_with_names(add_self=False).values():
+                            if not sub_reversed:
+                                local_sinks = sub_port.get_local_sinks()
+                                for (local_sink, first_in_path) in local_sinks:
+                                    if is_output_port(local_sink) and local_sink.get_parent_module() is self._true_module:
+                                        insertion_points.add((sub_port, first_in_path))
+                for my_output in self._true_module.get_outputs().values():
+                    if my_output.is_composite():
+                        for sub_port, sub_reversed in my_output.get_all_member_junctions_with_names(add_self=False).values():
+                            if sub_reversed:
+                                local_sinks = sub_port.get_local_sinks()
+                                for (local_sink, first_in_path) in local_sinks:
+                                    if is_output_port(local_sink) and local_sink.get_parent_module() is self._true_module:
+                                        insertion_points.add((sub_port, first_in_path))
+                for (insertion_source, insertion_sink) in insertion_points:
+                    insert_adaptor(insertion_source, insertion_sink, insertion_source.get_net_type(), self._true_module, force=True)
+
 
             with self.netlist.set_current_scope(self._true_module):
                 incomplete_sub_modules = OrderedSet(self._sub_modules)

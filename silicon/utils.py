@@ -206,6 +206,8 @@ def implicit_adapt(input: Any, output_type: 'NetType') -> 'Junction':
     Implicitly adapts input to output_type.
 
     Implicit adaption happens when mismatched port-types are bound together.
+
+    If 'force' is set to True, an adaptor is inserted even if input is already of the right type
     """
     return adapt(input, output_type, implicit=True, force=False)
 
@@ -466,7 +468,7 @@ def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Mod
             junction.set_parent_module(parent_module)
         same_level = junction_parent_module is parent_module
         sub_level = junction_parent_module._impl.parent is parent_module
-        is_unused_wire = is_wire(junction) and not junction.has_source() and len(junction.sinks) == 0
+        is_unused_wire = is_wire(junction) and not junction.has_source() and not junction.has_sinks()
         if junction._no_rtl:
             if debug_print_level > 0:
                 print(f"\tNO_RTL JUNCTION {name} {id(junction):x} SKIPPED for {debug_scope}")
@@ -499,9 +501,9 @@ def register_local_wire(name: str, junction: 'JunctionBase', parent_module: 'Mod
                     print(f"\tjunction {id(junction):x} connectivity:")
                     if junction.has_source():
                         print(f"\t   sources: {', '.join((hex(id(src.far_end)) for _, src in junction._partial_sources))}")
-                    sinks = "; ".join(f"{id(sink):x}" for sink in junction.sinks)
+                    sinks = "; ".join(f"{id(sink):x}" for sink in junction.get_sinks())
                     print(f"\t   sinks: {sinks}")
-                for old_sink in junction.sinks:
+                for old_sink in junction.get_sinks():
                     if debug_print_level > 1:
                         print(f"\t-- splice after SETTING SOURCE OF {id(old_sink):x} to {id(wire):x}")
                     # We have to be careful here: junction could be a partial source for old_sink. If we simply called set_source, we would

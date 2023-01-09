@@ -18,14 +18,15 @@ module top (
 	logic x1_valid;
 	logic x1_ready;
 
-	assign out2_data = in2_data;
 	assign x1_data = in2_data;
-	assign out2_data2 = in2_data2;
 	assign x1_data2 = in2_data2;
-	assign out2_valid = in2_valid;
 	assign x1_valid = in2_valid;
-	assign in2_ready = out2_ready;
 	assign x1_ready = out2_ready;
+
+	assign out2_data = x1_data;
+	assign out2_data2 = x1_data2;
+	assign out2_valid = x1_valid;
+	assign in2_ready = x1_ready;
 endmodule
 
 

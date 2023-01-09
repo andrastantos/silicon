@@ -432,21 +432,6 @@ class Junction(JunctionBase):
         """
         return self
 
-    def get_all_sinks(self) -> Set['Junction']:
-        """
-        Returns the transitive closure of the sink-chain,
-        that is all junctions that sink from this port.
-
-        Of course this might be incomplete if the netlist
-        is still under construction.
-        """
-        ret_val = set()
-        for sink in self.sinks:
-            ret_val.add(sink)
-            ret_val |= sink.get_all_sinks()
-        return ret_val
-
-
     def set_parent_module(self, parent_module: 'Module') -> None:
         assert parent_module is None or is_module(parent_module)
         assert self._parent_module is None or self._parent_module is parent_module
@@ -473,7 +458,6 @@ class Junction(JunctionBase):
                     if len(key_chains) != len(self._partial_sources):
                         raise SyntaxErrorException(f"You can't have both partial and full assignment to junction '{self}'")
                     self.phi_slice = PhiSlice(key_chains)
-                    self._partial_sources = [] # Remove all sources: we're handling them in a PhySlice instance from now on
                     self.set_source(self.phi_slice(*sources), scope)
 
     def get_junction_type(self) -> type:
@@ -620,12 +604,69 @@ class Junction(JunctionBase):
             seen_sources.add(source)
         self._partial_sources.clear()
 
-    @property
-    def sinks(self):
+    def get_sinks(self) -> Sequence['Junction']:
         return tuple(self._sinks.keys())
 
-    def get_sink_scopes(self):
+    def has_sinks(self) -> bool:
+        return len(self._sinks) != 0
+
+    def get_sink_scopes(self) -> Sequence['Module']:
         return tuple(self._sinks.values())
+
+    def get_scope_for_sink(self, sink: 'Junction') -> Optional['Module']:
+        return self._sinks.get(sink, None)
+
+    def get_local_sinks(self) -> Set[Tuple['Junction', 'Junction']]:
+        """
+        Returns all the junctions that this one drives in the
+        first element in the tuple. The second element will
+        contain the first junction on the path between self and
+        the sink.
+
+        For a wire or an input, this gives back all the sinks
+        within the same scope or inputs within immediate sub-modules
+        For an output, this gives back all the sinks in the
+        parent scope or inputs of sub-modules of parent.
+
+        Of course this might be incomplete if the netlist
+        is still under construction.
+        """
+        if is_output_port(self):
+            scope = self.get_parent_module()._impl.parent
+        else:
+            scope = self.get_parent_module()
+        if scope is None: return set()
+        scopes = OrderedSet()
+        scopes.add(scope)
+        for sub_module in scope._impl.get_sub_modules():
+            scopes.add(sub_module)
+        
+        ret_val = OrderedSet()
+        def _get_sinks(for_junction: 'Junction', first_in_path: Optional['Junction']) -> None:
+            for my_sink, my_scope in for_junction._sinks.items():
+                if my_scope in scopes:
+                    if first_in_path is None:
+                        first_in_path = my_sink
+                    ret_val.add((my_sink, first_in_path))
+                    _get_sinks(my_sink, first_in_path)
+        
+        _get_sinks(self, None)
+        return ret_val
+
+
+    def get_all_sinks(self) -> Set['Junction']:
+        """
+        Returns the transitive closure of the sink-chain,
+        that is all junctions that sink from this port.
+
+        Of course this might be incomplete if the netlist
+        is still under construction.
+        """
+        ret_val = OrderedSet()
+        for sink in self.get_sinks():
+            ret_val.add(sink)
+            ret_val |= sink.get_all_sinks()
+        return ret_val
 
     def _get_source_edge(self):
         found_edge = None

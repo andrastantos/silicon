@@ -22,18 +22,19 @@ module top (
 	logic x1_ready;
 	logic x2_ready;
 
-	assign out2_data = in2_data;
-	assign x1_data = in2_data;
 	assign x2_data = in2_data;
-	assign out2_data2 = in2_data2;
-	assign x1_data2 = in2_data2;
 	assign x2_data2 = in2_data2;
-	assign out2_valid = in2_valid;
-	assign x1_valid = in2_valid;
 	assign x2_valid = in2_valid;
-	assign in2_ready = out2_ready;
-	assign x1_ready = out2_ready;
 	assign x2_ready = out2_ready;
+
+	assign out2_data = x2_data;
+	assign x1_data = x2_data;
+	assign out2_data2 = x2_data2;
+	assign x1_data2 = x2_data2;
+	assign out2_valid = x2_valid;
+	assign x1_valid = x2_valid;
+	assign in2_ready = x2_ready;
+	assign x1_ready = x2_ready;
 endmodule
 
 

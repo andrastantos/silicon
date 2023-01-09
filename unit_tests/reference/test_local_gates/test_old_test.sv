@@ -14,8 +14,6 @@ module top (
 	output logic out_6
 );
 
-	logic xxx;
-	logic xxxx;
 	logic A_out_a;
 	logic ttt;
 	logic tttt;
@@ -23,12 +21,15 @@ module top (
 	logic d;
 	logic dd;
 	logic u1_out_a;
+	logic xxx;
+	logic xxxx;
 	logic out_a;
 	logic yyyy;
 	logic outc;
 
 	assign out_5 = 1'h0;
 	assign out_6 = 1'h1;
+	assign xxxx = in_4;
 
 	and_gate B (
 		.in_a(1'hx),
@@ -68,12 +69,11 @@ module top (
 		.out_a(dd)
 	);
 
-	assign out_2 = in_4;
-	assign xxx = in_4;
-	assign xxxx = in_4;
 	assign out_4 = 1'hx;
 	assign ttt = tttt;
 	assign d = dd;
+	assign out_2 = xxxx;
+	assign xxx = xxxx;
 	assign out_1 = yyyy;
 	assign out_a = yyyy;
 	assign out_3 = outc;

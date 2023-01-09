@@ -325,11 +325,11 @@ class Netlist(object):
                     x_net = XNet()
 
                     def trace_x_net(current_junction: Junction):
-                        for sink in current_junction.sinks:
+                        for sink in current_junction.get_sinks():
                             if is_wire(sink):
                                 x_net.add_alias(sink)
                             else:
-                                if len(sink.sinks) == 0:
+                                if not sink.has_sinks():
                                     # No sinks of this junction: this is a terminal node.
                                     x_net.add_sink(sink)
                                 else:

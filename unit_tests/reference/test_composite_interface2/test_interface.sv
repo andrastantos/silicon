@@ -50,6 +50,7 @@ module top (
 	assign side_a_data_write_bus_ready = side_b_data_write_bus_ready;
 	assign side_a_resp_write_bus_data = side_b_resp_write_bus_data;
 	assign side_a_resp_write_bus_valid = side_b_resp_write_bus_valid;
+
 endmodule
 
 

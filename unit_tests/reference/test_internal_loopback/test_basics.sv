@@ -1,36 +1,29 @@
 ////////////////////////////////////////////////////////////////////////////////
-// top
+// Outer
 ////////////////////////////////////////////////////////////////////////////////
-module top (
-	input logic in_1,
-	input logic in_2,
-	output logic out_1
+module Outer (
+	input logic outer_in,
+	output logic outer_out
 );
 
-	logic A_out_a;
-
-	and_gate A (
-		.in_a(1'hx),
-		.in_b(1'hx),
-		.out_a(A_out_a)
+	Inner u (
+		.inner_in(outer_in),
+		.inner_out(outer_out)
 	);
 
-	assign out_1 = 1'hx;
 endmodule
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// and_gate
+// Inner
 ////////////////////////////////////////////////////////////////////////////////
-module and_gate (
-	input logic in_a,
-	input logic in_b,
-	output logic out_a
+module Inner (
+	input logic inner_in,
+	output logic inner_out
 );
-	assign out_a = in_a & in_b;
+
+	assign inner_out = inner_in;
+
 endmodule
-
-
-
 
 

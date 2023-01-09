@@ -19,16 +19,17 @@ module top (
 
 	logic [7:0] a;
 
-	assign out_i = 8'hx;
-	assign out_a = in_a;
-	assign out_b = in_a;
-	assign out_d = in_a;
 	assign a = in_a;
 	assign out_e = in_b;
 	assign out_c = in_c;
-	assign out_f = in_c;
 	assign out_g = in_d;
+
+	assign out_i = 8'hx;
+	assign out_f = in_c;
 	assign out_h = in_d;
+	assign out_a = a;
+	assign out_b = a;
+	assign out_d = a;
 endmodule
 
 

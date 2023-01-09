@@ -14,9 +14,9 @@ module top (
 );
 
 	assign in_a_ready = out_a_ready & in_a_valid;
+	assign out_a_data = x_in;
 
 	assign out_a_valid = 1'hx;
-	assign out_a_data = x_in;
 endmodule
 
 

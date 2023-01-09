@@ -30,26 +30,27 @@ module top (
 	logic x2_ready;
 	logic x3_ready;
 
-	assign out2_data = in2_data;
-	assign x0_data = in2_data;
-	assign x1_data = in2_data;
-	assign x2_data = in2_data;
 	assign x3_data = in2_data;
-	assign out2_data2 = in2_data2;
-	assign x0_data2 = in2_data2;
-	assign x1_data2 = in2_data2;
-	assign x2_data2 = in2_data2;
 	assign x3_data2 = in2_data2;
-	assign out2_valid = in2_valid;
-	assign x0_valid = in2_valid;
-	assign x1_valid = in2_valid;
-	assign x2_valid = in2_valid;
 	assign x3_valid = in2_valid;
-	assign in2_ready = out2_ready;
-	assign x0_ready = out2_ready;
-	assign x1_ready = out2_ready;
-	assign x2_ready = out2_ready;
 	assign x3_ready = out2_ready;
+
+	assign out2_data = x3_data;
+	assign x0_data = x3_data;
+	assign x1_data = x3_data;
+	assign x2_data = x3_data;
+	assign out2_data2 = x3_data2;
+	assign x0_data2 = x3_data2;
+	assign x1_data2 = x3_data2;
+	assign x2_data2 = x3_data2;
+	assign out2_valid = x3_valid;
+	assign x0_valid = x3_valid;
+	assign x1_valid = x3_valid;
+	assign x2_valid = x3_valid;
+	assign in2_ready = x3_ready;
+	assign x0_ready = x3_ready;
+	assign x1_ready = x3_ready;
+	assign x2_ready = x3_ready;
 endmodule
 
 

@@ -8,8 +8,9 @@ module top (
 
 	logic out_1_1;
 
-	assign out_1 = in_1;
 	assign out_1_1 = in_1;
+
+	assign out_1 = out_1_1;
 endmodule
 
 

@@ -8,8 +8,8 @@ module top (
 );
 
 	assign output2 = 1'h0;
-
 	assign output1 = input_port;
+
 endmodule
 
 

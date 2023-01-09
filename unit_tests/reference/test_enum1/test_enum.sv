@@ -19,6 +19,7 @@ module top (
 );
 
 	assign out_a = in_a;
+
 endmodule
 
 
