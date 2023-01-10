@@ -942,6 +942,9 @@ class Module(object):
                         input_port.set_net_type(NoneNetType)
 
             # Let's call 'body' which will create all the sub-modules
+            self.tracer_local_wires = dict() # This will get populated by the Tracer with all the local wires that need registering
+            self.tracer_local_modules = dict() # This will get populated by the Tracer with all the local modules that need registering
+            scope_table = self.netlist.symbol_table[self._true_module]
             with ScopedAttr(self, "setattr__impl", self._setattr__elaboration):
                 with self.netlist.set_current_scope(self._true_module):
                     with Module.Context(self):
@@ -951,6 +954,16 @@ class Module(object):
                                 self._true_module.body()
                         else:
                             self._true_module.body()
+                        for (func_name, local_name), local_wire in self.tracer_local_wires.items():
+                            register_local_wire(local_name, local_wire, self._true_module, explicit=False, debug_print_level=0, debug_scope=func_name)
+                        for (func_name, local_name), local_module in self.tracer_local_modules.items():
+                            if scope_table.is_auto_symbol(local_module):
+                                scope_table.add_hard_symbol(local_module, local_name)
+                            else:
+                                print(f"\t\tWARNING: module already has a name {module}. Not changing it")
+                        # We don't need these anymore, so declutter the namespace a little.
+                        delattr(self, "tracer_local_wires")
+                        delattr(self, "tracer_local_modules")
                         # Look through all the attributes and register them, if needed.
                         for attr_name in dir(self._true_module):
                             if attr_name in old_attr_list:
