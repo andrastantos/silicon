@@ -402,7 +402,7 @@ class Junction(JunctionBase):
         self._member_junctions = OrderedDict() # Contains members for struct/interfaces/vectors
         self._parent_junction = None # Reverences back to the container for struct/interface/vector members
         self._net_type = None
-        self._xnet = None # This is set by Netlist to cache the result of Netlist.get_xnet_for_junction(self)
+        self._xnet: 'XNet' = None # This is set by Netlist to cache the result of Netlist.get_xnet_for_junction(self)
         if net_type is not None:
             if not is_net_type(net_type):
                 raise SyntaxErrorException(f"Net type for a port must be a subclass of NetType.")
@@ -922,13 +922,22 @@ class Junction(JunctionBase):
             new_sim_value = adapt(value, self.get_net_type(), implicit=False, force=False)
 
         xnet_source = self._xnet.get_source()
-        if xnet_source is not self and xnet_source is not None:
+        if xnet_source is self:
+            self._xnet.sim_state.sim_context.schedule_value_change(self._xnet, new_sim_value, when)
+            return
+        if xnet_source is not None:
             is_transition = self._xnet.is_transition(self)
             is_sink = self._xnet.is_sink(self)
             assert is_transition or is_sink
-            raise SimulationException(f"Can't assigned to net that has a driver during simulation. This net is a {'transition, which means it both has a driver and sink(s)' if is_transition else 'sink, which means it does not drive anything'}", self)
-        if xnet_source is self:
+            raise SimulationException(f"Can't assigne to net that has a driver during simulation. This net is a {'transition, which means it both has a driver and sink(s)' if is_transition else 'sink, which means it does not drive anything'}", self)
+        else:
+            # XNet source is None. This is only allowed if the XNet has a single (output) node on it. So test for that and assign the sim_value if that's the case
+            assert xnet_source is None
+            if self._xnet.num_junctions(include_source=False) > 1:
+                raise SimulationException(f"Can't assigne to XNet that has no driver during simulation. This net is a {'transition, which means it both has a driver and sink(s)' if is_transition else 'sink, which means it does not drive anything'}", self)
             self._xnet.sim_state.sim_context.schedule_value_change(self._xnet, new_sim_value, when)
+            
+
 
 
     ############################################
@@ -1171,6 +1180,8 @@ class OutputPort(Port):
 class WireJunction(Junction):
 
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None):
+        #if net_type is None:
+        #    print(f"Wire with NetType None is being created at {hex(id(self))}")
         from .netlist import Netlist
         if parent_module is None:
             parent_module = Netlist.get_current_scope()

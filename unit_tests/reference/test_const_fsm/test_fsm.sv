@@ -66,13 +66,11 @@ module FSMLogic (
 	input logic input_11_to_12
 );
 
-	logic condition_port;
 	logic [3:0] condition_selector;
 
 	assign condition_selector = input_11_to_12 ? 4'hc : 4'b0 | default_state;
 	assign next_state = state == 4'hb ? condition_selector : 4'b0 | default_state;
 
-	assign condition_port = input_11_to_12;
 endmodule
 
 

@@ -34,7 +34,6 @@ module top (
 	input logic clk2
 );
 
-	logic clk;
 	logic [7:0] registered_b;
 	logic [7:0] registered_g;
 	logic [7:0] registered_r;
@@ -44,7 +43,7 @@ module top (
 	logic [7:0] reset_reg2_b;
 	logic [7:0] reset_reg2_g;
 	logic [7:0] reset_reg2_r;
-	logic reset;
+	logic u5_output_port;
 
 	always_ff @(posedge clk1) sout1_b <= uin1_b;
 	always_ff @(posedge clk1) sout1_g <= uin1_g;
@@ -52,27 +51,26 @@ module top (
 	always_ff @(posedge clk1) registered_b <= uin2_b;
 	always_ff @(posedge clk1) registered_g <= uin2_g;
 	always_ff @(posedge clk1) registered_r <= uin2_r;
-	always_ff @(posedge clk2) uout2_b <= reset ? 8'h0 : uin2_b;
-	always_ff @(posedge clk2) uout2_g <= reset ? 8'h0 : uin2_g;
-	always_ff @(posedge clk2) uout2_r <= reset ? 8'h0 : uin2_r;
-	always_ff @(posedge clk1) uout3_b <= reset ? 8'h0 : uin1_b;
-	always_ff @(posedge clk1) uout3_g <= reset ? 8'h0 : uin1_g;
-	always_ff @(posedge clk1) uout3_r <= reset ? 8'h0 : uin1_r;
-	assign reset = uin2_r[0];
+	always_ff @(posedge clk2) uout2_b <= u5_output_port ? 8'h0 : uin2_b;
+	always_ff @(posedge clk2) uout2_g <= u5_output_port ? 8'h0 : uin2_g;
+	always_ff @(posedge clk2) uout2_r <= u5_output_port ? 8'h0 : uin2_r;
+	always_ff @(posedge clk1) uout3_b <= u5_output_port ? 8'h0 : uin1_b;
+	always_ff @(posedge clk1) uout3_g <= u5_output_port ? 8'h0 : uin1_g;
+	always_ff @(posedge clk1) uout3_r <= u5_output_port ? 8'h0 : uin1_r;
 	always_ff @(posedge clk1) reset_reg_b <= uin2_r[4] ? uin2_b : uin1_b;
 	always_ff @(posedge clk1) reset_reg_g <= uin2_r[4] ? uin2_g : uin1_g;
 	always_ff @(posedge clk1) reset_reg_r <= uin2_r[4] ? uin2_r : uin1_r;
-	always_ff @(posedge clk1) reset_reg2_b <= reset ? uin2_b : uin1_b;
-	always_ff @(posedge clk1) reset_reg2_g <= reset ? uin2_g : uin1_g;
-	always_ff @(posedge clk1) reset_reg2_r <= reset ? uin2_r : uin1_r;
+	always_ff @(posedge clk1) reset_reg2_b <= u5_output_port ? uin2_b : uin1_b;
+	always_ff @(posedge clk1) reset_reg2_g <= u5_output_port ? uin2_g : uin1_g;
+	always_ff @(posedge clk1) reset_reg2_r <= u5_output_port ? uin2_r : uin1_r;
 
 	assign uout4_b = 8'hx;
 	assign uout4_g = 8'hx;
 	assign uout4_r = 8'hx;
-	assign clk = clk1;
 	assign uout1_b = registered_b;
 	assign uout1_g = registered_g;
 	assign uout1_r = registered_r;
+	assign u5_output_port = uin2_r[0];
 endmodule
 
 

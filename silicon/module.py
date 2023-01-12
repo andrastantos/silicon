@@ -5,7 +5,7 @@ import typing
 from collections import OrderedDict
 from .port import Junction, Port, Output, Input, Wire, JunctionBase
 from .net_type import NetType, NetTypeMeta
-from .utils import str_block, TSimEvent, ContextMarker, first, Context
+from .utils import is_junction, str_block, TSimEvent, ContextMarker, first, Context
 from .tracer import Tracer, Trace, no_trace
 from .netlist import Netlist
 from enum import Enum
@@ -14,7 +14,7 @@ from .exceptions import SimulationException, SyntaxErrorException, InvalidPortEr
 from threading import RLock
 from itertools import chain, zip_longest
 from .utils import is_port, is_input_port, is_output_port, is_wire, is_module, fill_arg_names, is_junction_base, is_iterable, MEMBER_DELIMITER, first, implicit_adapt, convert_to_junction
-from .utils import ScopedAttr, register_local_wire
+from .utils import ScopedAttr
 from .state_stack import StateStackElement
 import inspect
 
@@ -955,7 +955,11 @@ class Module(object):
                         else:
                             self._true_module.body()
                         for (func_name, local_name), local_wire in self.tracer_local_wires.items():
-                            register_local_wire(local_name, local_wire, self._true_module, explicit=False, debug_print_level=0, debug_scope=func_name)
+                            # TODO: not everything thrown in here is a Junction. There are UniSlicers, ScopedPorts as well.
+                            #       There are not accounted for at the moment as even though they get registered, they are
+                            #       not picked up during XNet naming.
+                            #print(f"registering local wire '{local_name}': {hex(id(local_wire))} of type {type(local_wire)}")
+                            scope_table.add_soft_symbol(local_wire, local_name)
                         for (func_name, local_name), local_module in self.tracer_local_modules.items():
                             if scope_table.is_auto_symbol(local_module):
                                 scope_table.add_hard_symbol(local_module, local_name)
@@ -970,7 +974,11 @@ class Module(object):
                                 continue
                             attr_value = getattr(self._true_module, attr_name)
                             if is_junction_base(attr_value):
-                                register_local_wire(attr_name, attr_value, self._true_module, explicit=False, debug_print_level=0, debug_scope=f"{self}")
+                                # TODO: not everything thrown in here is a Junction. There are UniSlicers, ScopedPorts as well.
+                                #       There are not accounted for at the moment as even though they get registered, they are
+                                #       not picked up during XNet naming.
+                                #print(f"registering attr wire '{attr_name}': {hex(id(attr_value))} of type {type(attr_value)}")
+                                scope_table.add_hard_symbol(attr_value, attr_name)
 
                     # Finish ordering sub-modules:
                     for sub_module in self._unordered_sub_modules:
@@ -1044,7 +1052,7 @@ class Module(object):
                             parent_module = source.get_parent_module()
                             names = self.netlist.symbol_table[parent_module._impl.parent].get_names(source)
                             if len(names) > 0:
-                                name = names[0]
+                                name = first(names)
                                 naming_wire = Wire(new_source.get_net_type(), scope)
                                 self.netlist.symbol_table[scope].add_soft_symbol(naming_wire, name) # This creates duplicates of course, but that will be resolved later on
                                 naming_wire.set_source(new_source, scope=scope)
@@ -1388,34 +1396,42 @@ class Module(object):
                   and as a consequence, there could be new name-collisions.
             """
 
+            scope_table = self.netlist.symbol_table[self._true_module]
             # Start with all our own ports (must have at least one inner name)
             for my_port_name, my_port in self.get_ports().items():
-                xnets = netlist.get_xnets_for_junction(my_port, my_port_name)
-                for name, (xnet, port) in xnets.items():
-                    xnet.add_name(self._true_module, name, is_explicit=True, is_input=is_input_port(port))
+                names = scope_table.get_names(my_port)
+                assert my_port_name in names
+                for my_port_name in names:
+                    xnets = netlist.get_xnets_for_junction(my_port, my_port_name)
+                    for name, (xnet, port) in xnets.items():
+                        xnet.add_name(self._true_module, name, is_explicit=True, is_input=is_input_port(port))
             # Look at named wires. These also have a name.
             for my_wire_name, my_wire in self.get_wires().items():
-                xnets = netlist.get_xnets_for_junction(my_wire, my_wire_name)
-                for name, (xnet, wire) in xnets.items():
-                    xnet.add_name(self._true_module, name, is_explicit=True, is_input=False)
+                names = scope_table.get_names(my_wire)
+                assert my_wire_name in names
+                for my_wire_name in names:
+                    xnets = netlist.get_xnets_for_junction(my_wire, my_wire_name)
+                    for name, (xnet, wire) in xnets.items():
+                        xnet.add_name(self._true_module, name, is_explicit=True, is_input=False)
 
             # Look through local wires (Wire objects defined in the body of the module)
             # 1. promote them to the _wire map as well as make sure they're unique
             # 2. Add them to the associated xnet
             # 3. Give them a name if they're not named (for example, if they're part of a container such as a list or tuple)
             for my_wire in tuple(self._local_wires.values()):
-                wire_name = first(netlist.symbol_table[self._true_module].get_names(my_wire))
-                explicit = not netlist.symbol_table[self._true_module].is_auto_symbol(my_wire)
+                wire_names = scope_table.get_names(my_wire)
+                explicit = not scope_table.is_auto_symbol(my_wire)
                 # Get all the sub-nets (or the net itself if it's not a composite)
                 # and handle those instead of my_wire.
-                xnets = netlist.get_xnets_for_junction(my_wire, wire_name)
-                for name, (xnet, wire) in xnets.items():
-                    # Test if name is already registered as either my_wire or xnet
-                    # If it is, make sure that it is the same object.
-                    # Either way, make sure the xnet is aware of that name.
-                    xnet.add_name(self._true_module, name, is_explicit=explicit, is_input=False)
-                    self._wires[name] = wire
-                    self._junctions[name] = wire
+                for wire_name in wire_names:
+                    xnets = netlist.get_xnets_for_junction(my_wire, wire_name)
+                    for name, (xnet, wire) in xnets.items():
+                        # Test if name is already registered as either my_wire or xnet
+                        # If it is, make sure that it is the same object.
+                        # Either way, make sure the xnet is aware of that name.
+                        xnet.add_name(self._true_module, name, is_explicit=explicit, is_input=False)
+                        self._wires[name] = wire
+                        self._junctions[name] = wire
                 del self._local_wires[id(my_wire)]
             assert len(self._local_wires) == 0
 
@@ -1429,6 +1445,14 @@ class Module(object):
             #       (we're talking nameless wires here, so I think in almost all cases one source and one sink.)
             for sub_module in self._sub_modules:
                 for sub_module_port_name, sub_module_port in sub_module.get_outputs().items():
+                    found = False
+                    for name in scope_table.get_names(sub_module_port):
+                        xnets = netlist.get_xnets_for_junction(sub_module_port, name)
+                        for name, (xnet, wire) in xnets.items():
+                            xnet.add_name(self._true_module, name, is_explicit=True, is_input=False)
+                        found = True
+                    if found:
+                        continue
                     # Deliberately leave the base-name component out. Once we figure it out, we can just pre-pend it...
                     xnets = netlist.get_xnets_for_junction(sub_module_port, "")
                     for name_suffix, (xnet, sub_port) in xnets.items():

@@ -149,13 +149,11 @@ module FSMLogic (
 	input logic input_get_first_data_to_send_data
 );
 
-	logic condition_port;
 	States condition_selector;
 
 	assign condition_selector = input_get_first_data_to_get_wait ? get_wait : 3'b0 | input_get_first_data_to_get_data ? get_data : 3'b0 | input_get_first_data_to_send_data ? send_data : 3'b0 | default_state;
 	assign next_state = state == reset ? input_reset_to_idle ? idle : 3'b0 | default_state : 3'b0 | state == idle ? input_idle_to_get_first_data ? get_first_data : 3'b0 | input_idle_to_send_data ? send_data : 3'b0 | default_state : 3'b0 | state == get_data ? input_get_data_to_get_wait ? get_wait : 3'b0 | input_get_data_to_get_data ? get_data : 3'b0 | input_get_data_to_send_data ? send_data : 3'b0 | default_state : 3'b0 | state == get_wait ? input_get_wait_to_get_wait ? get_wait : 3'b0 | input_get_wait_to_get_data ? get_data : 3'b0 | input_get_wait_to_send_data ? send_data : 3'b0 | default_state : 3'b0 | state == send_data ? input_send_data_to_idle ? idle : 3'b0 | input_send_data_to_get_first_data ? get_first_data : 3'b0 | input_send_data_to_send_data ? send_data : 3'b0 | default_state : 3'b0 | state == get_first_data ? condition_selector : 3'b0 | default_state;
 
-	assign condition_port = input_get_first_data_to_send_data;
 endmodule
 
 

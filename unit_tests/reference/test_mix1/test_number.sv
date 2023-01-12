@@ -15,20 +15,16 @@ module top (
 
 	logic c0;
 	logic u5_out_a;
-	logic a0;
-	logic b0;
 
-	assign a0 = in_a[0];
-	assign b0 = in_b[0];
 	assign out_num = in_b & in_c;
-	assign out_c = {a0, b0, c0, c0, b0};
+	assign out_c = {in_a[0], in_b[0], c0, c0, in_b[0]};
 	assign out_b = {6'(1'h0), u5_out_a, in_a[2:0], c0};
-	assign out_d = {7'(1'h1), 4'({c0, b0, in_a[4]})};
+	assign out_d = {7'(1'h1), 4'({c0, in_b[0], in_a[4]})};
 	assign out_num_b = 5'h1f;
 
 	test_number_and_gate u (
-		.in_a(a0),
-		.in_b(b0),
+		.in_a(in_a[0]),
+		.in_b(in_b[0]),
 		.out_a(c0)
 	);
 

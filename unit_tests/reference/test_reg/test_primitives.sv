@@ -13,29 +13,29 @@ module top (
 	input logic clk2
 );
 
-	logic clk;
 	logic [1:0] u_output_port;
 	logic [3:0] registered;
 	logic [1:0] reset_reg;
 	logic [1:0] reset_reg2;
 	logic [3:0] u8_output_port;
 	logic [1:0] u9_output_port;
-	logic reset;
+	logic u6_output_port;
+	logic signed [4:0] registered_1;
 
 	always_ff @(posedge clk1) u_output_port <= uin1;
 	always_ff @(posedge clk1) registered <= uin2;
-	always_ff @(posedge clk2) u8_output_port <= reset ? 4'h0 : uin2;
-	always_ff @(posedge clk1) u9_output_port <= reset ? 2'h0 : uin1;
-	assign reset = uin2[0];
+	always_ff @(posedge clk2) u8_output_port <= u6_output_port ? 4'h0 : uin2;
+	always_ff @(posedge clk1) u9_output_port <= u6_output_port ? 2'h0 : uin1;
 	always_ff @(posedge clk1) reset_reg <= uin2[1] ? 2'h3 : uin1;
-	always_ff @(posedge clk1) reset_reg2 <= reset ? 2'h2 : uin1;
+	always_ff @(posedge clk1) reset_reg2 <= u6_output_port ? 2'h2 : uin1;
 	assign sout1 = u_output_port;
-	assign uout1 = registered;
+	assign registered_1 = registered;
 	assign uout2 = u8_output_port;
 	assign uout3 = u9_output_port;
 
 	assign uout4 = 5'hx;
-	assign clk = clk1;
+	assign u6_output_port = uin2[0];
+	assign uout1 = registered_1;
 endmodule
 
 

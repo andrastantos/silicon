@@ -15,43 +15,40 @@ module top (
 );
 
 	logic A_out_a;
-	logic ttt;
-	logic tttt;
+	logic B_out_a;
 	logic c;
-	logic d;
 	logic dd;
+	logic d;
 	logic u1_out_a;
-	logic xxx;
-	logic xxxx;
-	logic out_a;
 	logic yyyy;
+	logic out_a;
 	logic outc;
 
 	assign out_5 = 1'h0;
 	assign out_6 = 1'h1;
-	assign xxxx = in_4;
+	assign out_2 = in_4;
 
 	and_gate B (
 		.in_a(1'hx),
 		.in_b(1'hx),
-		.out_a(tttt)
+		.out_a(B_out_a)
 	);
 
 	and_gate A (
-		.in_a(tttt),
-		.in_b(tttt),
+		.in_a(B_out_a),
+		.in_b(B_out_a),
 		.out_a(A_out_a)
 	);
 
 	and_gate u (
 		.in_a(A_out_a),
-		.in_b(tttt),
+		.in_b(B_out_a),
 		.out_a(c)
 	);
 
 	generic_and_gate u1 (
 		.in_a(A_out_a),
-		.in_b(tttt),
+		.in_b(B_out_a),
 		.out_a(u1_out_a)
 	);
 
@@ -59,23 +56,20 @@ module top (
 		.in_a(in_1),
 		.in_b(in_2),
 		.in_c(in_3),
-		.out_a(yyyy),
+		.out_a(out_a),
 		.out_c(outc)
 	);
 
 	and_gate D (
 		.in_a(c),
 		.in_b(u1_out_a),
-		.out_a(dd)
+		.out_a(d)
 	);
 
 	assign out_4 = 1'hx;
-	assign ttt = tttt;
-	assign d = dd;
-	assign out_2 = xxxx;
-	assign xxx = xxxx;
-	assign out_1 = yyyy;
-	assign out_a = yyyy;
+	assign dd = 1'hx;
+	assign out_1 = out_a;
+	assign yyyy = out_a;
 	assign out_3 = outc;
 endmodule
 

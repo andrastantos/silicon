@@ -60,6 +60,18 @@ def test_pass_through():
 
     t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_multiple_wire_names():
+    class top(si.Module):
+        top_port = si.Input(si.logic)
+        top_out = si.Output(si.logic)
+
+        def body(self):
+            a = self.top_port
+            aa = a
+            self.top_out <<= aa
+
+    t.test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 def test_wire_names():
     class top(si.Module):
         out_a = si.Output(si.logic)
@@ -513,6 +525,39 @@ def test_complex_loopback(mode="rtl"):
 
 
 
+def test_named_local_output(mode="rtl"):
+    class Top(si.Module):
+        top_in1 = si.Input(si.logic)
+        top_in2 = si.Input(si.logic)
+        top_out = si.Output()
+        def body(self):
+            xxx = self.top_in1 & self.top_in2
+            self.top_out <<= xxx
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+def test_named_local_output2(mode="rtl"):
+    class Top(si.Module):
+        top_in1 = si.Input(si.logic)
+        top_in2 = si.Input(si.logic)
+        top_out = si.Output()
+        def body(self):
+            xxx = si.Wire()
+            xxx <<= self.top_in1 & self.top_in2
+            yyy = xxx
+            self.top_out <<= yyy
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
 
 
 
@@ -530,6 +575,7 @@ if __name__ == "__main__":
     #test_module_with_io()
     #test_module_with_assigned_io()
     #test_pass_through()
+    #test_multiple_wire_names()
     #test_wire_names()
     #test_wire_array3()
     #test_wire_array2()
@@ -544,7 +590,9 @@ if __name__ == "__main__":
     #test_invalid_slice()
     #test_output_slice()
     #test_mixed_sources()
-    test_default_port()
+    #test_default_port()
     #test_external_loopback()
     #test_internal_loopback()
     #test_complex_loopback()
+    #test_named_local_output()
+    test_named_local_output2()

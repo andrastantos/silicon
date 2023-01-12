@@ -2,15 +2,17 @@
 // top
 ////////////////////////////////////////////////////////////////////////////////
 module top (
-	output logic [7:0] out_a,
-	input logic [7:0] in_a
+	output logic top_in_bwd,
+	input logic [1:0] top_in_fwd
 );
 
-	logic bit_1;
+	logic [1:0] top_w_fwd;
+	logic top_w_bwd;
 
-	assign bit_1 = in_a[7];
-	assign out_a = {bit_1, in_a[6], in_a[5], in_a[4], in_a[3], in_a[2], in_a[1], in_a[0]};
+	assign top_w_bwd = 1'h1;
 
+	assign top_w_fwd = top_in_fwd;
+	assign top_in_bwd = top_w_bwd;
 endmodule
 
 

@@ -8,10 +8,12 @@ module top (
 );
 
 	logic [3:0] registered;
+	logic signed [4:0] registered_1;
 
 	always_ff @(posedge clk) registered <= uin2;
-	assign uout1 = registered;
+	assign registered_1 = registered;
 
+	assign uout1 = registered_1;
 endmodule
 
 

@@ -57,6 +57,12 @@ def test_sim_select():
             self.c = Wire(Unsigned(1))
             self.selectw = Wire(Unsigned(4))
             self.select_one_hot = Wire(Unsigned(4))
+            #self.select1 = Wire()
+            #self.select2 = Wire()
+            #self.select3 = Wire()
+            #self.select1 <<= Select(selector_port = self.selectw & 3, value_0 = self.a, value_1 = self.b, value_2 = self.c)
+            #self.select2 <<= SelectFirst(selector_0 = self.selectw[0], value_0 = self.a, selector_1 = self.selectw[1], value_1 = self.b, selector_2 = self.selectw[2], value_2 = self.c)
+            #self.select3 <<= SelectOne(selector_0 = self.select_one_hot[0], value_0 = self.a, selector_1 = self.select_one_hot[1], value_1 = self.b, selector_2 = self.select_one_hot[2], value_2 = self.c)
             self.select1 = Select(selector_port = self.selectw & 3, value_0 = self.a, value_1 = self.b, value_2 = self.c)
             self.select2 = SelectFirst(selector_0 = self.selectw[0], value_0 = self.a, selector_1 = self.selectw[1], value_1 = self.b, selector_2 = self.selectw[2], value_2 = self.c)
             self.select3 = SelectOne(selector_0 = self.select_one_hot[0], value_0 = self.a, selector_1 = self.select_one_hot[1], value_1 = self.b, selector_2 = self.select_one_hot[2], value_2 = self.c)
@@ -98,6 +104,38 @@ def test_sim_select():
                     assert self.select3.sim_value == self.c.sim_value
                 else:
                     assert self.select3.sim_value is None
+            print("Done")
+    test.simulation(top, inspect.currentframe().f_code.co_name)
+
+def test_sim_select1():
+    class top(Module):
+        def body(self):
+            self.a = Wire(Unsigned(10))
+            self.b = Wire(Unsigned(5))
+            self.c = Wire(Unsigned(1))
+            self.selectw = Wire(Unsigned(4))
+            #self.select1 = Wire()
+            #self.select1 <<= Select(selector_port = self.selectw & 3, value_0 = self.a, value_1 = self.b, value_2 = self.c)
+            self.select1 = Select(selector_port = self.selectw & 3, value_0 = self.a, value_1 = self.b, value_2 = self.c)
+
+        def simulate(self) -> TSimEvent:
+            print("Simulation started")
+            self.a <<= 3
+            self.b <<= 2
+            self.c <<= 1
+            for sel_val in range(15):
+                self.selectw <<= sel_val
+                yield 10
+
+                if sel_val & 3 == 0:
+                    assert self.select1.sim_value == self.a.sim_value
+                elif sel_val & 3 == 1:
+                    assert self.select1.sim_value == self.b.sim_value
+                elif sel_val & 3 == 2:
+                    assert self.select1.sim_value == self.c.sim_value
+                else:
+                    assert self.select1.sim_value is None
+
             print("Done")
     test.simulation(top, inspect.currentframe().f_code.co_name)
 
@@ -175,8 +213,9 @@ def test_sim_concat():
 
 if __name__ == "__main__":
     #test_sim_gates()
-    test_sim_counter()
+    #test_sim_counter()
     #test_sim_select()
+    test_sim_select1()
     #test_sim_concat()
 
 """

@@ -10,6 +10,7 @@ from itertools import chain
 WeakKeyDictionary = dict
 WeakValueDictionary = dict
 WeakSet = OrderedSet
+frozenset = OrderedSet
 
 def _dump_obj(obj) -> str:
     from .utils import is_module, is_junction_base, is_junction, is_port, is_input_port, is_output_port, is_wire

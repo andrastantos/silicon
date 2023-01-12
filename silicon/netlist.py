@@ -240,7 +240,7 @@ class Netlist(object):
         self.module_variants: Optional[Dict[str, Dict[str, List['Module']]]] = None
         self.module_to_class_map: Optional[Dict['Module', str]] = None
         self.module_class_short_name_map: Dict[str, str] = OrderedDict() # Maps short names to their fully qualified names
-        self.xnets = OrderedSet()
+        self.xnets: Set[XNet] = OrderedSet()
         self.junction_to_xnet_map = OrderedDict()
         self.module_to_xnet_map = OrderedDict()
         self._parent_modules = Stack()
@@ -631,6 +631,10 @@ class Netlist(object):
         self._create_xnets()
         populate_names(self.top_level)
         self._fill_xnet_names()
+
+        #for xnet in self.xnets:
+        #    print(f"xnet {hex(id(xnet))} names: {'; '.join(tuple(' '.join(name.keys()) for name in xnet.scoped_names.values()))}")
+
         self.rank_list, self.rank_map = self._rank_netlist()
         self.module_variants = OrderedDict()
         self.module_to_class_map = OrderedDict()

@@ -76,7 +76,7 @@ class SimXNetState(object):
 
     def record_change(self, when: int):
         if self._vcd_value_converter is None:
-            self._vcd_value_converter = self.parent_xnet.get_source().get_net_type().convert_to_vcd_type
+            self._vcd_value_converter = self.parent_xnet.get_net_type().convert_to_vcd_type
         vcd_val = self._vcd_value_converter(self.value)
         writer = self.sim_context.vcd_writer
         for vcd_var in self.vcd_vars:

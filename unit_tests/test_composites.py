@@ -392,6 +392,37 @@ def test_interface_wire3(mode: str = "rtl"):
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 
+class BiDir(Interface):
+    fwd = Unsigned(2)
+    bwd = Reverse(logic)
+
+def test_bidir_interface(mode: str = "rtl"):
+    
+    class mod(Module):
+        mod_out = Output(BiDir)
+
+        def body(self):
+            pass
+            self.mod_out.fwd <<= 2
+    
+    class top(Module):
+        top_in = Input(BiDir)
+        
+        def body(self):
+            top_w = Wire(BiDir)
+
+            #m = mod()
+            #top_w <<= m()
+            top_w <<= self.top_in
+
+            top_w.bwd <<= 1
+            top_w.bwd.BBB = True
+            print(f"source: {hex(id(top_w.bwd._partial_sources[0][1].far_end))}, top_w.bwd: {hex(id(top_w.bwd))}, sink: {hex(id(first(top_w.bwd._sinks.keys())))}")
+            pass
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+
 
 if __name__ == "__main__":
     #test_select_struct()
@@ -409,11 +440,12 @@ if __name__ == "__main__":
     #test_number_to_struct("sim")
     #test_interface_wire("rtl")
     #test_interface_wire2("rtl")
-    #test_interface_wire3("rtl")
+    test_interface_wire3("rtl")
     #test_number_to_struct_sim()
     #test_multi_assign("sim")
     #test_select_one_struct_default()
-    test_type_propagation()
+    #test_type_propagation()
+    #test_bidir_interface()
 
 """
 Additional tests needed:
