@@ -7,13 +7,13 @@ module Top (
 	output logic top_out
 );
 
-	logic yyy;
 	logic xxx;
+	logic yyy;
 
-	assign xxx = top_in1 & top_in2;
+	assign yyy = top_in1 & top_in2;
 
-	assign top_out = xxx;
-	assign yyy = xxx;
+	assign top_out = yyy;
+	assign xxx = yyy;
 endmodule
 
 

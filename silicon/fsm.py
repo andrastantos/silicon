@@ -76,9 +76,11 @@ class FSMLogic(Module):
                 for condition_port in condition_ports:
                     args.append(condition_port)
                     args.append(new_state)
-            condition_selector = SelectOne(*args, default_port = self.default_state)
+            condition_selector = SelectOne(*args, default_port = current_state)
             next_state_args.append(self.state == current_state)
             next_state_args.append(condition_selector)
+            setattr(self, f"state_{_format_state_name(current_state)}_selector", condition_selector)
+        del condition_selector
         self.next_state <<= SelectOne(*next_state_args, default_port = self.default_state)
 
     def draw(self, scope: Module, netlist: 'Netlist', back_end: 'BackEnd', graph: Optional['Digraph'] = None) -> 'Digraph':

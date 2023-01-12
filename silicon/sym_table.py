@@ -79,7 +79,7 @@ class ScopeTable(object):
         try:
             self.hard_names[obj].add(name)
         except KeyError:
-            self.hard_names[obj] = set((name,))
+            self.hard_names[obj] = OrderedSet((name,))
 
     def add_soft_symbol(self, obj: object, name: str) -> None:
         assert name is not None
@@ -95,7 +95,7 @@ class ScopeTable(object):
         try:
             self.soft_names[obj].add(name)
         except KeyError:
-            self.soft_names[obj] = set((name,))
+            self.soft_names[obj] = OrderedSet((name,))
 
     def add_auto_symbol(self, obj: object) -> None:
         self.auto_symbols.add(obj)
