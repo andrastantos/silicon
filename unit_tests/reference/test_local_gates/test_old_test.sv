@@ -17,8 +17,8 @@ module top (
 	logic A_out_a;
 	logic B_out_a;
 	logic c;
-	logic dd;
 	logic d;
+	logic dd;
 	logic u1_out_a;
 	logic yyyy;
 	logic out_a;
@@ -63,11 +63,11 @@ module top (
 	and_gate D (
 		.in_a(c),
 		.in_b(u1_out_a),
-		.out_a(d)
+		.out_a(dd)
 	);
 
 	assign out_4 = 1'hx;
-	assign dd = 1'hx;
+	assign d = 1'hx;
 	assign out_1 = out_a;
 	assign yyyy = out_a;
 	assign out_3 = outc;
