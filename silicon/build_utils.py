@@ -24,7 +24,7 @@ class Build:
         with Netlist().elaborate() as netlist:
             top = top_class()
         system_verilog = SystemVerilog(stream_class = Build.RegisteredFile)
-        netlist.generate(netlist, system_verilog)
+        netlist.generate(system_verilog)
         if not Build._skip_iverilog:
             from shutil import which
             iverilog_path = which("iverilog", mode=os.X_OK)
