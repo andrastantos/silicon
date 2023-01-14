@@ -49,7 +49,7 @@ class XNet(object):
     def add_source(self, junction: 'Junction') -> None:
         assert self._source is None
         self._source = junction
-    
+
     def add_sink(self, junction: 'Junction') -> None:
         self._sinks.add(junction)
 
@@ -64,13 +64,13 @@ class XNet(object):
 
     def is_sink(self, junction: 'Junction') -> bool:
         return junction in self._sinks
-        
+
     def is_transition(self, junction: 'Junction') -> bool:
         return junction in self._transitions
-        
+
     def is_alias(self, junction: 'Junction') -> bool:
         return junction in self._aliases
-        
+
     def get_source(self) -> Optional['Junction']:
         return self._source
 
@@ -79,8 +79,12 @@ class XNet(object):
 
     def add_rhs_expression(self, scope: 'Module', expr: str, precedence: int) -> None:
         assert scope is None or is_module(scope)
-        assert scope not in self.rhs_expressions
-        self.rhs_expressions[scope] = (expr, precedence)
+        if scope not in self.rhs_expressions:
+            self.rhs_expressions[scope] = (expr, precedence)
+        else:
+            current = self.rhs_expressions[scope]
+            assert current[0] == expr and current[1] == precedence
+
     def get_rhs_expression(self, scope: 'Module', back_end: 'BackEnd', allow_expression: bool = True) -> Tuple[str, int]:
         assert scope is None or is_module(scope)
         # We should return the unconnected value if there's no source for this XNet at all.

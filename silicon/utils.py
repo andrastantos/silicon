@@ -258,13 +258,21 @@ def adapt(input: Any, output_type: 'NetType', implicit: bool, force: bool) -> 'J
                     self.implicit = implicit
                     self.force = force
                     self.output_port.set_net_type(output_type)
+                    self.is_trivial = False
                 def body(self):
                     adapted = adapt(self.input_port, self.output_port.get_net_type(), self.implicit, self.force)
+                    self.is_trivial = adapted is self.input_port
                     self.adaptor = adapted.get_parent_module()
                     self.output_port <<= adapted
                 def get_inline_block(self, back_end: 'BackEnd', target_namespace: 'Module') -> Generator['InlineBlock', None, None]:
                     # Delegate inlining (if possible) to the adapter
-                    yield from self.adaptor.get_inline_block(back_end, target_namespace)
+                    if self.is_trivial:
+                        yield InlineExpression(
+                            self.output_port,
+                            *self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
+                        )
+                    else:
+                        yield from self.adaptor.get_inline_block(back_end, target_namespace)
                 def is_combinational(self) -> bool:
                     return True
             return DelayedAdaptor(output_type, implicit, force)(input)
