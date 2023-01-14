@@ -1408,7 +1408,8 @@ class Module(object):
             # Look at named wires. These also have a name.
             for my_wire_name, my_wire in self.get_wires().items():
                 names = scope_table.get_names(my_wire)
-                assert my_wire_name in names
+                if my_wire_name not in names:
+                    raise SyntaxErrorException(f"Wire {my_wire_name} doesn't exist in scope {names}. Most likely reason is the use of '=' instead of '<<=' somewhere.")
                 for my_wire_name in names:
                     xnets = netlist.get_xnets_for_junction(my_wire, my_wire_name)
                     for name, (xnet, wire) in xnets.items():
