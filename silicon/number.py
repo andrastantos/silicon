@@ -554,7 +554,7 @@ class Number(NetTypeFactory):
             op_precedence = back_end.get_operator_precedence("[]")
             # Apparently Verilog really doesn't like cascaded [] expressions. So we explicitly disallow it
             rhs_name, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence, allow_expression = False)
-            if self.key.start > self.input_port.get_net_type().length:
+            if self.key.start >= self.input_port.get_net_type().length:
                 raise FixmeException("Accessing slices of a Number outside it's length is not yet supported!!")
             if end == start:
                 return f"{rhs_name}[{start}]", op_precedence
@@ -638,7 +638,7 @@ class Number(NetTypeFactory):
             Returns True if the module is purely combinational, False otherwise
             """
             return True
-            
+
     class SizeAdaptor(GenericModule):
         def construct(self, input_type: 'NumberMeta', output_type: 'NumberMeta') -> None:
             if not is_number(input_type):
