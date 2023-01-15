@@ -51,20 +51,35 @@ class EnumNet(Number):
 
         @classmethod
         def generate(cls, netlist: Netlist, back_end: 'BackEnd') -> str:
-            base_type = super().generate_type_ref(back_end)
-            values = ",\n".join(f"{e.name}={e.value}" for e in cls.base_type)
-            return f"typedef enum {base_type} {{\n{back_end.indent(values)}\n}} {cls.get_type_name()};"
+            assert back_end.language == "SystemVerilog"
+            if back_end.support_enum:
+                base_type = super().generate_type_ref(back_end)
+                const_val_method = super().generate_const_val
+                values = ",\n".join(f"{cls.get_type_name()}__{e.name}={const_val_method(e.value, back_end)}" for e in cls.base_type)
+                return f"typedef enum {base_type} {{\n{back_end.indent(values)}\n}} {cls.get_type_name()};"
+            else:
+                ret_val = ""
+                for e in cls.base_type:
+                    ret_val += f"`define {cls.generate_const_val(e,back_end)[1:]} {super().generate_const_val(e.value, back_end)}\n"
+                return ret_val
 
         @classmethod
         def generate_type_ref(cls, back_end: 'BackEnd') -> str:
-            return cls.get_type_name()
+            assert back_end.language == "SystemVerilog"
+            if back_end.support_enum:
+                return cls.get_type_name()
+            else:
+                return super().generate_type_ref(back_end)
 
         # Numbers implementation seems to be sufficient
         #def generate_net_type_ref(self, for_junction: 'Junction', back_end: 'BackEnd') -> str:
         @classmethod
         def generate_const_val(cls, value: Optional[Enum], back_end: 'BackEnd') -> str:
             assert back_end.language == "SystemVerilog"
-            return value.name
+            if back_end.support_enum:
+                return f"{cls.get_type_name()}__{value.name}"
+            else:
+                return f"`{cls.get_type_name()}__{value.name}"
 
         @classmethod
         def convert_to_vcd_type(cls, value: Optional[Union['EnumNet', 'EnumNet.NetValue']]) -> Any:

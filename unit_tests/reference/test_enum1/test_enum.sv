@@ -1,11 +1,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Type definitions
 ////////////////////////////////////////////////////////////////////////////////
-typedef enum logic [1:0] {
-	first=1,
-	second=2,
-	third=3
-} E1;
+`define E1__first 2'h1
+`define E1__second 2'h2
+`define E1__third 2'h3
+
 
 
 
@@ -14,8 +13,8 @@ typedef enum logic [1:0] {
 // top
 ////////////////////////////////////////////////////////////////////////////////
 module top (
-	input E1 in_a,
-	output E1 out_a
+	input logic [1:0] in_a,
+	output logic [1:0] out_a
 );
 
 	assign out_a = in_a;

@@ -381,6 +381,9 @@ class Module(object):
                                     #if not my_xnet.is_source(sub_module_port_member) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
                                     #    continue
                                     source_str = sub_module_port_member.get_lhs_name(back_end, self)
+                                    # Unconnected outputs are simply left out of the instance
+                                    if source_str is None:
+                                        continue
                                 elif is_input_port(sub_module_port_member):
                                     source_str, _ = sub_module_port_member.get_rhs_expression(back_end, self)
                                 else:
@@ -402,6 +405,9 @@ class Module(object):
                                 #if not my_xnet.is_source(sub_module_port) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
                                 #    continue
                                 source_str = sub_module_port.get_lhs_name(back_end, self)
+                                # Unconnected outputs are simply left out of the instance
+                                if source_str is None:
+                                    continue
                             elif is_input_port(sub_module_port):
                                 source_str, _ = sub_module_port.get_rhs_expression(back_end, self)
                             else:
@@ -1128,6 +1134,16 @@ class Module(object):
                 # Not only that, but we'll have to be careful about composites and their reversed members
                 # Another point: we don't want to insert TrivialAdaptors, unless the net-types are already
                 # resolved. So, we'll bail if there's any mismatch.
+                #
+                #
+                # TODO: I think there's another problem: when a submodule output drivers several of our outputs,
+                #       our own super will get multiple drivers on the same net:
+                #
+                #       O---+--->O--------->
+                #           |
+                #           +--->O--------->
+                #
+                #       There unfortunately are probably several of these cases...
                 insertion_points = OrderedSet()
                 for sub_module in self._sub_modules:
                     for sub_module_output in sub_module.get_outputs().values():
@@ -1135,6 +1151,7 @@ class Module(object):
                             continue
                         # Deal with full assignments
                         local_sinks = sub_module_output.get_local_sinks()
+                        multiple_output_drives = False
                         for (local_sink, first_in_path) in local_sinks:
                             if sub_module_output.get_net_type() is not first_in_path.get_net_type():
                                 continue
@@ -1150,10 +1167,28 @@ class Module(object):
                                     assert sub_reversed == first_reversed
                                     if not sub_reversed:
                                         insertion_points.add((sub_port, first_sub))
+                            if is_output_port(local_sink):
+                                # Here the sub-module output drives another output
+                                assert local_sink.get_parent_module() is self._true_module
+                                if multiple_output_drives:
+                                    # We have more then one of these: generate a break in the XNet
+                                    for \
+                                        (sub_port, sub_reversed), (first_sub, first_reversed) \
+                                    in \
+                                        zip(
+                                            sub_module_output.get_all_member_junctions_with_names(add_self=True).values(),
+                                            first_in_path.get_all_member_junctions_with_names(add_self=True).values(),
+                                        ):
+                                        assert sub_reversed == first_reversed
+                                        if not sub_reversed:
+                                            insertion_points.add((sub_port, first_sub))
+                                multiple_output_drives = True
+
                         # Deal with member-only assignments
                         if sub_module_output.is_composite():
                             for sub_port, sub_reversed in sub_module_output.get_all_member_junctions_with_names(add_self=False).values():
                                 if not sub_reversed:
+                                    multiple_output_drives = False
                                     local_sinks = sub_port.get_local_sinks()
                                     for (local_sink, first_in_path) in local_sinks:
                                         if sub_port.get_net_type() is not first_in_path.get_net_type():
@@ -1161,12 +1196,20 @@ class Module(object):
                                         if local_sink.get_parent_module() is sub_module:
                                             assert is_input_port(local_sink)
                                             insertion_points.add((sub_port, first_in_path))
+                                        if is_output_port(local_sink):
+                                            # Here the sub-module output drives another output
+                                            assert local_sink.get_parent_module() is self._true_module
+                                            if multiple_output_drives:
+                                                # We have more then one of these: generate a break in the XNet
+                                                insertion_points.add((sub_port, first_in_path))
+                                            multiple_output_drives = True
                     for sub_module_input in sub_module.get_inputs().values():
                         if sub_module_input.get_net_type() is None:
                             continue
                         if sub_module_input.is_composite():
                             for sub_port, sub_reversed in sub_module_input.get_all_member_junctions_with_names(add_self=False).values():
                                 if sub_reversed:
+                                    multiple_output_drives = False
                                     local_sinks = sub_port.get_local_sinks()
                                     for (local_sink, first_in_path) in local_sinks:
                                         if sub_port.get_net_type() is not first_in_path.get_net_type():
@@ -1174,6 +1217,13 @@ class Module(object):
                                         if local_sink.get_parent_module() is sub_module:
                                             assert is_input_port(local_sink)
                                             insertion_points.add((sub_port, first_in_path))
+                                        if is_output_port(local_sink):
+                                            # Here the sub-module output drives another output
+                                            assert local_sink.get_parent_module() is self._true_module
+                                            if multiple_output_drives:
+                                                # We have more then one of these: generate a break in the XNet
+                                                insertion_points.add((sub_port, first_in_path))
+                                            multiple_output_drives = True
 
                 for my_input in self._true_module.get_inputs().values():
                     local_sinks = my_input.get_local_sinks()
@@ -1233,6 +1283,7 @@ class Module(object):
                         all_inputs_specialized = all(tuple(input.is_specialized() or input.is_deleted() for input in sub_module.get_inputs().values()))
                         if all_inputs_specialized:
                             with Module.Context(sub_module._impl):
+                                print(f"Elaborationing {sub_module}")
                                 sub_module._impl._elaborate(trace)
                             changes = True
                             incomplete_sub_modules.remove(sub_module)

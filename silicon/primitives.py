@@ -7,6 +7,7 @@ from collections import OrderedDict
 from .utils import ScopedAttr, get_common_net_type
 from .number import NumberMeta
 from .utils import TSimEvent, is_module
+from .sil_enum import is_enum
 
 class Select(Module):
     """
@@ -305,6 +306,10 @@ class SelectOne(_SelectOneHot):
         assert back_end.language == "SystemVerilog"
         ret_val = ""
         zero = f"{output_port.get_net_type().length}'b0"
+        # We have to be careful here: we do a bunch of or-s, and selects to 0. That works with bit-vectors, but doesn't work
+        # with enums: those need a type-conversion.
+        # TODO: this is a really hacky way to solve the problem, but the issue is that the type-conversion happens *for this partuclar primitive*
+        #       and only *in RTL*. In essence, we don't generate valid RTL for enums as they don't support or-s in SystemVerilog.
         op_precedence = back_end.get_operator_precedence("?:",None)
         final_precedence = back_end.get_operator_precedence("|",False)
         for selector, value in selector_to_value_map.items():
@@ -317,6 +322,10 @@ class SelectOne(_SelectOneHot):
             ret_val += default_expression
         else:
             ret_val = ret_val[:-2] # delete the last '|'
+        if back_end.support_enum:
+            if is_enum(output_port.get_net_type()):
+                ret_val = f"{output_port.get_net_type().generate_type_ref(back_end)}'({ret_val})"
+                final_precedence = 0
         return ret_val, final_precedence
 
 class SelectFirst(_SelectOneHot):

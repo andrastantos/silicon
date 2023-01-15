@@ -53,6 +53,7 @@ class SystemVerilog(BackEnd):
     def __init__(self, stream_class = File):
         self.language = "SystemVerilog"
         self.stream_class = stream_class
+        self.support_enum = False
     def _generate_file_name_for_module(self, module: 'Module') -> str:
         import os
         return os.path.splitext(module._impl._class_filename)[0] + ".sv"

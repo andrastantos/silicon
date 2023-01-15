@@ -1,0 +1,58 @@
+////////////////////////////////////////////////////////////////////////////////
+// Outer
+////////////////////////////////////////////////////////////////////////////////
+module Outer (
+);
+
+	logic wire1_n;
+	logic wire2_n;
+	logic wire1_r;
+	logic wire2_r;
+
+	Inner1 inner1 (
+		.inner1_in1_n(1'hx),
+		.inner1_in1_r(wire1_r),
+
+		.inner1_in2_n(1'hx),
+		.inner1_in2_r(wire2_r)
+	);
+
+	assign wire1_n = 1'hx;
+	assign wire2_n = 1'hx;
+endmodule
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Inner1
+////////////////////////////////////////////////////////////////////////////////
+module Inner1 (
+	input logic inner1_in1_n,
+	output logic inner1_in1_r,
+
+	input logic inner1_in2_n,
+	output logic inner1_in2_r
+);
+
+	assign inner1_in1_r = inner1_in2_r;
+
+	Inner2 inner2 (
+		.inner2_in_n(1'hx),
+		.inner2_in_r(inner1_in2_r)
+	);
+
+endmodule
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Inner2
+////////////////////////////////////////////////////////////////////////////////
+module Inner2 (
+	input logic inner2_in_n,
+	output logic inner2_in_r
+);
+
+	assign inner2_in_r = 1'h1;
+
+endmodule
+
+

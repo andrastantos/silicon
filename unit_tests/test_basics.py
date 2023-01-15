@@ -524,6 +524,115 @@ def test_complex_loopback(mode="rtl"):
 
 
 
+def test_multiple_outputs(mode="rtl"):
+    class Inner2(si.Module):
+        inner2_out = si.Output(si.logic)
+
+        def body(self):
+            self.inner2_out <<= 1
+    class Inner1(si.Module):
+        inner1_in = si.Input(si.logic)
+        inner1_out1 = si.Output(si.logic)
+        inner1_out2 = si.Output(si.logic)
+
+        def body(self):
+            inner2 = Inner2()
+
+            self.inner1_out1 <<= inner2.inner2_out
+            self.inner1_out2 <<= inner2.inner2_out
+
+    class Outer(si.Module):
+        def body(self):
+            wire1 = si.Wire(si.logic)
+            wire2 = si.Wire(si.logic)
+            inner1 = Inner1()
+            wire1 <<= inner1.inner1_out1
+            wire2 <<= inner1.inner1_out2
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Outer, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Outer, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+
+
+def test_multiple_outputs_if(mode="rtl"):
+    class IF(si.Interface):
+        n1 = si.logic
+        n2 = si.logic
+        r1 = si.Reverse(si.logic)
+        r2 = si.Reverse(si.logic)
+
+    class Inner2(si.Module):
+        inner2_out = si.Output(IF)
+
+        def body(self):
+            self.inner2_out.n1 <<= 1
+            self.inner2_out.n2 <<= 1
+    class Inner1(si.Module):
+        inner1_in = si.Input(IF)
+        inner1_out1 = si.Output(IF)
+        inner1_out2 = si.Output(IF)
+
+        def body(self):
+            inner2 = Inner2()
+
+            self.inner1_out1 <<= inner2.inner2_out
+            self.inner1_out2 <<= inner2.inner2_out
+
+    class Outer(si.Module):
+        def body(self):
+            wire1 = si.Wire(IF)
+            wire2 = si.Wire(IF)
+            inner1 = Inner1()
+            wire1 <<= inner1.inner1_out1
+            wire2 <<= inner1.inner1_out2
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Outer, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Outer, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+def test_multiple_outputs_if_rev_member(mode="rtl"):
+    class IF(si.Interface):
+        n = si.logic
+        r = si.Reverse(si.logic)
+
+    class Inner2(si.Module):
+        inner2_in = si.Input(IF)
+
+        def body(self):
+            self.inner2_in.r <<= 1
+    class Inner1(si.Module):
+        inner1_in1 = si.Input(IF)
+        inner1_in2 = si.Input(IF)
+
+        def body(self):
+            inner2 = Inner2()
+
+            self.inner1_in1.r <<= inner2.inner2_in.r
+            self.inner1_in2.r <<= inner2.inner2_in.r
+
+    class Outer(si.Module):
+        def body(self):
+            wire1 = si.Wire(IF)
+            wire2 = si.Wire(IF)
+            inner1 = Inner1()
+            inner1.inner1_in1 <<= wire1
+            inner1.inner1_in2 <<= wire2
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Outer, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Outer, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+
 
 def test_named_local_output(mode="rtl"):
     class Top(si.Module):
@@ -595,4 +704,7 @@ if __name__ == "__main__":
     #test_internal_loopback()
     #test_complex_loopback()
     #test_named_local_output()
-    test_named_local_output2()
+    #test_named_local_output2()
+    #test_multiple_outputs()
+    #test_multiple_outputs_if()
+    test_multiple_outputs_if_rev_member()
