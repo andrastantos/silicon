@@ -379,6 +379,7 @@ class Module(object):
                                     #my_xnet = netlist.get_xnet_for_junction(sub_module_port_member)
                                     #xnet_source = my_xnet.get_source()
                                     #if not my_xnet.is_source(sub_module_port_member) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
+                                    #    print(f"WARNING: deleting output port due to multiple drivers {module_class_name} {sub_module._impl.get_name()} {first(sub_module_port_member.get_interface_names())}")
                                     #    continue
                                     source_str = sub_module_port_member.get_lhs_name(back_end, self)
                                     # Unconnected outputs are simply left out of the instance
@@ -403,6 +404,7 @@ class Module(object):
                                 #my_xnet = netlist.get_xnet_for_junction(sub_module_port)
                                 #xnet_source = my_xnet.get_source()
                                 #if not my_xnet.is_source(sub_module_port) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
+                                #    print(f"WARNING: deleting output port due to multiple drivers {module_class_name} {sub_module._impl.get_name()} {sub_module_port_name}")
                                 #    continue
                                 source_str = sub_module_port.get_lhs_name(back_end, self)
                                 # Unconnected outputs are simply left out of the instance
@@ -1150,38 +1152,38 @@ class Module(object):
                         if sub_module_output.get_net_type() is None:
                             continue
                         # Deal with full assignments
-                        local_sinks = sub_module_output.get_local_sinks()
+                        local_sinks = sub_module_output.get_local_sinks(add_last=True)
                         multiple_output_drives = False
-                        for (local_sink, first_in_path) in local_sinks:
-                            if sub_module_output.get_net_type() is not first_in_path.get_net_type():
+                        for (local_sink, last_in_path) in local_sinks:
+                            if sub_module_output.get_net_type() is not last_in_path.get_net_type():
                                 continue
                             if local_sink.get_parent_module() is sub_module:
                                 assert is_input_port(local_sink)
                                 for \
-                                    (sub_port, sub_reversed), (first_sub, first_reversed) \
+                                    (sub_port, sub_reversed), (last_sub, last_reversed) \
                                 in \
                                     zip(
-                                        sub_module_output.get_all_member_junctions_with_names(add_self=True).values(),
-                                        first_in_path.get_all_member_junctions_with_names(add_self=True).values(),
+                                        local_sink.get_all_member_junctions_with_names(add_self=True).values(),
+                                        last_in_path.get_all_member_junctions_with_names(add_self=True).values(),
                                     ):
-                                    assert sub_reversed == first_reversed
+                                    assert sub_reversed == last_reversed
                                     if not sub_reversed:
-                                        insertion_points.add((sub_port, first_sub))
+                                        insertion_points.add((last_sub, sub_port))
                             if is_output_port(local_sink):
                                 # Here the sub-module output drives another output
                                 assert local_sink.get_parent_module() is self._true_module
                                 if multiple_output_drives:
                                     # We have more then one of these: generate a break in the XNet
                                     for \
-                                        (sub_port, sub_reversed), (first_sub, first_reversed) \
+                                        (sub_port, sub_reversed), (last_sub, last_reversed) \
                                     in \
                                         zip(
-                                            sub_module_output.get_all_member_junctions_with_names(add_self=True).values(),
-                                            first_in_path.get_all_member_junctions_with_names(add_self=True).values(),
+                                            local_sink.get_all_member_junctions_with_names(add_self=True).values(),
+                                            last_in_path.get_all_member_junctions_with_names(add_self=True).values(),
                                         ):
-                                        assert sub_reversed == first_reversed
+                                        assert sub_reversed == last_reversed
                                         if not sub_reversed:
-                                            insertion_points.add((sub_port, first_sub))
+                                            insertion_points.add((last_sub, sub_port))
                                 multiple_output_drives = True
 
                         # Deal with member-only assignments
@@ -1189,20 +1191,22 @@ class Module(object):
                             for sub_port, sub_reversed in sub_module_output.get_all_member_junctions_with_names(add_self=False).values():
                                 if not sub_reversed:
                                     multiple_output_drives = False
-                                    local_sinks = sub_port.get_local_sinks()
-                                    for (local_sink, first_in_path) in local_sinks:
-                                        if sub_port.get_net_type() is not first_in_path.get_net_type():
+                                    local_sinks = sub_port.get_local_sinks(add_last=True)
+                                    for (local_sink, last_in_path) in local_sinks:
+                                        if sub_port.get_net_type() is not last_in_path.get_net_type():
                                             continue
                                         if local_sink.get_parent_module() is sub_module:
                                             assert is_input_port(local_sink)
-                                            insertion_points.add((sub_port, first_in_path))
+                                            insertion_points.add((last_in_path, local_sink))
                                         if is_output_port(local_sink):
-                                            # Here the sub-module output drives another output
-                                            assert local_sink.get_parent_module() is self._true_module
-                                            if multiple_output_drives:
-                                                # We have more then one of these: generate a break in the XNet
-                                                insertion_points.add((sub_port, first_in_path))
-                                            multiple_output_drives = True
+                                            # It's possible that we drive another submodules output through a loopback
+                                            # in that submodule. That'll be handled elsewhere, so skip those cases.
+                                            if local_sink.get_parent_module() is self._true_module:
+                                                # Here the sub-module output drives another output
+                                                if multiple_output_drives:
+                                                    # We have more then one of these: generate a break in the XNet
+                                                    insertion_points.add((last_in_path, local_sink))
+                                                multiple_output_drives = True
                     for sub_module_input in sub_module.get_inputs().values():
                         if sub_module_input.get_net_type() is None:
                             continue
@@ -1210,20 +1214,22 @@ class Module(object):
                             for sub_port, sub_reversed in sub_module_input.get_all_member_junctions_with_names(add_self=False).values():
                                 if sub_reversed:
                                     multiple_output_drives = False
-                                    local_sinks = sub_port.get_local_sinks()
-                                    for (local_sink, first_in_path) in local_sinks:
-                                        if sub_port.get_net_type() is not first_in_path.get_net_type():
+                                    local_sinks = sub_port.get_local_sinks(add_last=True)
+                                    for (local_sink, last_in_path) in local_sinks:
+                                        if sub_port.get_net_type() is not last_in_path.get_net_type():
                                             continue
                                         if local_sink.get_parent_module() is sub_module:
                                             assert is_input_port(local_sink)
-                                            insertion_points.add((sub_port, first_in_path))
+                                            insertion_points.add((last_in_path, local_sink))
                                         if is_output_port(local_sink):
-                                            # Here the sub-module output drives another output
-                                            assert local_sink.get_parent_module() is self._true_module
-                                            if multiple_output_drives:
-                                                # We have more then one of these: generate a break in the XNet
-                                                insertion_points.add((sub_port, first_in_path))
-                                            multiple_output_drives = True
+                                            # It's possible that we drive another submodules output through a loopback
+                                            # in that submodule. That'll be handled elsewhere, so skip those cases.
+                                            if local_sink.get_parent_module() is self._true_module:
+                                                # Here the sub-module output drives another output
+                                                if multiple_output_drives:
+                                                    # We have more then one of these: generate a break in the XNet
+                                                    insertion_points.add((last_in_path, local_sink))
+                                                multiple_output_drives = True
 
                 for my_input in self._true_module.get_inputs().values():
                     local_sinks = my_input.get_local_sinks()

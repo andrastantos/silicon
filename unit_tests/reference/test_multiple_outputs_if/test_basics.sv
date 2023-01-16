@@ -8,10 +8,10 @@ module Outer (
 	logic wire1_r2;
 	logic wire2_r1;
 	logic wire2_r2;
-	logic wire2_n1;
-	logic wire2_n2;
 	logic wire1_n1;
 	logic wire1_n2;
+	logic wire2_n1;
+	logic wire2_n2;
 
 	Inner1 inner1 (
 		.inner1_in_n1(1'hx),
@@ -55,12 +55,12 @@ module Inner1 (
 	input logic inner1_out2_r2
 );
 
-	assign inner1_out1_n1 = inner1_out2_n1;
-	assign inner1_out1_n2 = inner1_out2_n2;
+	assign inner1_out2_n1 = inner1_out1_n1;
+	assign inner1_out2_n2 = inner1_out1_n2;
 
 	Inner2 inner2 (
-		.inner2_out_n1(inner1_out2_n1),
-		.inner2_out_n2(inner1_out2_n2),
+		.inner2_out_n1(inner1_out1_n1),
+		.inner2_out_n2(inner1_out1_n2),
 		.inner2_out_r1(inner1_out2_r1),
 		.inner2_out_r2(inner1_out2_r2)
 	);

@@ -6,8 +6,8 @@ module Outer (
 
 	logic wire1_n;
 	logic wire2_n;
-	logic wire1_r;
 	logic wire2_r;
+	logic wire1_r;
 
 	Inner1 inner1 (
 		.inner1_in1_n(1'hx),
@@ -33,11 +33,11 @@ module Inner1 (
 	output logic inner1_in2_r
 );
 
-	assign inner1_in1_r = inner1_in2_r;
+	assign inner1_in2_r = inner1_in1_r;
 
 	Inner2 inner2 (
 		.inner2_in_n(1'hx),
-		.inner2_in_r(inner1_in2_r)
+		.inner2_in_r(inner1_in1_r)
 	);
 
 endmodule

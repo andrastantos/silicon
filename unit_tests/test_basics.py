@@ -396,7 +396,7 @@ def test_rhs_slice(mode="rtl"):
         def body(self):
             self.o <<= self.a[2]
             self.p <<= self.a[5:0][2]
-            self.q <<= self.a[8:0][7:0][6:0]
+            self.q <<= self.a[7:0][6:0][5:0]
 
     si.set_verbosity_level(VerbosityLevels.instantiation)
     if mode == "rtl":
@@ -632,6 +632,54 @@ def test_multiple_outputs_if_rev_member(mode="rtl"):
         t.test.simulation(Outer, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 
+def test_multiple_outputs_if_rev_member2(mode="rtl"):
+    class Bus(si.Interface):
+        data_out        = si.Reverse(si.Unsigned(32))
+
+    class Consumer1(si.Module):
+        bus_if = si.Output(Bus)
+
+        def body(self): pass
+
+    class Consumer2(si.Module):
+        bus_if = si.Output(Bus)
+
+        def body(self): pass
+
+    class Procuder(si.Module):
+        fetch = si.Input(Bus)
+        mem = si.Input(Bus)
+
+        def body(self):
+            data_out        = si.Wire(si.Unsigned(32))
+
+            self.mem.data_out <<= data_out
+            self.fetch.data_out <<= data_out
+
+            data_out <<= 1
+
+    class Top(si.Module):
+        def body(self):
+            # Connecting tissue
+            c1bus = si.Wire(Bus)
+            c2bus = si.Wire(Bus)
+
+            producer = Procuder()
+            consumer1 = Consumer1()
+            consumer2 = Consumer2()
+
+            producer.fetch <<= c1bus
+            producer.mem <<= c2bus
+
+            c1bus <<= consumer1.bus_if
+            c2bus <<= consumer2.bus_if
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
 
 
 def test_named_local_output(mode="rtl"):
@@ -705,6 +753,7 @@ if __name__ == "__main__":
     #test_complex_loopback()
     #test_named_local_output()
     #test_named_local_output2()
-    #test_multiple_outputs()
+    test_multiple_outputs()
     #test_multiple_outputs_if()
-    test_multiple_outputs_if_rev_member()
+    #test_multiple_outputs_if_rev_member()
+    #test_multiple_outputs_if_rev_member2()

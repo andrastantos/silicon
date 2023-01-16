@@ -4,16 +4,15 @@
 module Outer (
 );
 
+	logic u1_output_port;
 	logic loopback;
-	logic u_inner_out;
-
-	assign loopback = u_inner_out;
 
 	Inner u (
-		.inner_in(loopback),
-		.inner_out(u_inner_out)
+		.inner_in(u1_output_port),
+		.inner_out(loopback)
 	);
 
+	assign u1_output_port = loopback;
 endmodule
 
 

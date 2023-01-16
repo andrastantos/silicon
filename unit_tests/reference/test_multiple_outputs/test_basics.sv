@@ -4,8 +4,8 @@
 module Outer (
 );
 
-	logic wire1;
 	logic wire2;
+	logic wire1;
 
 	Inner1 inner1 (
 		.inner1_in(1'hx),
@@ -25,10 +25,10 @@ module Inner1 (
 	output logic inner1_out2
 );
 
-	assign inner1_out1 = inner1_out2;
+	assign inner1_out2 = inner1_out1;
 
 	Inner2 inner2 (
-		.inner2_out(inner1_out2)
+		.inner2_out(inner1_out1)
 	);
 
 endmodule

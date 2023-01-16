@@ -616,11 +616,11 @@ class Junction(JunctionBase):
     def get_scope_for_sink(self, sink: 'Junction') -> Optional['Module']:
         return self._sinks.get(sink, None)
 
-    def get_local_sinks(self) -> Set[Tuple['Junction', 'Junction']]:
+    def get_local_sinks(self, add_last: bool = False) -> Set[Tuple['Junction', 'Junction']]:
         """
         Returns all the junctions that this one drives in the
         first element in the tuple. The second element will
-        contain the first junction on the path between self and
+        contain the first/last junction on the path between self and
         the sink.
 
         For a wire or an input, this gives back all the sinks
@@ -640,16 +640,19 @@ class Junction(JunctionBase):
         scopes.add(scope)
         for sub_module in scope._impl.get_sub_modules():
             scopes.add(sub_module)
-        
+
         ret_val = OrderedSet()
-        def _get_sinks(for_junction: 'Junction', first_in_path: Optional['Junction']) -> None:
+        def _get_sinks(for_junction: 'Junction', first_or_last_in_path: Optional['Junction']) -> None:
             for my_sink, my_scope in for_junction._sinks.items():
                 if my_scope in scopes:
-                    if first_in_path is None:
-                        first_in_path = my_sink
-                    ret_val.add((my_sink, first_in_path))
-                    _get_sinks(my_sink, first_in_path)
-        
+                    if first_or_last_in_path is None:
+                        first_or_last_in_path = my_sink
+                    if add_last:
+                        ret_val.add((my_sink, for_junction))
+                    else:
+                        ret_val.add((my_sink, first_or_last_in_path))
+                    _get_sinks(my_sink, first_or_last_in_path)
+
         _get_sinks(self, None)
         return ret_val
 
@@ -936,7 +939,7 @@ class Junction(JunctionBase):
             if self._xnet.num_junctions(include_source=False) > 1:
                 raise SimulationException(f"Can't assigne to XNet that has no driver during simulation. This net is a {'transition, which means it both has a driver and sink(s)' if is_transition else 'sink, which means it does not drive anything'}", self)
             self._xnet.sim_state.sim_context.schedule_value_change(self._xnet, new_sim_value, when)
-            
+
 
 
 
