@@ -630,6 +630,13 @@ class Junction(JunctionBase):
 
         Of course this might be incomplete if the netlist
         is still under construction.
+
+        NOTE: first_in_chain can be the same as sink for the first hop.
+              In other words:
+              - It is always guaranteed to be possible to insert an
+                adaptor self and first_in_chain if 'add_last' is False
+              - It is always guaranteed to be possible to insert an
+                adaptor between sink and last_in_chain if 'add_last' is True
         """
         if is_output_port(self):
             scope = self.get_parent_module()._impl.parent
@@ -645,13 +652,17 @@ class Junction(JunctionBase):
         def _get_sinks(for_junction: 'Junction', first_or_last_in_path: Optional['Junction']) -> None:
             for my_sink, my_scope in for_junction._sinks.items():
                 if my_scope in scopes:
-                    if first_or_last_in_path is None:
-                        first_or_last_in_path = my_sink
                     if add_last:
                         ret_val.add((my_sink, for_junction))
                     else:
-                        ret_val.add((my_sink, first_or_last_in_path))
-                    _get_sinks(my_sink, first_or_last_in_path)
+                        if first_or_last_in_path is None:
+                            ret_val.add((my_sink, my_sink))
+                        else:
+                            ret_val.add((my_sink, first_or_last_in_path))
+                    if first_or_last_in_path is None:
+                        _get_sinks(my_sink, my_sink)
+                    else:
+                        _get_sinks(my_sink, first_or_last_in_path)
 
         _get_sinks(self, None)
         return ret_val

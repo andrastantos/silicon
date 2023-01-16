@@ -681,6 +681,54 @@ def test_multiple_outputs_if_rev_member2(mode="rtl"):
         t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 
+def test_multiple_outputs_if_member(mode="rtl"):
+    class OutIf1(si.Interface):
+        out_if1_member = si.logic
+
+    class InIf(si.Interface):
+        in_if_member = si.logic
+
+    class OutIf2(si.Interface):
+        out_if2_member = si.logic
+
+
+    class Consumer(si.Module):
+        consumer_in = si.Input(InIf)
+        consumer_out1 = si.Output(OutIf1)
+        consumer_out2 = si.Output(OutIf2)
+
+        def body(self):
+            self.consumer_out1.out_if1_member <<= self.consumer_in.in_if_member
+            self.consumer_out2.out_if2_member <<= self.consumer_in.in_if_member
+
+    class Producer(si.Module):
+        in_if = si.Output(InIf)
+
+        def body(self):
+            self.in_if.in_if_member <<= 1
+
+    class Top(si.Module):
+        def body(self):
+            # Connecting tissue
+            mem_to_bus = si.Wire(OutIf1)
+            in_if = si.Wire(InIf)
+            out_if2 = si.Wire(OutIf2)
+
+            producer = Producer()
+            consumer = Consumer()
+
+            in_if <<= producer.in_if
+
+            consumer.consumer_in <<= in_if
+            mem_to_bus <<= consumer.consumer_out1
+            out_if2 <<= consumer.consumer_out2
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
 
 def test_named_local_output(mode="rtl"):
     class Top(si.Module):
@@ -753,7 +801,8 @@ if __name__ == "__main__":
     #test_complex_loopback()
     #test_named_local_output()
     #test_named_local_output2()
-    test_multiple_outputs()
+    #test_multiple_outputs()
     #test_multiple_outputs_if()
     #test_multiple_outputs_if_rev_member()
     #test_multiple_outputs_if_rev_member2()
+    test_multiple_outputs_if_member()
