@@ -25,7 +25,7 @@ class Tracer(object):
         stack_frame = frame.f_code
         func_name = stack_frame.co_name
         line_no = frame.f_lineno
-        filename = stack_frame.co_filename
+        filename:str = stack_frame.co_filename
 
         header_printed = False
 
@@ -38,6 +38,9 @@ class Tracer(object):
             return True
 
         if event == 'call':
+            # Work around PyDev debugger inserting funky calls into our trace that screws up our carefully curated enable-disable queue
+            if filename.find("/pydevd/") != -1:
+                return chain()
             if Tracer.initial_entry:
                 Tracer.initial_entry = False
                 Tracer.context.push(Tracer.ContextInfo(func_name, True))
@@ -56,6 +59,9 @@ class Tracer(object):
                     #    print(f">--- {func_name} at {filename}:{line_no}")
             return chain()
         elif event == 'return':
+            # Work around PyDev debugger inserting funky calls into our trace that screws up our carefully curated enable-disable queue
+            if filename.find("/pydevd/") != -1:
+                return chain()
             try:
                 context = Tracer.context.pop()
                 if not context.trace:
@@ -75,7 +81,7 @@ class Tracer(object):
             parent_module = Netlist.get_current_scope()
             if parent_module is None:
                 # We can't really assert in tracer, I don't think. So we simply terminate with a nasty message
-                print(f"Traces is enabled outside of module bodies. THIS IS REALLY BAD!!!", file=sys.stderr)
+                print(f"Tracer is enabled outside of module bodies. THIS IS REALLY BAD!!!", file=sys.stderr)
                 sys.exit(-1)
 
             for local_name in sorted(frame.f_locals.keys()):
