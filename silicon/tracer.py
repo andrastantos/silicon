@@ -41,6 +41,7 @@ class Tracer(object):
             # Work around PyDev debugger inserting funky calls into our trace that screws up our carefully curated enable-disable queue
             if filename.find("/pydevd/") != -1:
                 return chain()
+            #print(f">--- {func_name} at {filename}:{line_no}")
             if Tracer.initial_entry:
                 Tracer.initial_entry = False
                 Tracer.context.push(Tracer.ContextInfo(func_name, True))
@@ -90,6 +91,8 @@ class Tracer(object):
                     continue
                 from .utils import is_junction_base, is_module
                 if is_junction_base(local_value):
+                    if Tracer.debug_print_level > 1:
+                        print(f"     adding local {local_name} with value {local_value}")
                     try:
                         parent_module._impl.tracer_local_wires[(func_name, local_name)] = local_value
                     except Exception:
