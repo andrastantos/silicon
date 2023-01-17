@@ -58,21 +58,37 @@ class SimXNetState(object):
         return self._last_changed == self.sim_context.now
 
     def set_value(self, new_value: Any, now: int) -> None:
-        #print(f"--- at {self.sim_context.now} {self.parent_xnet.get_diagnostic_name()} setting value to {new_value}")
+        #print(f"--- at {self.sim_context.now} {self.parent_xnet.get_diagnostic_name(self.sim_context.netlist)} setting value from {self.previous_value} to {new_value}, last changed at {self._last_changed}")
         #assert self._last_changed != self.sim_context.now, "Combinational loop detected???"
 
         new_value = self.value_validator(new_value, self.parent_xnet.get_source())
-        if self._last_changed != now:
-            self.previous_value = self.value
-        self.value = new_value
-        self._last_changed = now
-        self.record_change(now)
+        # We have to be careful here: operator != might not do what we think it should, especially if one of the values is None.
+        # It really is the simulation implementation of the != operation, not a simulation value comparison.
+        # For complex sim values (Number.NetValue), there's a special method provided to check for value changes.
+        # We will revert back to != only if such lookup fails.
+        try:
+            changed = self.value.is_different(new_value)
+        except AttributeError:
+            try:
+                changed = new_value.is_different(self.value)
+            except AttributeError:
+                changed = self.value != new_value
 
-        for listener in self.listeners:
-            # Inlining schedule_generator
-            #self.sim_context.schedule_generator(listener) # Schedule the action on all the modules that registered to this value change
-            self.sim_context.simulator.current_event.add_generator(listener)
-        self.listeners.clear()
+        if changed:
+            if self._last_changed != now:
+                self.previous_value = self.value
+            self.value = new_value
+            self._last_changed = now
+            self.record_change(now)
+
+            for listener in self.listeners:
+                # Inlining schedule_generator
+                #self.sim_context.schedule_generator(listener) # Schedule the action on all the modules that registered to this value change
+                self.sim_context.simulator.current_event.add_generator(listener)
+            self.listeners.clear()
+
+    def get_last_changed(self) -> Optional[int]:
+        return self._last_changed
 
     def record_change(self, when: int):
         if self._vcd_value_converter is None:
@@ -201,12 +217,15 @@ class Simulator(object):
                 # - All xnets have a sim value of None
                 # - These generators can schedule value-changes to time 0 or otherwise
                 # - Most importantly they return their sensitivity list (or delayed schedule time) so we can
-                #   put the on the appropriate xnet sensitivity list or event trigger list.
+                #   put them on the appropriate xnet sensitivity list or event trigger list.
                 if hasattr(module, "simulate"):
                     generator = module.simulate()
                     from inspect import isgenerator
                     if isgenerator(generator):
-                        sensitivity_list = generator.send(None)
+                        try:
+                            sensitivity_list = generator.send(None)
+                        except StopIteration:
+                            continue
                         Simulator._process_yield(generator, sensitivity_list, self, 0)
 
         def dump_signals(self, signal_pattern: str = ".", add_unnamed_scopes: bool = False) -> None:

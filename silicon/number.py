@@ -185,6 +185,7 @@ class Number(NetTypeFactory):
         def _coerce_precisions(self, other) -> Tuple[int, int, int]:
             other_precision, other_value = Number.NetValue._precision_and_value(other)
             if other_precision is None or other_value is None:
+                #return self.value, None, self.precision
                 return None, None, None
             my_precision = self.precision
             result_precision = max(my_precision, other_precision)
@@ -408,6 +409,22 @@ class Number(NetTypeFactory):
             if my_value is None or other_value is None:
                 return False
             return my_value != other_value
+
+        def is_different(self, other: Optional['Number.NetValue']) -> bool:
+            """
+            This is roughly the same as != would be under normal circumstances.
+            In the simulator however, != has a different meaning: it's the implementation
+            of a != gate.
+
+            So this method is provided for cases where we *really need* to compare the values
+            """
+            if other is None:
+                return True
+            if self.value != other.value:
+                return True
+            if self.precision != other.precision:
+                return True
+            return False
 
         def __gt__(self, other: Any) -> bool:
             my_value, other_value, result_precision = self._coerce_precisions(other)

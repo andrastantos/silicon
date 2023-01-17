@@ -847,6 +847,12 @@ class Junction(JunctionBase):
         #    return None
         assert not self.is_composite(), "Simulator should never ask for the value of compound types"
         return self._xnet.sim_state.previous_value
+
+    @property
+    def last_changed(self) -> Optional[int]:
+        assert not self.is_composite(), "Simulator should never ask for the value of compound types"
+        return self._xnet.sim_state.get_last_changed()
+
     def get_sim_edge(self) -> EdgeType:
         #if not hasattr(self, "_xnet") or self._xnet is None:
         #    return None
