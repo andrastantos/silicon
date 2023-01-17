@@ -216,6 +216,24 @@ class XNet(object):
         #assert best_name is not None, "An XNet should have at least one name in every interesting scope"
         return best_name
 
+
+    def get_diagnostic_name(self, netlist: 'Netlist') -> str:
+        def get_fully_qualified_names(xnet, add_unnamed_scopes: bool) -> Generator[str, None, None]:
+            from .utils import FQN_DELIMITER
+            for scope in xnet.scoped_names.keys():
+                module_name = scope._impl.get_fully_qualified_name()
+                if not netlist.symbol_table[scope._impl.parent].is_auto_symbol(scope) or add_unnamed_scopes:
+                    names_in_scope = xnet.get_names(scope)
+                    for name in names_in_scope:
+                        yield module_name + FQN_DELIMITER + name
+
+        fqn = tuple(get_fully_qualified_names(self, False))
+        if len(fqn) == 0:
+            fqn = tuple(get_fully_qualified_names(self, True))
+        if len(fqn) == 0:
+            return f"UNNAMED XNET {id(self):x}"
+        return ' a.k.a. '.join(fqn)
+
     def get_net_type(self) -> 'NetType':
         if self._source is not None:
             return self._source.get_net_type()
@@ -435,21 +453,8 @@ class Netlist(object):
                 return rank_map[module]
             # Check for loops (i.e. if graph truly is a DAG)
             if module in visited_modules:
-                def get_fully_qualified_names(xnet, add_unnamed_scopes: bool) -> Generator[str, None, None]:
-                    from .utils import FQN_DELIMITER
-                    for scope in xnet.scoped_names.keys():
-                        module_name = scope._impl.get_fully_qualified_name()
-                        if not self.symbol_table[scope._impl.parent].is_auto_symbol(scope) or add_unnamed_scopes:
-                            names_in_scope = xnet.get_names(scope)
-                            for name in names_in_scope:
-                                yield module_name + FQN_DELIMITER + name
-                def get_xnet_names(xnet: XNet):
-                    fqn = tuple(get_fully_qualified_names(xnet, False))
-                    if len(fqn) == 0:
-                        fqn = get_fully_qualified_names(xnet, True)
-                    return ' a.k.a. '.join(fqn)
                 def xnet_trace_names():
-                    return "\n    ".join(get_xnet_names(xnet) for xnet in xnet_trace)
+                    return "\n    ".join(xnet.get_diagnostic_name(self) for xnet in xnet_trace)
                 raise SyntaxErrorException(f"Combinational loop found:\n    {xnet_trace_names()}")
             visited_modules.add(module)
             if not module.is_combinational():
