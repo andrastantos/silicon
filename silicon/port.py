@@ -370,6 +370,15 @@ class JunctionBase(object):
         return id(self)
 
 
+    def __format__(self, format_spec) -> str:
+        try:
+            sim_value = self.sim_value
+        except AttributeError:
+            return super().__format__(format_spec)
+        if sim_value is None:
+            return "None"
+        return sim_value.__format__(format_spec)
+
 
 
 
