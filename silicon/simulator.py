@@ -219,7 +219,11 @@ class Simulator(object):
                 # - Most importantly they return their sensitivity list (or delayed schedule time) so we can
                 #   put them on the appropriate xnet sensitivity list or event trigger list.
                 if hasattr(module, "simulate"):
-                    generator = module.simulate()
+                    try:
+                        generator = module.simulate(self.simulator)
+                    except TypeError:
+                        generator = module.simulate()
+
                     from inspect import isgenerator
                     if isgenerator(generator):
                         try:
