@@ -2,9 +2,9 @@
 import sys
 from pathlib import Path
 
-from silicon.utils import VerbosityLevels
 sys.path.append(str(Path(__file__).parent / ".."))
 import silicon as si
+from silicon.utils import VerbosityLevels
 import test_utils as t
 import inspect
 import pytest
@@ -775,7 +775,7 @@ def test_named_local_output2(mode="rtl"):
 
 if __name__ == "__main__":
     #test_module_decorator1()
-    #test_module_decorator()
+    test_module_decorator()
     #test_empty_module()
     #test_module_with_io()
     #test_module_with_assigned_io()
@@ -783,7 +783,7 @@ if __name__ == "__main__":
     #test_multiple_wire_names()
     #test_wire_names()
     #test_wire_array3()
-    #test_wire_array2()
+    test_wire_array2()
     #test_slice_bind()
     #test_double_port_assign()
     #test_full_adder()
@@ -805,4 +805,4 @@ if __name__ == "__main__":
     #test_multiple_outputs_if()
     #test_multiple_outputs_if_rev_member()
     #test_multiple_outputs_if_rev_member2()
-    test_multiple_outputs_if_member()
+    #test_multiple_outputs_if_member()

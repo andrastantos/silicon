@@ -98,7 +98,7 @@ module FSM (
 
 	always_ff @(posedge clock_port) local_state <= reset_port ? reset_value : local_next_state;
 
-	FSMLogic u (
+	FSMLogic fsm_logic (
 		.state(local_state),
 		.next_state(local_next_state),
 		.default_state(default_state),

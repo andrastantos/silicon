@@ -8,18 +8,18 @@ module Top (
 
 	logic aaa;
 	logic ddd;
-	logic [1:0] u_state;
-	logic [1:0] u_next_state;
+	logic [1:0] decode_fsm_state;
+	logic [1:0] decode_fsm_next_state;
 
-	assign aaa = u_state == 1'h0;
-	assign ddd = u_state == 1'h0;
+	assign aaa = decode_fsm_state == 1'h0;
+	assign ddd = decode_fsm_state == 1'h0;
 
-	FSM u (
+	FSM decode_fsm (
 		.clock_port(clk),
 		.reset_port(rst),
 		.reset_value(1'h0),
-		.state(u_state),
-		.next_state(u_next_state),
+		.state(decode_fsm_state),
+		.next_state(decode_fsm_next_state),
 		.default_state(1'h0),
 		.input_0_to_1(aaa),
 		.input_0_to_3(ddd)
@@ -47,7 +47,7 @@ module FSM (
 
 	always_ff @(posedge clock_port) local_state <= reset_port ? reset_value : local_next_state;
 
-	FSMLogic u (
+	FSMLogic fsm_logic (
 		.state(local_state),
 		.next_state(local_next_state),
 		.default_state(default_state),

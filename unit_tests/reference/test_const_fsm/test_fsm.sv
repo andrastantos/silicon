@@ -6,21 +6,21 @@ module Top (
 	input logic rst
 );
 
-	logic u3_output_port;
-	logic [3:0] u_state;
+	logic u2_output_port;
+	logic [3:0] decode_fsm_state;
 	logic [3:0] shouldnt_matter;
 
-	FSM u (
+	FSM decode_fsm (
 		.clock_port(clk),
 		.reset_port(rst),
 		.reset_value(4'hb),
-		.state(u_state),
+		.state(decode_fsm_state),
 		.next_state(shouldnt_matter),
 		.default_state(4'hc),
-		.input_11_to_12(u3_output_port)
+		.input_11_to_12(u2_output_port)
 	);
 
-	assign u3_output_port = 1'h1;
+	assign u2_output_port = 1'h1;
 endmodule
 
 
@@ -42,7 +42,7 @@ module FSM (
 
 	always_ff @(posedge clock_port) local_state <= reset_port ? reset_value : local_next_state;
 
-	FSMLogic u (
+	FSMLogic fsm_logic (
 		.state(local_state),
 		.next_state(local_next_state),
 		.default_state(default_state),

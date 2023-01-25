@@ -29,7 +29,7 @@ def _dump_obj(obj) -> str:
 class ScopeTable(object):
     """
     A symbol table for a single scope.
-    
+
     Symbols are names for 'things'. The table contains symbols within a single scope.
 
     Initially, duplicate symbols are allowed, there is a method to disambiguate collisions.
@@ -45,7 +45,7 @@ class ScopeTable(object):
       should become unique.
 
     ScopeTable uses weak references to the objects it contains: if an object gets
-    deleted one way or another, we shouldn't hold on to it just for the sake of the symbol table. 
+    deleted one way or another, we shouldn't hold on to it just for the sake of the symbol table.
     """
 
     class Reserved(object):
@@ -80,6 +80,9 @@ class ScopeTable(object):
             self.hard_names[obj].add(name)
         except KeyError:
             self.hard_names[obj] = OrderedSet((name,))
+        # Remove soft-symbols of the same name, if they exist
+        if name in self.soft_symbols and obj in self.soft_symbols[name]:
+            self.del_soft_symbol(obj, name)
 
     def add_soft_symbol(self, obj: object, name: str) -> None:
         assert name is not None
@@ -88,6 +91,10 @@ class ScopeTable(object):
             self.del_auto_symbol(obj)
         except KeyError:
             pass
+        # If there is a hard symbol with the same name, don't bother adding a soft-symbol
+        if name in self.hard_symbols and obj is self.hard_symbols[name]:
+            return
+
         try:
             self.soft_symbols[name].add(obj)
         except KeyError:
@@ -236,7 +243,7 @@ class ScopeTable(object):
 class SymbolTable(object):
     """
     A global symbol table.
-    
+
     Symbols are names for 'things'. The table contains symbols arranged into scopes.
     What scopes really are, is not really the business of the SymbolTable as long as they are hashable.
 
@@ -253,7 +260,7 @@ class SymbolTable(object):
       should become unique.
 
     SymbolTable uses weak references to the objects it contains: if an object gets
-    deleted one way or another, we shouldn't hold on to it just for the sake of the symbol table. 
+    deleted one way or another, we shouldn't hold on to it just for the sake of the symbol table.
     """
 
     def __init__(self):
@@ -268,7 +275,7 @@ class SymbolTable(object):
         except KeyError:
             self.scopes[scope] = ScopeTable()
             return self.scopes[scope]
-        
+
     def make_unique(self, delimiter: Union[str,Callable] = "_") -> None:
         for scope, table in self.scopes.items():
             table.make_unique(scope, delimiter)

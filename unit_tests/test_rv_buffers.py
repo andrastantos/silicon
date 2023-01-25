@@ -49,10 +49,10 @@ def test_gen_chk(mode: str = "rtl"):
 
         def body(self):
             self.data = Wire(RvData)
-            self.checker = Checker()
+            self.checker_module = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
-            self.checker.input_port <<= self.data
+            self.checker_module.input_port <<= self.data
 
         def simulate(self) -> TSimEvent:
             def clk() -> int:
@@ -98,13 +98,13 @@ def test_forward_buf(mode: str = "rtl"):
         rst = RstPort()
         def body(self):
             self.data = Wire(RvData)
-            self.checker = Checker()
+            self.checker_module = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
             dut = top()
             dut.rst <<= self.rst
             dut.clk <<= self.clk
-            self.checker.input_port <<= dut(self.data)
+            self.checker_module.input_port <<= dut(self.data)
 
         def simulate(self) -> TSimEvent:
             def clk() -> int:
@@ -147,13 +147,13 @@ def test_reverse_buf(mode: str = "rtl"):
         rst = RstPort()
         def body(self):
             self.data = Wire(RvData)
-            self.checker = Checker()
+            self.checker_module = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
             dut = top()
             dut.rst <<= self.rst
             dut.clk <<= self.clk
-            self.checker.input_port <<= dut(self.data)
+            self.checker_module.input_port <<= dut(self.data)
 
         def simulate(self) -> TSimEvent:
             def clk() -> int:
@@ -198,13 +198,13 @@ def test_fifo(mode: str = "rtl"):
         rst = RstPort()
         def body(self):
             self.data = Wire(RvData)
-            self.checker = Checker()
+            self.checker_module = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
             dut = top()
             dut.rst <<= self.rst
             dut.clk <<= self.clk
-            self.checker.input_port <<= dut(self.data)
+            self.checker_module.input_port <<= dut(self.data)
 
         def simulate(self) -> TSimEvent:
             def clk() -> int:
@@ -217,7 +217,7 @@ def test_fifo(mode: str = "rtl"):
             print("Simulation started")
 
             self.generator.max_wait_state = 10
-            self.checker.max_wait_state = 2
+            self.checker_module.max_wait_state = 2
             self.rst <<= 1
             self.clk <<= 1
             yield 10
@@ -227,11 +227,11 @@ def test_fifo(mode: str = "rtl"):
             for i in range(500):
                 yield from clk()
             self.generator.max_wait_state = 5
-            self.checker.max_wait_state = 5
+            self.checker_module.max_wait_state = 5
             for i in range(500):
                 yield from clk()
             self.generator.max_wait_state = 2
-            self.checker.max_wait_state = 10
+            self.checker_module.max_wait_state = 10
             for i in range(500):
                 yield from clk()
             now = yield 10
@@ -259,13 +259,13 @@ def test_delay_line(mode: str = "rtl"):
         rst = RstPort()
         def body(self):
             self.data = Wire(RvData)
-            self.checker = Checker()
+            self.checker_module = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
             dut = top()
             dut.rst <<= self.rst
             dut.clk <<= self.clk
-            self.checker.input_port <<= dut(self.data)
+            self.checker_module.input_port <<= dut(self.data)
 
         def simulate(self) -> TSimEvent:
             def clk() -> int:
@@ -285,15 +285,15 @@ def test_delay_line(mode: str = "rtl"):
             self.rst <<= 0
 
             self.generator.max_wait_state = 10
-            self.checker.max_wait_state = 2
+            self.checker_module.max_wait_state = 2
             for i in range(100):
                 yield from clk()
             self.generator.max_wait_state = 0
-            self.checker.max_wait_state = 0
+            self.checker_module.max_wait_state = 0
             for i in range(100):
                 yield from clk()
             self.generator.max_wait_state = 2
-            self.checker.max_wait_state = 10
+            self.checker_module.max_wait_state = 10
             for i in range(100):
                 yield from clk()
             now = yield 10
@@ -322,13 +322,13 @@ def test_pacer(mode: str = "rtl"):
         rst = RstPort()
         def body(self):
             self.data = Wire(RvData)
-            self.checker = Checker()
+            self.checker_module = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
             dut = top()
             dut.rst <<= self.rst
             dut.clk <<= self.clk
-            self.checker.input_port <<= dut(self.data)
+            self.checker_module.input_port <<= dut(self.data)
 
         def simulate(self) -> TSimEvent:
             def clk() -> int:
@@ -348,15 +348,15 @@ def test_pacer(mode: str = "rtl"):
             self.rst <<= 0
 
             self.generator.max_wait_state = 1
-            self.checker.max_wait_state = 1
+            self.checker_module.max_wait_state = 1
             for i in range(500):
                 yield from clk()
             self.generator.max_wait_state = 2
-            self.checker.max_wait_state = 5
+            self.checker_module.max_wait_state = 5
             for i in range(500):
                 yield from clk()
             self.generator.max_wait_state = 5
-            self.checker.max_wait_state = 2
+            self.checker_module.max_wait_state = 2
             for i in range(500):
                 yield from clk()
             now = yield 10
@@ -422,13 +422,13 @@ def test_stage(mode: str = "sim"):
         rst = RstPort()
         def body(self):
             self.data = Wire(RvData)
-            self.checker = Checker()
+            self.checker_module = Checker()
             self.generator = Generator()
             self.data <<= self.generator.output_port
             dut = top()
             dut.rst <<= self.rst
             dut.clk <<= self.clk
-            self.checker.input_port <<= dut(self.data)
+            self.checker_module.input_port <<= dut(self.data)
 
         def simulate(self) -> TSimEvent:
             def clk() -> int:
@@ -448,15 +448,15 @@ def test_stage(mode: str = "sim"):
             self.rst <<= 0
 
             self.generator.max_wait_state = 1
-            self.checker.max_wait_state = 1
+            self.checker_module.max_wait_state = 1
             for i in range(500):
                 yield from clk()
             self.generator.max_wait_state = 2
-            self.checker.max_wait_state = 5
+            self.checker_module.max_wait_state = 5
             for i in range(500):
                 yield from clk()
             self.generator.max_wait_state = 5
-            self.checker.max_wait_state = 2
+            self.checker_module.max_wait_state = 2
             for i in range(500):
                 yield from clk()
             now = yield 10
@@ -493,8 +493,8 @@ if __name__ == "__main__":
     #test_reverse_buf("sim")
     #test_fifo("sim")
     #test_gen_chk("rtl")
-    #test_gen_chk("sim")
+    test_gen_chk("sim")
     #test_delay_line("sim")
     #test_pacer("sim")
     #test_stage("rtl")
-    test_stage("sim")
+    #test_stage("sim")

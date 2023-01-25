@@ -6,7 +6,7 @@ from collections import OrderedDict
 from .port import Junction, Port, Output, Input, Wire, JunctionBase
 from .net_type import NetType, NetTypeMeta
 from .utils import is_junction, str_block, TSimEvent, ContextMarker, first, Context
-from .tracer import Tracer, Trace, no_trace
+from .tracer import Tracer
 from .netlist import Netlist
 from enum import Enum
 from .ordered_set import OrderedSet
@@ -279,7 +279,7 @@ class Module(object):
         return False
 
     def __str__(self) -> str:
-        if hasattr(self, "_impl"):
+        if "_impl" in self.__dict__:
             return self._impl.get_diagnostic_name(add_location = True)
         else:
             return super().__str__()
@@ -593,8 +593,7 @@ class Module(object):
                 (self._construct_args, self._construct_kwargs) = fill_arg_names(self._true_module.construct, args, kwargs)
                 with self.netlist.set_current_scope(self._true_module):
                     with Module.Context(self):
-                        with Trace():
-                            self._true_module.construct(*self._construct_args, **self._construct_kwargs)
+                        self.call_and_trace(True, self._true_module.construct, *self._construct_args, **self._construct_kwargs)
                 for port in self.get_ports().values():
                     if port._auto:
                         port.find_cadidates()
@@ -931,6 +930,44 @@ class Module(object):
                 chain(*(sub_module.get_inputs().values() for sub_module in self._sub_modules))
             )
 
+        def call_and_trace(self, do_trace: bool, fn: Callable , *args, **kwargs):
+            scope_table = self.netlist.symbol_table[self._true_module]
+            old_attr_list = set(dir(self._true_module))
+            self.tracer_local_wires = dict() # This will get populated by the Tracer with all the local wires that need registering
+            self.tracer_local_modules = dict() # This will get populated by the Tracer with all the local modules that need registering
+
+            if do_trace:
+                with Tracer():
+                    Tracer.enable=True
+                    fn(*args, **kwargs)
+            else:
+                fn(*args, **kwargs)
+
+            for (func_name, local_name), local_wire in self.tracer_local_wires.items():
+                # TODO: not everything thrown in here is a Junction. There are UniSlicers, ScopedPorts as well.
+                #       There are not accounted for at the moment as even though they get registered, they are
+                #       not picked up during XNet naming.
+                #print(f"registering local wire '{local_name}': {hex(id(local_wire))} of type {type(local_wire)}")
+                scope_table.add_soft_symbol(local_wire, local_name)
+            for (func_name, local_name), local_module in self.tracer_local_modules.items():
+                scope_table.add_soft_symbol(local_module, local_name)
+            # We don't need these anymore, so de-clutter the namespace a little.
+            delattr(self, "tracer_local_wires")
+            delattr(self, "tracer_local_modules")
+            # Look through all the attributes and register them, if needed.
+            for attr_name in dir(self._true_module):
+                if attr_name in old_attr_list:
+                    continue
+                attr_value = getattr(self._true_module, attr_name)
+                if is_junction_base(attr_value):
+                    # TODO: not everything thrown in here is a Junction. There are UniSlicers, ScopedPorts as well.
+                    #       There are not accounted for at the moment as even though they get registered, they are
+                    #       not picked up during XNet naming.
+                    #print(f"registering attr wire '{attr_name}': {hex(id(attr_value))} of type {type(attr_value)}")
+                    scope_table.add_hard_symbol(attr_value, attr_name)
+                elif is_module(attr_value):
+                    scope_table.add_hard_symbol(attr_value, attr_name)
+
         def _elaborate(self, trace: bool) -> None:
             # Recursively go through each new node, add it to the netlist and call its body (which most likely will create more new nodes).
             # The algorithm does a depth-first walk of the netlist hierarchy, eventually resulting in the full network and netlist created
@@ -949,45 +986,10 @@ class Module(object):
                         from .constant import NoneNetType
                         input_port.set_net_type(NoneNetType)
 
-            # Let's call 'body' which will create all the sub-modules
-            self.tracer_local_wires = dict() # This will get populated by the Tracer with all the local wires that need registering
-            self.tracer_local_modules = dict() # This will get populated by the Tracer with all the local modules that need registering
-            scope_table = self.netlist.symbol_table[self._true_module]
             with ScopedAttr(self, "setattr__impl", self._setattr__elaboration):
                 with self.netlist.set_current_scope(self._true_module):
                     with Module.Context(self):
-                        old_attr_list = set(dir(self._true_module))
-                        if trace:
-                            with Tracer():
-                                self._true_module.body()
-                        else:
-                            self._true_module.body()
-                        for (func_name, local_name), local_wire in self.tracer_local_wires.items():
-                            # TODO: not everything thrown in here is a Junction. There are UniSlicers, ScopedPorts as well.
-                            #       There are not accounted for at the moment as even though they get registered, they are
-                            #       not picked up during XNet naming.
-                            #print(f"registering local wire '{local_name}': {hex(id(local_wire))} of type {type(local_wire)}")
-                            scope_table.add_soft_symbol(local_wire, local_name)
-                        for (func_name, local_name), local_module in self.tracer_local_modules.items():
-                            if scope_table.is_auto_symbol(local_module):
-                                scope_table.add_hard_symbol(local_module, local_name)
-                            else:
-                                print(f"\t\tWARNING: module already has a name {module}. Not changing it")
-                        # We don't need these anymore, so declutter the namespace a little.
-                        delattr(self, "tracer_local_wires")
-                        delattr(self, "tracer_local_modules")
-                        # Look through all the attributes and register them, if needed.
-                        for attr_name in dir(self._true_module):
-                            if attr_name in old_attr_list:
-                                continue
-                            attr_value = getattr(self._true_module, attr_name)
-                            if is_junction_base(attr_value):
-                                # TODO: not everything thrown in here is a Junction. There are UniSlicers, ScopedPorts as well.
-                                #       There are not accounted for at the moment as even though they get registered, they are
-                                #       not picked up during XNet naming.
-                                #print(f"registering attr wire '{attr_name}': {hex(id(attr_value))} of type {type(attr_value)}")
-                                scope_table.add_hard_symbol(attr_value, attr_name)
-
+                        self.call_and_trace(trace, self._true_module.body)
                     # Finish ordering sub-modules:
                     for sub_module in self._unordered_sub_modules:
                         self._sub_modules.append(sub_module)
@@ -1565,9 +1567,14 @@ class DecoratorModule(GenericModule):
             raise InvalidPortError()
         return Input(net_type)
 
-    @no_trace
     def body(self) -> None:
-        return_values = self._impl.function(*self._impl._args, **self._impl._kwargs)
+        # This is a trick for the tracer: Since we're not tracing recursively, a single redirection will disable
+        # the annoying extra symbols in the generated RTL
+        self.module_body()
+
+    def module_body(self) -> None:
+        with Tracer():
+            return_values = self._impl.function(*self._impl._args, **self._impl._kwargs)
         if isinstance(return_values, str) or is_junction_base(return_values) or not is_iterable(return_values):
             return_values = (return_values, )
         if len(return_values) != len(self._impl.get_outputs()):

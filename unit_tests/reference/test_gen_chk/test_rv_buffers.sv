@@ -10,7 +10,7 @@ module top (
 	logic data_valid;
 	logic [7:0] data_data;
 
-	Generator u1 (
+	Generator generator (
 		.output_port_data(data_data),
 		.output_port_ready(data_ready),
 		.output_port_valid(data_valid),
@@ -19,7 +19,7 @@ module top (
 		.reset_port(rst)
 	);
 
-	Checker u (
+	Checker checker_module (
 		.input_port_data(data_data),
 		.input_port_ready(data_ready),
 		.input_port_valid(data_valid),
