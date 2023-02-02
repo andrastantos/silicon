@@ -18,8 +18,11 @@ class SyntaxErrorException(Exception):
         except Exception:
             loc = "<<NO LOCATION>>"
         from textwrap import indent, wrap
-        message = "\n".join(indent("\n".join(wrap(line, width=70)), "    ") for line in message.split("\n"))
-        super().__init__(f"{loc}\n{message}")
+        if message is not None:
+            message = "\n".join(indent("\n".join(wrap(line, width=70)), "    ") for line in message.split("\n"))
+            super().__init__(f"{loc}\n{message}")
+        else:
+            super().__init__(str(loc))
 
 class FixmeException(SyntaxErrorException):
     def __init__(self, message, context = None):
@@ -33,8 +36,11 @@ class SimulationException(Exception):
         except Exception:
             loc = "<<NO LOCATION>>"
         from textwrap import indent, wrap
-        message = indent("\n".join(wrap(message, width=70)), "    ")
-        super().__init__(f"{loc}\n{message}")
+        if message is not None:
+            message = indent("\n".join(wrap(message, width=70)), "    ")
+            super().__init__(f"{loc}\n{message}")
+        else:
+            super().__init__(str(loc))
 
 class IVerilogException(Exception):
     pass
