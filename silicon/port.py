@@ -958,7 +958,7 @@ class Junction(JunctionBase):
             is_transition = self._xnet.is_transition(self)
             is_sink = self._xnet.is_sink(self)
             assert is_transition or is_sink
-            raise SimulationException(f"Can't assigne to net that has a driver during simulation. This net is a {'transition, which means it both has a driver and sink(s)' if is_transition else 'sink, which means it does not drive anything'}", self)
+            raise SimulationException(f"Can't assign to net that has a driver during simulation. This net is a {'transition, which means it both has a driver and sink(s)' if is_transition else 'sink, which means it does not drive anything'}", self)
         else:
             # XNet source is None. This is only allowed if the XNet has a single (output) node on it. So test for that and assign the sim_value if that's the case
             assert xnet_source is None
