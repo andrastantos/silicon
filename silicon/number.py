@@ -1031,11 +1031,43 @@ class Number(NetTypeFactory):
             return None, key
 
         @classmethod
+        def get_default_value(cls, back_end: 'BackEnd') -> str:
+            """
+            Get the default used to denote unconnected values for the given back-end.
+
+            An example would be 3'0 for a 3-bit value.
+
+            The default implementation, which creates a 0 value with the number
+            of bits needed to represent the values of the type is probably sufficient
+            for most derived types.
+
+            The difference between get_default_value and get_unconnected_value is subtle
+            but important: most unconnected XNets get assigned the unconnected value.
+            However an optional auto-input, if left unconnected uses the default value.
+            """
+            assert back_end.language == "SystemVerilog"
+
+            # If 0 is in the valid range of values, use that. If not, use the value closest to it.
+            if cls.min_val <= 0 or cls.max_val >= 0:
+                val = 0
+            elif cls.min_val < 0:
+                val = cls.max_val
+            else:
+                val = cls.min_val
+            return f"{cls.get_num_bits()}'h{val:x}"
+        @classmethod
         def get_unconnected_sim_value(cls) -> Any:
             return None
         @classmethod
         def get_default_sim_value(cls) -> Any:
-            return 0
+            # If 0 is in the valid range of values, use that. If not, use the value closest to it.
+            if cls.min_val <= 0 and cls.max_val >= 0:
+                val = 0
+            elif cls.min_val < 0:
+                val = cls.max_val
+            else:
+                val = cls.min_val
+            return val
         @classmethod
         def validate_sim_value(cls, sim_value: Any, parent_junction: Junction) -> Any:
             """
