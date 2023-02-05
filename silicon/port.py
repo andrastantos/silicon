@@ -1023,7 +1023,7 @@ class Junction(JunctionBase):
         if self.is_composite():
             for member, _ in self.get_member_junctions().values():
                 ret_val |= member.get_all_member_junctions(True)
-        elif add_self:
+        if add_self:
             ret_val.add(self)
         return ret_val
 

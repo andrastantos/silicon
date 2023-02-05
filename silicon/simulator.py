@@ -117,6 +117,8 @@ class Simulator(object):
                 try:
                     for port in yielded_value:
                         for member_port in port.get_all_member_junctions(add_self=True):
+                            if member_port.is_composite():
+                                continue
                             xnet = sim_context.netlist.get_xnet_for_junction(member_port)
                             xnet.sim_state.add_listener(generator)
                 except TypeError:

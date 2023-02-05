@@ -1083,11 +1083,12 @@ class Module(object):
                             changes = True
                             incomplete_junctions.remove(junction)
                 # Look through all junctions for incompatible source-sink types and insert adaptors as needed
-                for junction in tuple(self.get_all_junctions()):
-                    old_source = junction.get_source()
-                    if junction.is_specialized() and old_source is not None and old_source.is_specialized():
-                        if junction.get_net_type() is not old_source.get_net_type():
-                            insert_adaptor(old_source, junction, junction.get_net_type(), junction.source_scope, force=False)
+                for composite_junction in tuple(self.get_all_junctions()):
+                    for junction in composite_junction.get_all_member_junctions(add_self=True):
+                        old_source = junction.get_source()
+                        if junction.is_specialized() and old_source is not None and old_source.is_specialized():
+                            if junction.get_net_type() is not old_source.get_net_type():
+                                insert_adaptor(old_source, junction, junction.get_net_type(), junction.source_scope, force=False)
                 # We also need to insert adaptors for loopbacks: This forces XNets with loopbacks to be broken up into
                 # multiple pieces thus generating proper RTL and simulation.
                 # Consider the following cenario:

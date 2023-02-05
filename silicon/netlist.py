@@ -438,6 +438,8 @@ class Netlist(object):
             xnets = OrderedSet()
             for port in module.get_ports().values():
                 for member in port.get_all_member_junctions(add_self=True):
+                    if member.is_composite():
+                        continue
                     xnet = self.junction_to_xnet_map[member]
                     if xnet.is_sink(member):
                         xnets.add(xnet)
