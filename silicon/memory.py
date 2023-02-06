@@ -397,6 +397,19 @@ class _Memory(GenericModule):
                     rtl_body += f"logic [{port_config.addr_bits-1}:0] {addr_name};\n"
                 else:
                     addr_name = addr
+            # We have a ton of case to consider:
+            #  data_in    data_out    reg_in   reg_out
+            #    -            -          ?        ?     -> no RTL needed (4 cases)
+            #    Yes          -          -        ?     -> not supported (2 cases)
+            #    Yes          Yes        -        ?     -> not supported (2 cases)
+
+            #    Yes          -          Yes      ?     -> first and second if statements (2 cases)
+            #    Yes          Yes        Yes      ?     -> first and second if statements (2 cases)
+            #    -            Yes        -        -     -> second if
+            #    -            Yes        -        Yes
+            #    -            Yes        Yes      -     -> first and second if statements (2 cases)
+            #    -            Yes        Yes      Yes
+
             if data_in_port is not None or (data_out_port is not None and port_config.registered_input):
                 rtl_body += f"always @(posedge {clk}) begin\n"
                 if data_in_port is not None:
@@ -420,6 +433,18 @@ class _Memory(GenericModule):
                     else:
                         rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n")
                 rtl_body += f"end\n"
+
+            if data_in_port is None and data_out_port is not None and not port_config.registered_input:
+                if port_config.registered_output:
+                    rtl_body += f"always @(posedge {clk}) begin\n"
+
+                    if port_config.mem_ratio == 1:
+                        rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name}];\n")
+                    else:
+                        rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n")
+
+                    rtl_body += f"end\n"
+
             if data_out_port is not None and not port_config.registered_output:
                 if port_config.mem_ratio == 1:
                     rtl_body += f"assign {data_out} = {memory_name}[{addr_name}];\n"
@@ -512,6 +537,10 @@ class _Memory(GenericModule):
             # We simulate READ_FIRST mode only (since that's the one we synthesize as well)
             # That means that we loop through the ports twice: first doing the reads, then doing the writes
             # In fact, we're looping three times: first, we're dealing with the input/output registers, then the actual reads, and finally the actual writes
+            # FIXME: there could be a bug here: in fact read-conflict resolution is controlled by the configuration of input-output registers:
+            #        - If a (read) port has its input registered, it will read new data
+            #        - If a (read) port has an unregistered input, it will read old data
+            #        We might just be lucky in that the behavior below is correct, but more likely then not, there's a bug in here.
 
             for idx, port_config in enumerate(self.config.port_configs):
                 data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
