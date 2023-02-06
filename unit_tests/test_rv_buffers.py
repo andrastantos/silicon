@@ -394,7 +394,7 @@ def test_stage(mode: str = "sim"):
                 stage.reset_value   <<= States.idle
                 stage.idle_state    <<= States.idle
 
-                stage_input = Wire(RvData.get_data_member_type())
+                stage_input = Wire(self.in1.get_data_member_type())
                 stage_input <<= stage.stage_input
 
                 count = stage_input.data[1:0]
@@ -493,8 +493,8 @@ if __name__ == "__main__":
     #test_reverse_buf("sim")
     #test_fifo("sim")
     #test_gen_chk("rtl")
-    test_gen_chk("sim")
+    #test_gen_chk("sim")
     #test_delay_line("sim")
     #test_pacer("sim")
-    #test_stage("rtl")
+    test_stage("rtl")
     #test_stage("sim")

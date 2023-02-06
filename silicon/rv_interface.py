@@ -29,6 +29,8 @@ class ReadyValid(Interface):
             # TODO: how to make the test easier? The code below will blow up if names are not right, but still
             #if data_members.get_net_type() is not self.get_net_type().get_data_member_type():
             #    raise SyntaxErrorException(f"set_data_members of ReadyValid must be called with a struct of type {self.get_net_type().get_data_member_type()}")
+            if not data_members.is_specialized():
+                raise SyntaxErrorException("FIXME: This is a limitation of Silicon, but you can't set data-members from a junction which is not specialized")
             for name, (junction, _) in data_members.get_member_junctions().items():
                 my_wire = getattr(self, name)
                 my_wire <<= junction
@@ -44,7 +46,7 @@ class ReadyValid(Interface):
         cls._data_member_type = None
 
     @classmethod
-    def get_data_member_type(cls) -> Struct:
+    def _get_data_member_type(cls) -> Struct:
         try:
             if cls._data_member_type is not None:
                 return cls._data_member_type
@@ -55,6 +57,9 @@ class ReadyValid(Interface):
             if name not in ("ready", "valid"):
                 cls._data_member_type.add_member(name, member)
         return cls._data_member_type
+
+    def get_data_member_type(self) -> Struct:
+        return self.get_net_type()._get_data_member_type()
 
     @classmethod
     def add_member(cls, name: str, member: Union[NetType, Reverse]) -> None:
