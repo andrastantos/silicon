@@ -1173,8 +1173,31 @@ class Module(object):
                                     if not sub_reversed:
                                         insertion_points.add((last_sub, sub_port))
                             if is_output_port(local_sink):
-                                # Here the sub-module output drives another output
-                                assert local_sink.get_parent_module() is self._true_module
+                                # Here the sub-module output drives another output.
+                                # We only cared if the output is our own output or the output of a direct
+                                # submodule:
+                                #
+                                #    +-----------------------------------------+
+                                #    |                OUTER                    |
+                                #    |                                         |
+                                #    |   +-----------------------------+       |
+                                #    |   |                             |       |
+                                #    |   |     +------------------+    |       |
+                                #    |   |     |                  |    |       |
+                                #    |   |     |                  |    |       |
+                                #    | +-\/----/\-+           +---\/---/\---+  |
+                                #    | |          |           |   |    |    |  |
+                                #    | |          |           |   +----+    |  |
+                                #    | |          |           |             |  |
+                                #    | |  INNER1  |           |    INNER2   |  |
+                                #    | +----------+           +-------------+  |
+                                #    |                                         |
+                                #    +-----------------------------------------+
+                                #
+                                assert (
+                                    (local_sink.get_parent_module() is self._true_module) or
+                                    (local_sink.get_parent_module()._impl.parent is self._true_module)
+                                )
                                 if multiple_output_drives:
                                     # We have more then one of these: generate a break in the XNet
                                     for \
