@@ -691,7 +691,15 @@ class Number(NetTypeFactory):
         def simulate(self) -> TSimEvent:
             while True:
                 yield self.input_port
-                self.output_port <<= adjust_precision_sim(self.input_port.sim_value, self.input_port.precision, self.output_port.precision)
+                input_val = adjust_precision_sim(self.input_port.sim_value, self.input_port.precision, self.output_port.precision)
+                output_bit_mask = (1 << self.output_port.get_net_type().int_length) - 1
+                input_val &= output_bit_mask
+                if self.output_port.signed:
+                    if input_val > self.output_port.get_net_type().max_val:
+                        input_val = Number.NetValue(input_val.value - output_bit_mask, input_val.precision)
+                # So far we've done what the RTL is doing. However, that might still be a mistake if output is not a full power-of-two range.
+                # This however will get caught in the implementation if __ilshift__
+                self.output_port <<= input_val
         def is_combinational(self) -> bool:
             """
             Returns True if the module is purely combinational, False otherwise

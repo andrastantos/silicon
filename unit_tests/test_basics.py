@@ -784,9 +784,32 @@ def test_incorrect_slice(mode="rtl"):
 
 
 
+def test_unsigned_cast(mode="sim"):
+    class Top(si.Module):
+        i1 = si.Input(si.Unsigned(8))
+        i2 = si.Input(si.Unsigned(8))
+        o = si.Output(si.Unsigned(8))
+        os = si.Output(si.Signed(8))
 
+        def body(self):
+            self.o <<= si.Unsigned(8)(self.i1 - self.i2)
+            self.os <<= si.Signed(8)(self.i1)
 
+        def simulate(self) -> si.TSimEvent:
+            self.i1 <<= 2
+            self.i2 <<= 3
+            yield 10
+            assert self.o.sim_value == 255
+            for i in range(128,255):
+                self.i1 <<= i
+                yield 10
+                assert self.os.sim_value == i-255
 
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 
 
@@ -823,4 +846,5 @@ if __name__ == "__main__":
     #test_multiple_outputs_if_rev_member()
     #test_multiple_outputs_if_rev_member2()
     #test_multiple_outputs_if_member()
-    test_incorrect_slice()
+    #test_incorrect_slice()
+    test_unsigned_cast()
