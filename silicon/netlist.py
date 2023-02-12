@@ -663,10 +663,10 @@ class Netlist(object):
         print_submodules(self.top_level)
 
 
-    def generate(self, back_end: 'BackEnd') -> None:
+    def generate(self, back_end: 'BackEnd', file_names: Optional[Union[str, Dict[type, str]]] = None) -> None:
         from .utils import str_block
 
-        streams = back_end.generate_order(self)
+        streams = back_end.generate_order(self, file_names)
 
         self.top_level._impl._generate_needed = True
         for stream, (modules, types) in streams.items():

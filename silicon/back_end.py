@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, IO, Tuple, Optional, Sequence
+from typing import List, Dict, Any, IO, Tuple, Optional, Sequence, Union
 from .module import Module
 from collections import OrderedDict
 from textwrap import indent
@@ -6,16 +6,16 @@ from textwrap import indent
 class BackEnd(object):
     def __init__(self):
         self.language = ""
-    def generate_order(self, netlist: 'Netlist') -> Dict[Any, Tuple[Sequence['Module'], Sequence['NetType']]]:
+    def generate_order(self, netlist: 'Netlist', file_names: Optional[Union[str, Dict[type, str]]] = None) -> Dict[Any, Tuple[Sequence['Module'], Sequence['NetType']]]:
         """
         Returns a list of modules and types per output file name. Modules are going to be generated into their corresponding files in order
         """
-        pass
+        raise NotImplementedError()
     def generate_module(self, module: 'Module') -> str:
         """
         Creates default module body for given module. Only called if module doesn't offer up a specialized implementation.
         """
-        pass
+        raise NotImplementedError()
 
 class File(object):
     """
@@ -54,12 +54,19 @@ class SystemVerilog(BackEnd):
         self.language = "SystemVerilog"
         self.stream_class = stream_class
         self.support_enum = False
-    def _generate_file_name_for_module(self, module: 'Module') -> str:
+    def _generate_file_name_for_module(self, module: 'Module', file_names: Optional[Union[str, Dict[type, str]]] = None) -> str:
+        if file_names is not None:
+            if isinstance(file_names, str):
+                return file_names
+            try:
+                return file_names[type(module)]
+            except AttributeError:
+                pass
         import os
         return os.path.splitext(module._impl._class_filename)[0] + ".sv"
     def get_unconnected_value(self) -> str:
         return f"'X"
-    def generate_order(self, netlist: 'Netlist') -> Dict[Any, Tuple[Sequence['Module'], Sequence['NetType']]]:
+    def generate_order(self, netlist: 'Netlist', file_names: Optional[Union[str, Dict[type, str]]] = None) -> Dict[Any, Tuple[Sequence['Module'], Sequence['NetType']]]:
         """
         Returns a list of modules and types per output file name. Modules are going to be generated into their corresponding files in order
 
@@ -73,7 +80,7 @@ class SystemVerilog(BackEnd):
         """
 
         # For now, we simply dump everything into the top-level file
-        top_file_name = self._generate_file_name_for_module(netlist.top_level)
+        top_file_name = self._generate_file_name_for_module(netlist.top_level, file_names)
         top_file = self.stream_class(top_file_name, "w")
         ret_val = OrderedDict()
         ret_val[top_file] = ([], [])
