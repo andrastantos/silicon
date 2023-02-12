@@ -684,9 +684,9 @@ class Number(NetTypeFactory):
             if need_sign_cast:
                 precedence = 0
                 if self.output_port.signed:
-                    ret_val += back_end.signed_cast(ret_val)
+                    ret_val = back_end.signed_cast(ret_val)
                 else:
-                    ret_val += back_end.unsigned_cast(ret_val)
+                    ret_val = back_end.unsigned_cast(ret_val)
             return ret_val, precedence
         def simulate(self) -> TSimEvent:
             while True:
