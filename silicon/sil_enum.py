@@ -102,7 +102,26 @@ class EnumNet(Number):
                 assert back_end.language == "SystemVerilog"
 
                 rhs_name, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), allow_expression = True)
-                ret_val = f"{self.output_port.get_net_type().get_type_name()}'({rhs_name})"
+                if back_end.support_enum:
+                    ret_val = f"{self.output_port.get_net_type().get_type_name()}'({rhs_name})"
+                else:
+                    ret_val = ""
+                    need_sign_cast = self.input_port.signed and not self.output_port.signed
+                    need_int_size_cast = self.input_port.get_net_type().int_length > self.output_port.get_net_type().int_length
+                    if need_int_size_cast:
+                        ret_val += f"{self.output_port.length}'("
+                    rhs_name, precedence = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
+                    ret_val += rhs_name
+                    if need_int_size_cast:
+                        precedence = 0
+                        ret_val += ")"
+                    if need_sign_cast:
+                        precedence = 0
+                        if self.output_port.signed:
+                            ret_val = back_end.signed_cast(ret_val)
+                        else:
+                            ret_val = back_end.unsigned_cast(ret_val)
+                    return ret_val, precedence
                 return ret_val, 0
             def simulate(self) -> TSimEvent:
                 while True:

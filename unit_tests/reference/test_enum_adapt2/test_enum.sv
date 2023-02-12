@@ -18,7 +18,7 @@ module top (
 	output logic [1:0] out_a
 );
 
-	assign out_a = E1'(in_a);
+	assign out_a = 2'(in_a);
 
 endmodule
 
