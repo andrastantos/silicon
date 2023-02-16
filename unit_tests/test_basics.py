@@ -788,22 +788,61 @@ def test_unsigned_cast(mode="sim"):
     class Top(si.Module):
         i1 = si.Input(si.Unsigned(8))
         i2 = si.Input(si.Unsigned(8))
+        is1 = si.Input(si.Signed(8))
         o = si.Output(si.Unsigned(8))
         os = si.Output(si.Signed(8))
 
         def body(self):
             self.o <<= si.Unsigned(8)(self.i1 - self.i2)
-            self.os <<= si.Signed(8)(self.i1)
+            self.os <<= si.Signed(8)(self.i1 + self.is1)
 
         def simulate(self) -> si.TSimEvent:
             self.i1 <<= 2
             self.i2 <<= 3
+            self.is1 <<= 0
             yield 10
             assert self.o.sim_value == 255
             for i in range(128,255):
                 self.i1 <<= i
                 yield 10
-                assert self.os.sim_value == i-255
+                assert (self.os.sim_value.value) & 255 == i
+            self.i1 <<= si.Unsigned(8)(-1)
+            self.is1 <<= si.Signed(8)(255)
+            self.i2 <<= 1
+            yield 10
+            assert self.o.sim_value == 254
+            assert self.os.sim_value == -2
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+
+def test_right_shift(mode="sim"):
+    class Top(si.Module):
+        i1 = si.Input(si.Unsigned(8))
+        i2 = si.Input(si.Signed(8))
+        o = si.Output(si.Unsigned(8))
+        os = si.Output(si.Signed(8))
+
+        def body(self):
+            self.o <<= self.i1 >> 2
+            self.os <<= self.i2 >> 2
+
+        def simulate(self) -> si.TSimEvent:
+            self.i1 <<= 0xaa
+            self.i2 <<= si.Signed(8)(0xaa)
+            yield 10
+            assert self.o == 0xaa >> 2
+            assert self.os & 255 == (0xaa >> 2) | 0xc0
+            self.i1 <<= 0x55
+            self.i2 <<= 0x55
+            yield 10
+            assert self.o == 0x55 >> 2
+            assert self.os & 255 == 0x55 >> 2
 
     si.set_verbosity_level(VerbosityLevels.instantiation)
     if mode == "rtl":
@@ -848,3 +887,4 @@ if __name__ == "__main__":
     #test_multiple_outputs_if_member()
     #test_incorrect_slice()
     test_unsigned_cast()
+    #test_right_shift()

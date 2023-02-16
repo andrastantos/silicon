@@ -111,7 +111,10 @@ class NetType(object, metaclass=NetTypeMeta):
         # We'll have to do a trick here: ret_val is an OutputPort instance. However, Ports derive from NetType, so
         # if we simply returned it, Python would call __init__ on it, which is not what we want.
         # So we'll create an intermediary type, that overrides __init__ and return that.
-        return suppress_init(ret_val)
+        if isinstance(ret_val, NetType):
+            return suppress_init(ret_val)
+        else:
+            return ret_val
 
     @classmethod
     def generate_type_ref(cls, back_end: 'BackEnd') -> str:
