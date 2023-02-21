@@ -70,7 +70,7 @@ module top (
 	assign sout3 = sin1 - sin2;
 	assign slsh_out = sin1 <<< uin1;
 	assign ulsh_out = uin1 << uin1;
-	assign srsh_out = sin1 >>> uin1;
+	assign srsh_out = $signed(sin1 >>> uin1);
 	assign ursh_out = uin1 >> uin1;
 
 	assign uout5 = 4'hx;

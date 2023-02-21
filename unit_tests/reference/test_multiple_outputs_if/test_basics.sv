@@ -8,6 +8,8 @@ module Outer (
 	logic wire1_r2;
 	logic wire2_r1;
 	logic wire2_r2;
+	logic inner1_inner1_in_r1;
+	logic inner1_inner1_in_r2;
 	logic wire1_n1;
 	logic wire1_n2;
 	logic wire2_n1;
@@ -16,6 +18,8 @@ module Outer (
 	Inner1 inner1 (
 		.inner1_in_n1(1'hx),
 		.inner1_in_n2(1'hx),
+		.inner1_in_r1(inner1_inner1_in_r1),
+		.inner1_in_r2(inner1_inner1_in_r2),
 
 		.inner1_out1_n1(wire1_n1),
 		.inner1_out1_n2(wire1_n2),

@@ -15,7 +15,8 @@ module top (
 );
 
 	logic A_out_a;
-	logic B_out_a;
+	logic ttt;
+	logic tttt;
 	logic c;
 	logic d;
 	logic dd;
@@ -31,24 +32,24 @@ module top (
 	and_gate B (
 		.in_a(1'hx),
 		.in_b(1'hx),
-		.out_a(B_out_a)
+		.out_a(tttt)
 	);
 
 	and_gate A (
-		.in_a(B_out_a),
-		.in_b(B_out_a),
+		.in_a(tttt),
+		.in_b(tttt),
 		.out_a(A_out_a)
 	);
 
 	and_gate u (
 		.in_a(A_out_a),
-		.in_b(B_out_a),
+		.in_b(tttt),
 		.out_a(c)
 	);
 
 	generic_and_gate u1 (
 		.in_a(A_out_a),
-		.in_b(B_out_a),
+		.in_b(tttt),
 		.out_a(u1_out_a)
 	);
 
@@ -67,6 +68,7 @@ module top (
 	);
 
 	assign out_4 = 1'hx;
+	assign ttt = tttt;
 	assign d = 1'hx;
 	assign out_1 = out_a;
 	assign yyyy = out_a;

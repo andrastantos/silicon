@@ -720,7 +720,7 @@ class Module(object):
             if name in self._true_module.__dict__:
                 old_attr = self._true_module.__dict__[name]
                 if is_junction_base(old_attr):
-                    if is_port(junction):
+                    if is_port(old_attr):
                         old_attr.del_interface_name(name)
                     if not is_wire(old_attr):
                         del self._ports[name]
@@ -1527,8 +1527,11 @@ class Module(object):
             #       on a sub-module, that net doesn't really exist in this scope. If the input *is* connected,
             #       even if we don't iterate through it here, we would eventually come across it's driving output.
             #       (we're talking nameless wires here, so I think in almost all cases one source and one sink.)
+            # NOTE: actually that shouldn't be true anymore. First of all: we should have any unconnected inputs,
+            #       and second, we need to deal with composite inputs with reversed members. Those count as outputs
+            #       as well.
             for sub_module in self._sub_modules:
-                for sub_module_port_name, sub_module_port in sub_module.get_outputs().items():
+                for sub_module_port_name, sub_module_port in sub_module.get_ports().items():
                     found = False
                     for name in scope_table.get_names(sub_module_port):
                         xnets = netlist.get_xnets_for_junction(sub_module_port, name)
