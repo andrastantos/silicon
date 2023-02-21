@@ -211,7 +211,7 @@ class XNet(object):
             return None
         # It's possible that even the best name for this XNet is 'None' within an interesting scope.
         # Imagine an input port in the instantiation scope that is left unconnected.
-        # This XNet actually 'lives' in the instantiation scope, yet tere's no way to reference it,
+        # This XNet actually 'lives' in the instantiation scope, yet there's no way to reference it,
         # so it has no 'best' name
         #assert best_name is not None, "An XNet should have at least one name in every interesting scope"
         return best_name

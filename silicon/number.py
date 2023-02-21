@@ -135,8 +135,9 @@ class Number(NetTypeFactory):
                 self.value = value.value
                 self.precision = value.precision
             else:
-                self.precision = int(precision)
-                self.value = int(value)
+                assert value is None or precision is not None
+                self.precision = int(precision) if precision is not None else 0
+                self.value = int(value) if value is not None else None
 
         @staticmethod
         def _precision_and_value(thing: Union[int, float, 'Number.NetValue', 'Junction']) -> Tuple[int]:
@@ -880,7 +881,7 @@ class Number(NetTypeFactory):
                 # This piece of code should not elaborate. However, if PhiSlice
                 # auto-determines its output type, it'll think it's a 1-bit output.
                 # Then auto-type-conversion simply zero-extends that to the rest of the bits.
-                # Even if made that OK, the following would clearly be an error,
+                # Even if decided that that is OK, the following would clearly be an error,
                 # confusing for the user even further:
                 #     w = Wire(Unsigned(8))
                 #     w[1] = 1
