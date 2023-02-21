@@ -395,6 +395,12 @@ class rshift_gate(BinaryGate):
             return ">>>", back_end.get_operator_precedence(">>>", back_end.BINARY)
         else:
             return ">>", back_end.get_operator_precedence(">>", back_end.BINARY)
+    def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
+        ret_val, op_precedence = super().generate_inline_expression(back_end, target_namespace)
+        if self.input_port_0.signed:
+            ret_val = f"$signed({ret_val})"
+            op_precedence = 0
+        return ret_val, op_precedence
     def get_operation_str(self) -> str:
         return "SHR"
     def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
