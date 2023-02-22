@@ -76,6 +76,8 @@ class InlineComposite(InlineBlock):
                 ret_val = None
             if ret_val != None:
                 ret_val += member_inline
+                if ret_val[-1] != "\n":
+                    ret_val += "\n"
         return ret_val
 
 class GlobalSymbolTable(object):
@@ -348,8 +350,10 @@ class Module(object):
                     has_inline_support = True
                     for inline_port in inline_block.target_ports:
                         assert is_output_port(inline_port)
-                    inline_str = inline_block.inline(self, self._impl.netlist, back_end)
+                    inline_str: str = inline_block.inline(self, self._impl.netlist, back_end)
                     if inline_str is not None:
+                        if inline_str[-1] != "\n":
+                            inline_str += "\n"
                         rtl_inline_assignments += inline_str
                 if not has_inline_support:
                     module_class_name = self._impl.netlist.get_module_class_name(sub_module)

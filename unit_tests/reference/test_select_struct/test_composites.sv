@@ -25,9 +25,30 @@ module top (
 	input logic [1:0] sel_in
 );
 
-	assign out_port_b = sel_in == 0 ? in1_b : 8'b0 | sel_in == 1 ? in2_b : 8'b0 | sel_in == 2 ? in3_b : 8'b0 | sel_in == 3 ? in4_b : 8'b0;
-	assign out_port_g = sel_in == 0 ? in1_g : 8'b0 | sel_in == 1 ? in2_g : 8'b0 | sel_in == 2 ? in3_g : 8'b0 | sel_in == 3 ? in4_g : 8'b0;
-	assign out_port_r = sel_in == 0 ? in1_r : 8'b0 | sel_in == 1 ? in2_r : 8'b0 | sel_in == 2 ? in3_r : 8'b0 | sel_in == 3 ? in4_r : 8'b0;
+	always @(*) begin
+	    unique case (sel_in)
+	        2'd0: out_port_b = in1_b;
+	        2'd1: out_port_b = in2_b;
+	        2'd2: out_port_b = in3_b;
+	        2'd3: out_port_b = in4_b;
+	    endcase
+	end
+	always @(*) begin
+	    unique case (sel_in)
+	        2'd0: out_port_g = in1_g;
+	        2'd1: out_port_g = in2_g;
+	        2'd2: out_port_g = in3_g;
+	        2'd3: out_port_g = in4_g;
+	    endcase
+	end
+	always @(*) begin
+	    unique case (sel_in)
+	        2'd0: out_port_r = in1_r;
+	        2'd1: out_port_r = in2_r;
+	        2'd2: out_port_r = in3_r;
+	        2'd3: out_port_r = in4_r;
+	    endcase
+	end
 
 endmodule
 

@@ -54,6 +54,8 @@ class SystemVerilog(BackEnd):
         self.language = "SystemVerilog"
         self.stream_class = stream_class
         self.support_enum = False
+        self.support_always_comb = False
+        self.support_always_ff = True
     def _generate_file_name_for_module(self, module: 'Module', file_names: Optional[Union[str, Dict[type, str]]] = None) -> str:
         if file_names is not None:
             if isinstance(file_names, str):

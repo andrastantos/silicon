@@ -61,6 +61,7 @@ module Memory (
 	end
 	assign real_mem_data_out = mem[addr_reg];
 	assign {data_out_b, data_out_g, data_out_r} = real_mem_data_out;
+
 endmodule
 
 

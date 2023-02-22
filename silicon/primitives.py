@@ -13,6 +13,8 @@ class Select(Module):
     """
     Selector (mux), where the selector is binary encoded
     """
+    outline_limit = 4
+
     output_port = Output()
     selector_port = Input()
     default_port = Input(keyword_only=True, can_be_deleted=True)
@@ -60,8 +62,8 @@ class Select(Module):
     def body(self) -> None:
         if len(self.value_ports) == 0:
             raise SyntaxErrorException(f"Select must have at least one value port")
-        if self.has_default():
-            raise SyntaxErrorException("Default values for 'Select' modules are not supported: generation of inline verilog is rather difficult for them.")
+        #if self.has_default():
+        #    raise SyntaxErrorException("Default values for 'Select' modules are not supported: generation of inline verilog is rather difficult for them.")
         new_net_type = self.generate_output_type()
         assert not self.output_port.is_specialized() or self.output_port.get_net_type() is new_net_type
         if not self.output_port.is_specialized():
@@ -92,12 +94,61 @@ class Select(Module):
                     value_port_members[idx][value_port_key] = member_port
 
             for idx, output_port in enumerate(output_port_members):
-                expression, precedence = self.generate_inline_expression(back_end, target_namespace, output_port_members[idx], value_port_members[idx])
-                sub_block = InlineExpression(output_port, expression, precedence)
-                inline_block.add_member_inlines((sub_block, ))
+                if len(self.value_ports) >= self.outline_limit or self.has_default():
+                    statement = self.generate_inline_statement(back_end, target_namespace, output_port_members[idx], value_port_members[idx])
+                    sub_block = InlineStatement(output_port, statement)
+                    inline_block.add_member_inlines((sub_block, ))
+                else:
+                    expression, precedence = self.generate_inline_expression(back_end, target_namespace, output_port_members[idx], value_port_members[idx])
+                    sub_block = InlineExpression(output_port, expression, precedence)
+                    inline_block.add_member_inlines((sub_block, ))
             yield inline_block
         else:
-            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace, self.output_port, self.value_ports))
+            if len(self.value_ports) >= self.outline_limit or self.has_default():
+                yield InlineStatement((self.output_port, ), self.generate_inline_statement(back_end, target_namespace, self.output_port, self.value_ports))
+            else:
+                yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace, self.output_port, self.value_ports))
+
+    def generate_inline_statement(self, back_end: 'BackEnd', target_namespace: Module, output_port: Junction, value_ports: Dict[Any, Junction]) -> str:
+        assert back_end.language == "SystemVerilog"
+        assert is_module(target_namespace)
+
+        output_name = output_port.get_lhs_name(back_end, target_namespace)
+        assert output_name is not None
+
+        # logic [3:0] select;
+        # logic output, input;
+        # always_comb begin
+        #  case (select[3:0]) begin
+        #    4'b0001 : output  = input_1;
+        #    4'b0010 : output  = input_2;
+        #    4'b0100 : output  = input_3;
+        #    4'b1000 : output  = input_4;
+        #    default : output  = 1'b0;
+        #  endcase
+        # end
+
+        selector_type = self.selector_port.get_net_type()
+
+        if back_end.support_always_comb:
+            ret_val  = "always_comb begin\n"
+        else:
+            ret_val  = "always @(*) begin\n"
+        selector_expression, _ = self.selector_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
+        ret_val += f"    unique case ({selector_expression})\n"
+
+        for selector_idx in sorted(value_ports.keys()):
+            value_port = value_ports[selector_idx]
+            value_expression, _ = value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
+            ret_val += f"        {selector_type.length}'d{selector_idx}: {output_name} = {value_expression};\n"
+        if self.has_default():
+            default_expression, _ = self.default_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
+            ret_val += f"        default: {output_name} = {default_expression};\n"
+
+        ret_val += "    endcase\n"
+        ret_val += "end"
+
+        return ret_val
 
     def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module, output_port: Junction, value_ports: Dict[Any, Junction]) -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
@@ -550,6 +601,12 @@ class GenericReg(GenericModule):
 
     def generate_inline_statement(self, back_end: 'BackEnd', target_namespace: Module, output_port: Junction, input_port: Junction, reset_value_port: Junction) -> str:
         assert back_end.language == "SystemVerilog"
+
+        if back_end.support_always_ff:
+            always = "always_ff"
+        else:
+            always = "always"
+
         assert is_module(target_namespace)
         output_name = output_port.get_lhs_name(back_end, target_namespace)
         assert output_name is not None
@@ -568,7 +625,7 @@ class GenericReg(GenericModule):
             input_precedence = back_end.get_operator_precedence("?:")
         if not self.reset_port.has_driver():
             input_expression, _ = back_end.wrap_expression(input_expression, input_precedence, back_end.get_operator_precedence("<="))
-            ret_val = f"always_ff @({edge} {clk}) {output_name} <= {input_expression};\n"
+            ret_val = f"{always} @({edge} {clk}) {output_name} <= {input_expression};\n"
         else:
             rst_expression, rst_precedence = self.reset_port.get_rhs_expression(back_end, target_namespace)
             if reset_value_port.has_driver():
@@ -579,9 +636,9 @@ class GenericReg(GenericModule):
             rst_sensitivity_expression, _ = back_end.wrap_expression(rst_expression, rst_precedence, back_end.get_operator_precedence("()"))
             rst_test_expression, _ = back_end.wrap_expression(rst_expression, rst_precedence, back_end.get_operator_precedence("?:"))
             if self.sync_reset:
-                ret_val = f"always_ff @({edge} {clk})"
+                ret_val = f"{always} @({edge} {clk})"
             else:
-                ret_val = f"always_ff @({edge} {clk} or {rst_sensitivity_expression})"
+                ret_val = f"{always} @({edge} {clk} or {rst_sensitivity_expression})"
             ret_val += f" {output_name} <= {rst_test_expression} ? {rst_val_expression} : {input_expression};\n"
         return ret_val
 

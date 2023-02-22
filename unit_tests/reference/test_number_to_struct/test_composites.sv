@@ -9,6 +9,7 @@ module Top (
 );
 
 	assign {outp_r, outp_g, outp_b} = in1;
+
 endmodule
 
 

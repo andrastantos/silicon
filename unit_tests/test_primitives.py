@@ -251,6 +251,16 @@ def test_const_cast():
             self.push_data <<= cast(3, Unsigned(32))
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_large_select():
+    class top(Module):
+        i = Input(Unsigned(32))
+        s = Input(Unsigned(5))
+        o = Output(logic)
+
+        def body(self):
+            self.o <<= Select(self.s, *self.i)
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 if __name__ == "__main__":
     #test_select()
@@ -259,7 +269,7 @@ if __name__ == "__main__":
     #test_reg3()
     #test_reg3b()
     #test_reg4()
-    test_reg5()
+    #test_reg5()
     #test_mux()
     #test_select_with_none()
     #test_reg4()
@@ -267,3 +277,4 @@ if __name__ == "__main__":
     #test_partial_assign()
     #test_unassigned_net_repro()
     #test_const_cast()
+    test_large_select()

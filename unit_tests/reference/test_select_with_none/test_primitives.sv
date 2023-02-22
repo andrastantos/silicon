@@ -10,7 +10,18 @@ module top (
 	input logic [1:0] sel_in
 );
 
-	assign sout1 = sel_in == 0 ? uin1 : 5'b0 | sel_in == 1 ? uin2 : 5'b0 | sel_in == 2 ? sin1 : 5'b0 | sel_in == 3 ? sin2 : 5'b0 | sel_in == 4 ? $signed(1'bX) : 5'b0;
+	logic signed [4:0] u_output_port;
+
+	always @(*) begin
+	    unique case (sel_in)
+	        2'd0: u_output_port = uin1;
+	        2'd1: u_output_port = uin2;
+	        2'd2: u_output_port = sin1;
+	        2'd3: u_output_port = sin2;
+	        2'd4: u_output_port = $signed(1'bX);
+	    endcase
+	end
+	assign sout1 = u_output_port;
 
 endmodule
 
