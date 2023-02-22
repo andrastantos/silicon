@@ -135,7 +135,10 @@ class Select(Module):
         else:
             ret_val  = "always @(*) begin\n"
         selector_expression, _ = self.selector_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
-        ret_val += f"    unique case ({selector_expression})\n"
+        if back_end.support_unique_case:
+            ret_val += f"    unique case ({selector_expression})\n"
+        else:
+            ret_val += f"    case ({selector_expression})\n"
 
         for selector_idx in sorted(value_ports.keys()):
             value_port = value_ports[selector_idx]

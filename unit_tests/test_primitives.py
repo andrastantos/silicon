@@ -262,6 +262,18 @@ def test_large_select():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_default_select():
+    class top(Module):
+        i = Input(Unsigned(3))
+        s = Input(Unsigned(2))
+        d = Input(logic)
+        o = Output(logic)
+
+        def body(self):
+            self.o <<= Select(self.s, *self.i, default_port=self.d)
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 if __name__ == "__main__":
     #test_select()
     #test_select_one_first()
@@ -277,4 +289,5 @@ if __name__ == "__main__":
     #test_partial_assign()
     #test_unassigned_net_repro()
     #test_const_cast()
-    test_large_select()
+    #test_large_select()
+    test_default_select()
