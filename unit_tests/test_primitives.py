@@ -262,6 +262,20 @@ def test_large_select():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_large_select_one():
+    class top(Module):
+        i = Input(Unsigned(5))
+        s = Input(Unsigned(5))
+        o = Output(logic)
+
+        def body(self):
+            list = []
+            for s, i in zip(self.s, self.i):
+                list += (s, i)
+            self.o <<= SelectOne(*list)
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 def test_default_select():
     class top(Module):
         i = Input(Unsigned(3))
@@ -290,4 +304,5 @@ if __name__ == "__main__":
     #test_unassigned_net_repro()
     #test_const_cast()
     #test_large_select()
-    test_default_select()
+    #test_default_select()
+    test_large_select_one()

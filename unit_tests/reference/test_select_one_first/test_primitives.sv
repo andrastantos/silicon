@@ -18,7 +18,12 @@ module top (
 	input logic signed sel_in4
 );
 
-	assign sout1 = sel_in1 ? val_in1 : 9'b0 | sel_in2 ? val_in2 : 9'b0 | sel_in3 ? val_in3 : 9'b0 | sel_in4 ? val_in4 : 9'b0 | default_port;
+	assign sout1 = 
+		(sel_in1 ? val_in1 : 9'b0) | 
+		(sel_in2 ? val_in2 : 9'b0) | 
+		(sel_in3 ? val_in3 : 9'b0) | 
+		(sel_in4 ? val_in4 : 9'b0) | 
+		default_port;
 	assign sout2 = sel_in1 ? val_in1 : sel_in2 ? val_in2 : sel_in3 ? val_in3 : sel_in4 ? val_in4 : default_port;
 	assign sout3 = sel_in1 ? val_in1 : sel_in2 ? val_in2 : sel_in3 ? val_in3 : sel_in4 ? val_in4 : default_port;
 	assign sout4 = sel_in1 ? val_in1 : sel_in2 ? val_in2 : sel_in3 ? val_in3 : sel_in4 ? val_in4 : default_port;

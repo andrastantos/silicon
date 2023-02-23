@@ -2,20 +2,17 @@
 // top
 ////////////////////////////////////////////////////////////////////////////////
 module top (
-	input logic [2:0] i,
-	input logic [1:0] s,
-	input logic d,
+	input logic [4:0] i,
+	input logic [4:0] s,
 	output logic o
 );
 
-	always @(*) begin
-		unique case (s)
-			2'd0: o = i[0];
-			2'd1: o = i[1];
-			2'd2: o = i[2];
-			default: o = d;
-		endcase
-	end
+	assign o = 
+		(s[0] ? i[0] : 1'b0) | 
+		(s[1] ? i[1] : 1'b0) | 
+		(s[2] ? i[2] : 1'b0) | 
+		(s[3] ? i[3] : 1'b0) | 
+		(s[4] ? i[4] : 1'b0) ;
 
 endmodule
 

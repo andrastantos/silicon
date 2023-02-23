@@ -32,7 +32,13 @@ module UseFSM (
 	logic [2:0] my_fsm_state;
 	logic [2:0] my_fsm_next_state;
 
-	assign next_my_sum = my_fsm_next_state == `States__reset ? 1'h0 : 8'b0 | my_fsm_next_state == `States__idle ? 1'h0 : 8'b0 | my_fsm_next_state == `States__get_first_data ? data_in : 8'b0 | my_fsm_next_state == `States__get_data ? u30_output_port[7:0] : 8'b0 | my_fsm_next_state == `States__get_wait ? my_sum : 8'b0 | my_fsm_next_state == `States__send_data ? u35_output_port[7:0] : 8'b0 ;
+	assign next_my_sum = 
+		(my_fsm_next_state == `States__reset ? 1'h0 : 8'b0) | 
+		(my_fsm_next_state == `States__idle ? 1'h0 : 8'b0) | 
+		(my_fsm_next_state == `States__get_first_data ? data_in : 8'b0) | 
+		(my_fsm_next_state == `States__get_data ? u30_output_port[7:0] : 8'b0) | 
+		(my_fsm_next_state == `States__get_wait ? my_sum : 8'b0) | 
+		(my_fsm_next_state == `States__send_data ? u35_output_port[7:0] : 8'b0) ;
 	always_ff @(posedge clk) my_sum <= rst ? 8'h0 : next_my_sum;
 	assign data_out_valid = my_fsm_state == `States__send_data;
 
@@ -155,13 +161,20 @@ module FSMLogic (
 	logic [2:0] state_send_data_selector;
 	logic [2:0] state_get_first_data_selector;
 
-	assign state_reset_selector = input_reset_to_idle ? `States__idle : 3'b0 | `States__reset;
-	assign state_idle_selector = input_idle_to_get_first_data ? `States__get_first_data : 3'b0 | input_idle_to_send_data ? `States__send_data : 3'b0 | `States__idle;
-	assign state_get_data_selector = input_get_data_to_get_wait ? `States__get_wait : 3'b0 | input_get_data_to_get_data ? `States__get_data : 3'b0 | input_get_data_to_send_data ? `States__send_data : 3'b0 | `States__get_data;
-	assign state_get_wait_selector = input_get_wait_to_get_wait ? `States__get_wait : 3'b0 | input_get_wait_to_get_data ? `States__get_data : 3'b0 | input_get_wait_to_send_data ? `States__send_data : 3'b0 | `States__get_wait;
-	assign state_send_data_selector = input_send_data_to_idle ? `States__idle : 3'b0 | input_send_data_to_get_first_data ? `States__get_first_data : 3'b0 | input_send_data_to_send_data ? `States__send_data : 3'b0 | `States__send_data;
-	assign state_get_first_data_selector = input_get_first_data_to_get_wait ? `States__get_wait : 3'b0 | input_get_first_data_to_get_data ? `States__get_data : 3'b0 | input_get_first_data_to_send_data ? `States__send_data : 3'b0 | `States__get_first_data;
-	assign next_state = state == `States__reset ? state_reset_selector : 3'b0 | state == `States__idle ? state_idle_selector : 3'b0 | state == `States__get_data ? state_get_data_selector : 3'b0 | state == `States__get_wait ? state_get_wait_selector : 3'b0 | state == `States__send_data ? state_send_data_selector : 3'b0 | state == `States__get_first_data ? state_get_first_data_selector : 3'b0 | default_state;
+	assign state_reset_selector = (input_reset_to_idle ? `States__idle : 3'b0) | `States__reset;
+	assign state_idle_selector = (input_idle_to_get_first_data ? `States__get_first_data : 3'b0) | (input_idle_to_send_data ? `States__send_data : 3'b0) | `States__idle;
+	assign state_get_data_selector = (input_get_data_to_get_wait ? `States__get_wait : 3'b0) | (input_get_data_to_get_data ? `States__get_data : 3'b0) | (input_get_data_to_send_data ? `States__send_data : 3'b0) | `States__get_data;
+	assign state_get_wait_selector = (input_get_wait_to_get_wait ? `States__get_wait : 3'b0) | (input_get_wait_to_get_data ? `States__get_data : 3'b0) | (input_get_wait_to_send_data ? `States__send_data : 3'b0) | `States__get_wait;
+	assign state_send_data_selector = (input_send_data_to_idle ? `States__idle : 3'b0) | (input_send_data_to_get_first_data ? `States__get_first_data : 3'b0) | (input_send_data_to_send_data ? `States__send_data : 3'b0) | `States__send_data;
+	assign state_get_first_data_selector = (input_get_first_data_to_get_wait ? `States__get_wait : 3'b0) | (input_get_first_data_to_get_data ? `States__get_data : 3'b0) | (input_get_first_data_to_send_data ? `States__send_data : 3'b0) | `States__get_first_data;
+	assign next_state = 
+		(state == `States__reset ? state_reset_selector : 3'b0) | 
+		(state == `States__idle ? state_idle_selector : 3'b0) | 
+		(state == `States__get_data ? state_get_data_selector : 3'b0) | 
+		(state == `States__get_wait ? state_get_wait_selector : 3'b0) | 
+		(state == `States__send_data ? state_send_data_selector : 3'b0) | 
+		(state == `States__get_first_data ? state_get_first_data_selector : 3'b0) | 
+		default_state;
 
 endmodule
 

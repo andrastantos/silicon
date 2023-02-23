@@ -66,8 +66,8 @@ module FSMLogic (
 
 	logic [3:0] state_11_selector;
 
-	assign state_11_selector = input_11_to_12 ? 4'hc : 4'b0 | 4'hb;
-	assign next_state = state == 4'hb ? state_11_selector : 4'b0 | default_state;
+	assign state_11_selector = (input_11_to_12 ? 4'hc : 4'b0) | 4'hb;
+	assign next_state = (state == 4'hb ? state_11_selector : 4'b0) | default_state;
 
 endmodule
 

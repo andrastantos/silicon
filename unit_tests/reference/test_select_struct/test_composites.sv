@@ -26,28 +26,28 @@ module top (
 );
 
 	always @(*) begin
-	    unique case (sel_in)
-	        2'd0: out_port_b = in1_b;
-	        2'd1: out_port_b = in2_b;
-	        2'd2: out_port_b = in3_b;
-	        2'd3: out_port_b = in4_b;
-	    endcase
+		unique case (sel_in)
+			2'd0: out_port_b = in1_b;
+			2'd1: out_port_b = in2_b;
+			2'd2: out_port_b = in3_b;
+			2'd3: out_port_b = in4_b;
+		endcase
 	end
 	always @(*) begin
-	    unique case (sel_in)
-	        2'd0: out_port_g = in1_g;
-	        2'd1: out_port_g = in2_g;
-	        2'd2: out_port_g = in3_g;
-	        2'd3: out_port_g = in4_g;
-	    endcase
+		unique case (sel_in)
+			2'd0: out_port_g = in1_g;
+			2'd1: out_port_g = in2_g;
+			2'd2: out_port_g = in3_g;
+			2'd3: out_port_g = in4_g;
+		endcase
 	end
 	always @(*) begin
-	    unique case (sel_in)
-	        2'd0: out_port_r = in1_r;
-	        2'd1: out_port_r = in2_r;
-	        2'd2: out_port_r = in3_r;
-	        2'd3: out_port_r = in4_r;
-	    endcase
+		unique case (sel_in)
+			2'd0: out_port_r = in1_r;
+			2'd1: out_port_r = in2_r;
+			2'd2: out_port_r = in3_r;
+			2'd3: out_port_r = in4_r;
+		endcase
 	end
 
 endmodule

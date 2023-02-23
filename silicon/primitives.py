@@ -116,18 +116,6 @@ class Select(Module):
         output_name = output_port.get_lhs_name(back_end, target_namespace)
         assert output_name is not None
 
-        # logic [3:0] select;
-        # logic output, input;
-        # always_comb begin
-        #  case (select[3:0]) begin
-        #    4'b0001 : output  = input_1;
-        #    4'b0010 : output  = input_2;
-        #    4'b0100 : output  = input_3;
-        #    4'b1000 : output  = input_4;
-        #    default : output  = 1'b0;
-        #  endcase
-        # end
-
         selector_type = self.selector_port.get_net_type()
 
         if back_end.support_always_comb:
@@ -136,19 +124,19 @@ class Select(Module):
             ret_val  = "always @(*) begin\n"
         selector_expression, _ = self.selector_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
         if back_end.support_unique_case:
-            ret_val += f"    unique case ({selector_expression})\n"
+            ret_val += f"\tunique case ({selector_expression})\n"
         else:
-            ret_val += f"    case ({selector_expression})\n"
+            ret_val += f"\tcase ({selector_expression})\n"
 
         for selector_idx in sorted(value_ports.keys()):
             value_port = value_ports[selector_idx]
             value_expression, _ = value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
-            ret_val += f"        {selector_type.length}'d{selector_idx}: {output_name} = {value_expression};\n"
+            ret_val += f"\t\t{selector_type.length}'d{selector_idx}: {output_name} = {value_expression};\n"
         if self.has_default():
             default_expression, _ = self.default_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
-            ret_val += f"        default: {output_name} = {default_expression};\n"
+            ret_val += f"\t\tdefault: {output_name} = {default_expression};\n"
 
-        ret_val += "    endcase\n"
+        ret_val += "\tendcase\n"
         ret_val += "end"
 
         return ret_val
@@ -177,7 +165,7 @@ class Select(Module):
                 first = False
                 value_port = value_ports[selector_idx]
                 value_expression, _ = value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
-                ret_val += f"{selector_expression} == {selector_idx} ? {value_expression} : {zero}"
+                ret_val += f"({selector_expression} == {selector_idx} ? {value_expression} : {zero})"
             # We don't add the default expression, because that's not the right thing to do: we would have to guard it with an 'else' clause, but that doesn't really exist in a series of and-or gates
             #default_expression, _ = self.default_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             #ret_val += default_expression
@@ -300,6 +288,8 @@ class SelectOne(_SelectOneHot):
     """
     One-hot encoded selector
     """
+    outline_limit = 4
+
     def simulate(self) -> TSimEvent:
         self.init_map()
         while True:
@@ -366,15 +356,17 @@ class SelectOne(_SelectOneHot):
         #       and only *in RTL*. In essence, we don't generate valid RTL for enums as they don't support or-s in SystemVerilog.
         op_precedence = back_end.get_operator_precedence("?:",None)
         final_precedence = back_end.get_operator_precedence("|",False)
+        prefix = "\n\t" if len(selector_to_value_map) >= self.outline_limit else ""
         for selector, value in selector_to_value_map.items():
             selector_expression, _ = selector.get_rhs_expression(back_end, target_namespace, None, op_precedence)
             value_expression, _ = value.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
-            ret_val += f"{selector_expression} ? {value_expression} : {zero} | "
+            ret_val += f"{prefix}({selector_expression} ? {value_expression} : {zero}) | "
         assert default_member is None or default_member.is_specialized()
         if default_member is not None:
             default_expression, _ = default_member.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
-            ret_val += default_expression
+            ret_val += f"{prefix}{default_expression}"
         else:
+            assert ret_val[-2:] == "| "
             ret_val = ret_val[:-2] # delete the last '|'
         if back_end.support_enum:
             if is_enum(output_port.get_net_type()):
