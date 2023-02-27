@@ -367,7 +367,7 @@ class Netlist(object):
                     if x_net.num_junctions(include_source=True) == 0:
                         # XNet contains only this single junction --> Determine if it's a source-only XNet or a source-less one
                         if is_wire(for_junction):
-                            x_net.add_aliase(for_junction)
+                            x_net.add_alias(for_junction)
                         elif is_input_port(for_junction):
                             # This is an XNet with a single input on it. That is: it's an unconnected input.
                             x_net.add_transition(for_junction)
