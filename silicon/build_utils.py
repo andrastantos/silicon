@@ -1,5 +1,5 @@
 from .exceptions import IVerilogException
-from .back_end import SystemVerilog, File
+from .back_end import SystemVerilog, File, BackEnd
 from .netlist import Netlist
 from .utils import ScopedAttr
 from typing import Callable, IO, Optional, Union, Dict
@@ -19,12 +19,17 @@ class Build:
             return super().__enter__()
 
     @staticmethod
-    def generate_rtl(top_class: Callable, file_names: Optional[Union[str, Dict[type, str]]] = None) -> Netlist:
+    def generate_rtl(top_class: Callable, file_names: Optional[Union[str, Dict[type, str]]] = None, back_end: Optional[BackEnd] = None) -> Netlist:
         Build.clear()
         with Netlist().elaborate() as netlist:
             top = top_class()
-        system_verilog = SystemVerilog(stream_class = Build.RegisteredFile)
-        netlist.generate(system_verilog, file_names)
+
+        if back_end is None:
+            back_end = SystemVerilog(stream_class = Build.RegisteredFile)
+        else:
+            back_end.stream_class = Build.RegisteredFile
+
+        netlist.generate(back_end, file_names)
         if not Build._skip_iverilog:
             from shutil import which
             iverilog_path = which("iverilog", mode=os.X_OK)

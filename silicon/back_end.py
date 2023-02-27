@@ -57,6 +57,7 @@ class SystemVerilog(BackEnd):
         self.support_always_comb = False
         self.support_always_ff = True
         self.support_unique_case = True
+        self.yosys_fix = False
 
     def _generate_file_name_for_module(self, module: 'Module', file_names: Optional[Union[str, Dict[type, str]]] = None) -> str:
         if file_names is not None:
@@ -123,17 +124,17 @@ class SystemVerilog(BackEnd):
             (("+", "-"),                                                              False,  5),
             (("<<", ">>", "<<<", ">>>"),                                              None,   6),
             (("<", "<=", ">", ">=", "inside", "dist"),                                None,   7),
-            (("==", "!=", "===", "!==", "==?", "!=?"),                                None,   8),
+            (("==", "!=", "===", "!==", "==?", "!=?"),                                None,   8 if not self.yosys_fix else 15),
             (("&",),                                                                  False,  9),
             (("^", "~^", "^~"),                                                       False, 10),
             (("|",),                                                                  False, 11),
             (("&&",),                                                                 None,  12),
             (("||",),                                                                 None,  13),
             (("?:",),                                                                 None,  14),
-            (("->", "<->"),                                                           None,  15),
+            (("->", "<->"),                                                           None,  16),
             (("=", "+=", "-=", "*=", "/=", "%=", "&=", "^=", "|=",
-              "<<=", ">>=", "<<<=", ">>>=", ":=", ":/", "<="),                        None,  16),
-            (("{}", "{{}}"),                                                          None,  17)
+              "<<=", ">>=", "<<<=", ">>>=", ":=", ":/", "<="),                        None,  17),
+            (("{}", "{{}}"),                                                          None,  18)
         )
         for ops, unary, precedence in operators:
             if operator in ops and (unary is None or unary == is_unary):
