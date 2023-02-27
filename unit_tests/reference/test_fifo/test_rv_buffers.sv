@@ -79,7 +79,15 @@ module Fifo (
 	assign pop_will_wrap = pop_addr == 4'h9;
 	assign pop =  ~ empty & output_port_ready;
 	assign next_pop_addr = pop ? pop_will_wrap ? 1'h0 : pop_addr + 1'h1 : pop_addr;
-	assign next_looped = push != 1'h1 & pop != 1'h1 ? looped : 1'b0 | push == 1'h1 & pop != 1'h1 ? push_will_wrap ? 1'h1 : looped : 1'b0 | push != 1'h1 & pop == 1'h1 ? pop_will_wrap ? 1'h0 : looped : 1'b0 | push == 1'h1 & pop == 1'h1 ? push_will_wrap != 1'h1 & pop_will_wrap != 1'h1 ? looped : 1'b0 | push_will_wrap == 1'h1 & pop_will_wrap != 1'h1 ? 1'h1 : 1'b0 | push_will_wrap != 1'h1 & pop_will_wrap == 1'h1 ? 1'h0 : 1'b0 | push_will_wrap == 1'h1 & pop_will_wrap == 1'h1 ? looped : 1'b0  : 1'b0 ;
+	assign next_looped = 
+		(push != 1'h1 & pop != 1'h1 ? looped : 1'b0) | 
+		(push == 1'h1 & pop != 1'h1 ? push_will_wrap ? 1'h1 : looped : 1'b0) | 
+		(push != 1'h1 & pop == 1'h1 ? pop_will_wrap ? 1'h0 : looped : 1'b0) | 
+		(push == 1'h1 & pop == 1'h1 ? 
+		(push_will_wrap != 1'h1 & pop_will_wrap != 1'h1 ? looped : 1'b0) | 
+		(push_will_wrap == 1'h1 & pop_will_wrap != 1'h1 ? 1'h1 : 1'b0) | 
+		(push_will_wrap != 1'h1 & pop_will_wrap == 1'h1 ? 1'h0 : 1'b0) | 
+		(push_will_wrap == 1'h1 & pop_will_wrap == 1'h1 ? looped : 1'b0)  : 1'b0) ;
 	assign next_empty_or_full = next_push_addr == next_pop_addr;
 	assign next_empty = next_empty_or_full ?  ~ next_looped : 1'h0;
 	assign next_full = next_empty_or_full ? next_looped : 1'h0;
@@ -137,6 +145,7 @@ module Memory (
 	assign real_mem_port2_data_out = mem[port2_addr_reg];
 
 	assign {port2_data_out_data} = real_mem_port2_data_out;
+
 endmodule
 
 
