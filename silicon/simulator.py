@@ -45,6 +45,7 @@ class SimXNetState(object):
         self.parent_xnet = parent_xnet
         self.vcd_vars = []
         self._last_changed = None
+        self._edge = False
         self._vcd_value_converter = None
         self.value_validator = net_type.validate_sim_value if net_type is not None else (lambda x, y: x)
 
@@ -55,7 +56,13 @@ class SimXNetState(object):
         """
         Returns True if there is a change on the port at the current moment in the simulation.
         """
-        return self._last_changed == self.sim_context.now
+        return self._edge
+
+    def reset_edge(self) -> None:
+        """
+        Resets the edge setting: we won't report any more edges until a new set_value call
+        """
+        self._edge = False
 
     def set_value(self, new_value: Any, now: int) -> None:
         #print(f"--- at {self.sim_context.now} {self.parent_xnet.get_diagnostic_name(self.sim_context.netlist)} setting value from {self.previous_value} to {new_value}, last changed at {self._last_changed}")
@@ -80,6 +87,7 @@ class SimXNetState(object):
             self.value = new_value
             self._last_changed = now
             self.record_change(now)
+            self._edge = True
 
             for listener in self.listeners:
                 # Inlining schedule_generator
@@ -171,10 +179,18 @@ class Simulator(object):
             # Exit the loop when no more combinational modules are pending generator-call
             # Now call all remaining generators in the normal way
 
+            value_change_nets = set()
             while True:
+                # At this point we have to reset all edges on all xnets that we didn't have a value change on:
+                # we would only consider them having an edge if they get further updates in the next loop
+                netlist: Netlist = sim_context.netlist
+                for xnet in netlist.xnets:
+                    if xnet not in value_change_nets:
+                        xnet.sim_state.reset_edge()
+                value_change_nets.clear()
                 for current_rank, generators_in_rank in enumerate(self.generators):
                     # When yielding to generators, it's possible that they re-schedule themselves at 0 time.
-                    # That would result in them being re-insterted into the same generators[current_rank] set.
+                    # That would result in them being re-inserted into the same generators[current_rank] set.
                     # As such, we can't clear the set after-the-fact. We have to replace it with an empty set
                     # before entering the for loop below
                     self.generators[current_rank] = set()
@@ -188,6 +204,7 @@ class Simulator(object):
                     # The previous loop re-populated value_changes with new things, so let's apply those changes (which will trigger a bunch of listeners, added to the generators)
                     for xnet, value in self.value_changes.items():
                         xnet.sim_state.set_value(value, now)
+                        value_change_nets.add(xnet)
                     self.value_changes = OrderedDict()
                 if len(self.generators[0]) == 0:
                     break
