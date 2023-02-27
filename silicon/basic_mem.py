@@ -100,11 +100,14 @@ class BasicMemory(GenericModule):
         while True:
             yield trigger_ports
 
-            now = simulator.now
-            print(f"{now:4d} Memory got triggered")
+            def log(*args, **kwargs):
+                print(f"{simulator.now:4d}:{simulator.delta:4d} ", end="")
+                print(*args, **kwargs)
+
+            log("Memory got triggered")
             # This is an asynchronous memory with 'read-old-value' behavior.
             # However, if any writes are performed, that will trigger a 'content_trigger' change
-            # So we will come back in the next epsilon step and do another read. This behavior
+            # So we will come back in the next delta step and do another read. This behavior
             # is good enough to capture the output in registers, if needed, but also properly
             # simulates the fact that this is an asynchronous array
             for port in self.mem_ports:
@@ -119,7 +122,7 @@ class BasicMemory(GenericModule):
                     port.data_out <<= None
                     continue
                 raw_value = read_mem(addr, port.width)
-                print(f"{now:4d} reading {addr} with value {raw_value}")
+                log(f"reading {addr} with value {raw_value}")
                 port.data_out <<= raw_value
 
             for port in self.mem_ports:
@@ -140,7 +143,7 @@ class BasicMemory(GenericModule):
                     except (TypeError, ValueError):
                         raw_value = None
 
-                    print(f"{now:4d} writing {addr} with value {raw_value}")
+                    log(f"writing {addr} with value {raw_value}")
                     write_mem(addr, raw_value, port.width)
 
                     self.content_trigger <<= 1 if self.content_trigger == 0 else 0
