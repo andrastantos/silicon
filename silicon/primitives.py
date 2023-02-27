@@ -307,7 +307,7 @@ class SelectOne(_SelectOneHot):
                     # synthesized logic will actually produce the expected value, so let's accept it.
                     if found:
                         if selected_value != self.selector_to_value_map[selector].sim_value:
-                            # Due to simultanious changes (that are delayed by epsilon) it's possible that we have multiple inputs set even if that should not occur in a no-delay simulation
+                            # Due to simultanious changes (that are delayed by delta) it's possible that we have multiple inputs set even if that should not occur in a no-delay simulation
                             self.output_port <<= None
                             break
                             #raise SimulationException(f"Multiple selectors set on one-hot encoded selector", self)

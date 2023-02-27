@@ -45,7 +45,7 @@ class SimXNetState(object):
         self.parent_xnet = parent_xnet
         self.vcd_vars = []
         self._last_changed = None
-        self._edge = False
+        self._last_changed_delta = None
         self._vcd_value_converter = None
         self.value_validator = net_type.validate_sim_value if net_type is not None else (lambda x, y: x)
 
@@ -56,15 +56,10 @@ class SimXNetState(object):
         """
         Returns True if there is a change on the port at the current moment in the simulation.
         """
-        return self._edge
+        ret_val = self._last_changed == self.sim_context.now and self._last_changed_delta == self.sim_context.delta
+        return ret_val
 
-    def reset_edge(self) -> None:
-        """
-        Resets the edge setting: we won't report any more edges until a new set_value call
-        """
-        self._edge = False
-
-    def set_value(self, new_value: Any, now: int) -> None:
+    def set_value(self, new_value: Any, now: int, delta: int) -> None:
         #print(f"--- at {self.sim_context.now} {self.parent_xnet.get_diagnostic_name(self.sim_context.netlist)} setting value from {self.previous_value} to {new_value}, last changed at {self._last_changed}")
         #assert self._last_changed != self.sim_context.now, "Combinational loop detected???"
 
@@ -86,8 +81,8 @@ class SimXNetState(object):
                 self.previous_value = self.value
             self.value = new_value
             self._last_changed = now
+            self._last_changed_delta = delta
             self.record_change(now)
-            self._edge = True
 
             for listener in self.listeners:
                 # Inlining schedule_generator
@@ -166,8 +161,10 @@ class Simulator(object):
             assert now is not None
             #debug_print(f"========= {now}")
 
+            sim_context.reset_delta()
+
             for xnet, value in self.value_changes.items():
-                xnet.sim_state.set_value(value, now)
+                xnet.sim_state.set_value(value, now, sim_context.delta)
             self.value_changes = OrderedDict()
 
             # Sort the generators into two groups: ones that belong to combinational modules and ones that are not.
@@ -179,15 +176,7 @@ class Simulator(object):
             # Exit the loop when no more combinational modules are pending generator-call
             # Now call all remaining generators in the normal way
 
-            value_change_nets = set()
             while True:
-                # At this point we have to reset all edges on all xnets that we didn't have a value change on:
-                # we would only consider them having an edge if they get further updates in the next loop
-                netlist: Netlist = sim_context.netlist
-                for xnet in netlist.xnets:
-                    if xnet not in value_change_nets:
-                        xnet.sim_state.reset_edge()
-                value_change_nets.clear()
                 for current_rank, generators_in_rank in enumerate(self.generators):
                     # When yielding to generators, it's possible that they re-schedule themselves at 0 time.
                     # That would result in them being re-inserted into the same generators[current_rank] set.
@@ -203,11 +192,11 @@ class Simulator(object):
                             pass # The generator decided not to yield again: simply don't schedule it
                     # The previous loop re-populated value_changes with new things, so let's apply those changes (which will trigger a bunch of listeners, added to the generators)
                     for xnet, value in self.value_changes.items():
-                        xnet.sim_state.set_value(value, now)
-                        value_change_nets.add(xnet)
+                        xnet.sim_state.set_value(value,now, sim_context.delta+1)
                     self.value_changes = OrderedDict()
                 if len(self.generators[0]) == 0:
                     break
+                sim_context.inc_delta()
             assert sum(len(p) for p in self.generators) == 0
 
     class SimulatorContext(object):
@@ -277,6 +266,16 @@ class Simulator(object):
         @property
         def now(self) -> int:
             return self.simulator.now
+
+        @property
+        def delta(self) -> int:
+            return self._delta
+
+        def inc_delta(self) -> None:
+            self._delta += 1
+
+        def reset_delta(self) -> None:
+            self._delta = 0
 
         def schedule_generator(self, generator: Generator, when: Optional[int] = None) -> None:
             """
@@ -374,6 +373,10 @@ class Simulator(object):
             return 0
         return self.current_event.when
 
+    @property
+    def delta(self) -> int:
+        return self.context.delta
+
     def _get_event(self, when: Optional[int] = None) -> 'Simulator.Event':
         if when is None:
             when = self.now
@@ -430,8 +433,8 @@ class Simulator(object):
         c. For 'ModuleActionEvents', this will cause the associated modules' 'simulate' method being called.
            This in turn will (potentially) result in a bunch of new 'PortValueChangeEvent's being pushed into the timeline.
     Step 3:
-        If there are any new actions (current_action_collector is not empty), schedule that event to the next epsilon. This is to say that
-        PortValueChange events cause a ModuleActionEvent in the next epsilon time-step.
+        If there are any new actions (current_action_collector is not empty), schedule that event to the next delta. This is to say that
+        PortValueChange events cause a ModuleActionEvent in the next delta time-step.
     PROBLEMS:
         point 2b and 2c nicely ping-pong between them, which is what you want to present a consistent view of the world. However point 2a can ruin that:
         generator events, if ever get mixed up with PortValueChangeEvents in the same time-step, they will generate off-beat port value changes and consequently
