@@ -851,6 +851,76 @@ def test_right_shift(mode="sim"):
         t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 
+def test_precedence(mode="sim"):
+    class Top(si.Module):
+        i1 = si.Input(si.Unsigned(8))
+        i2 = si.Input(si.logic)
+        o = si.Output(si.logic)
+
+        def body(self):
+            self.o <<= self.i2 & (self.i1 == 42)
+
+        def simulate(self) -> si.TSimEvent:
+            self.i1 <<= 41
+            self.i2 <<= 1
+            yield 10
+            assert self.o == 0
+            self.i1 <<= 42
+            self.i2 <<= 1
+            yield 10
+            assert self.o == 1
+            self.i1 <<= 41
+            self.i2 <<= 0
+            yield 10
+            assert self.o == 0
+            self.i1 <<= 42
+            self.i2 <<= 0
+            yield 10
+            assert self.o == 0
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+def test_mul_size(mode="sim"):
+    class Top(si.Module):
+        i1 = si.Input(si.Unsigned(8))
+        i2 = si.Input(si.Unsigned(8))
+        i3 = si.Input(si.Unsigned(2))
+        o = si.Output(si.Unsigned(14))
+
+        def body(self):
+            self.o <<= si.Unsigned(14)((self.i2 * self.i1) >> self.i3)
+
+        def simulate(self) -> si.TSimEvent:
+            self.i3 <<= 0
+            self.i1 <<= 41
+            self.i2 <<= 1
+            yield 10
+            assert self.o == 41
+            self.i1 <<= 42
+            self.i2 <<= 3
+            yield 10
+            assert self.o == 42*3
+            self.i1 <<= 200
+            self.i2 <<= 199
+            yield 10
+            assert self.o == (200*199) & 0x3fff
+            self.i1 <<= 42
+            self.i2 <<= 0
+            yield 10
+            assert self.o == 0
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
 
 if __name__ == "__main__":
     #test_module_decorator1()
@@ -886,5 +956,7 @@ if __name__ == "__main__":
     #test_multiple_outputs_if_rev_member2()
     #test_multiple_outputs_if_member()
     #test_incorrect_slice()
-    test_unsigned_cast()
+    #test_unsigned_cast()
     #test_right_shift()
+    #test_precedence("rtl")
+    test_mul_size("sim")

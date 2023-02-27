@@ -312,6 +312,42 @@ def test_multi_assign(mode: str = "rtl"):
     else:
         test.simulation(Top, "test_multi_assign")
 
+# This should fail, but it doesn't: we shouldn't allow multiple drivers, even if they are through reversed members of interfaces
+@pytest.mark.skip(reason="This test is failing at the moment: we shouldn't allow multiple drivers, even if they are through reversed members of interfaces")
+def test_illegal_branch(mode: str = "rtl"):
+    class If(Interface):
+        fwd = logic
+        rev = Reverse(logic)
+
+    class Producer(Module):
+        o = Output(If)
+
+        def body(self):
+            self.o.fwd <<= 1
+
+    class Consumer(Module):
+        i = Input(If)
+
+        def body(self):
+            self.i.rev <<= 0
+
+    class Top(Module):
+        def body(self):
+            p = Producer()
+            c1 = Consumer()
+            c2 = Consumer()
+
+            c1.i <<= p.o
+
+        def simulate(self):
+            yield 10
+            print("Done")
+
+    if mode == "rtl":
+        with ExpectError(SyntaxErrorException):
+            test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        test.simulation(Top, "test_illegal_branch")
 
 
 def test_struct_sub_module(mode: str = "rtl"):
@@ -397,17 +433,17 @@ class BiDir(Interface):
     bwd = Reverse(logic)
 
 def test_bidir_interface(mode: str = "rtl"):
-    
+
     class mod(Module):
         mod_out = Output(BiDir)
 
         def body(self):
             pass
             self.mod_out.fwd <<= 2
-    
+
     class top(Module):
         top_in = Input(BiDir)
-        
+
         def body(self):
             top_w = Wire(BiDir)
 
@@ -440,12 +476,13 @@ if __name__ == "__main__":
     #test_number_to_struct("sim")
     #test_interface_wire("rtl")
     #test_interface_wire2("rtl")
-    test_interface_wire3("rtl")
+    #test_interface_wire3("rtl")
     #test_number_to_struct_sim()
     #test_multi_assign("sim")
     #test_select_one_struct_default()
     #test_type_propagation()
     #test_bidir_interface()
+    test_illegal_branch()
 
 """
 Additional tests needed:

@@ -152,28 +152,28 @@ def test_sim_counter():
         def simulate(self) -> TSimEvent:
             print("Simulation started")
             now = yield 10
-            print(f"now: {now}")
+            print(f"now: {now} {self.count}")
             self.clock <<= 0
             self.reset <<= 1
             expected_count = 0
             for i in range(5):
                 self.clock <<= 0
                 now = yield 10
-                print(f"now: {now}")
+                print(f"now: {now} {self.count}")
                 self.clock <<= 1
                 now = yield 10
-                print(f"now: {now}")
+                print(f"now: {now} {self.count}")
             self.reset <<= 0
             print(f"now: {now} --------")
             for i in range(50):
                 self.clock <<= 0
                 now = yield 10
-                print(f"now: {now}")
+                print(f"now: {now} {self.count}")
                 assert self.count.sim_value == expected_count
                 expected_count = (expected_count + 1) & 15
                 self.clock <<= 1
                 now = yield 10
-                print(f"now: {now}")
+                print(f"now: {now} {self.count}")
             print(f"Done at {now}")
 
     test.simulation(top, "test_sim_counter")
@@ -213,9 +213,9 @@ def test_sim_concat():
 
 if __name__ == "__main__":
     #test_sim_gates()
-    #test_sim_counter()
+    test_sim_counter()
     #test_sim_select()
-    test_sim_select1()
+    #test_sim_select1()
     #test_sim_concat()
 
 """
