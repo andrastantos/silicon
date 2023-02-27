@@ -428,6 +428,16 @@ class Junction(JunctionBase):
         ret_val += f" = {self._xnet.sim_state.value}"
         return ret_val
 
+    def __repr__(self) -> str:
+        ret_val = self.get_diagnostic_name(add_location=False)
+        if not self.is_specialized():
+            return ret_val
+        ret_val += ": " + str(self.get_net_type())
+        if not hasattr(self, "_xnet") or self._xnet is None:
+            return ret_val
+        ret_val += f" = {self._xnet.sim_state.value}"
+        return ret_val
+
     def ilshift__elab(self, other: Any) -> 'Junction':
         if self.has_source():
             raise SyntaxErrorException(f"{self} is already bound to {', '.join((str(src.far_end) for _, src in self._partial_sources))}.")
@@ -892,7 +902,7 @@ class Junction(JunctionBase):
             return "<floating>"
         from .utils import FQN_DELIMITER
         parent_module = self.get_parent_module()
-        module_name = parent_module._impl.get_diagnostic_name(False)
+        module_name = parent_module._impl.get_diagnostic_name(add_location = False, add_type = False, add_hierarchy = True)
         scope_table = parent_module._impl.netlist.symbol_table[parent_module]
         names = scope_table.get_names(self)
         if len(names) == 0:

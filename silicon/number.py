@@ -528,6 +528,10 @@ class Number(NetTypeFactory):
             if self.precision == 0:
                 return str(self.value)
             return str(self.value / (1 << self.precision))
+
+        def __repr__(self) -> str:
+            return str(self)
+
         def __format__(self, format_spec) -> str:
             if self.precision == 0:
                 return format(self.value, format_spec)
