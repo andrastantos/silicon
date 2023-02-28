@@ -393,6 +393,11 @@ class Simulator(object):
         self.timeline.insert(insert_idx, ret_val)
         return ret_val
 
+    def log(self, *args, **kwargs):
+        prefix = f"{self.now}:{self.delta}"
+        print(f"{prefix:>7} ", end="")
+        print(*args, **kwargs)
+
 
 
 
