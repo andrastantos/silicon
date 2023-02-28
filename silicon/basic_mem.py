@@ -11,6 +11,7 @@ class BasicMemory(GenericModule):
 
     def construct(self, port_cnt: int):
         self.mem_ports: List[BasicMemory.MemoryPort] = []
+        self.do_log = False
         for idx in range(port_cnt):
             port = BasicMemory.MemoryPort()
             setattr(self, f"data_in_{idx}_port", port.data_in)
@@ -74,7 +75,7 @@ class BasicMemory(GenericModule):
             value = 0
             burst_size = data_width // content_width
             start_addr = addr * burst_size
-            data_mask = (1 << data_width) - 1
+            data_mask = (1 << content_width) - 1
             for burst_addr in range(start_addr + burst_size - 1, start_addr - 1, -1):
                 try:
                     data_section = content[burst_addr]
@@ -82,35 +83,31 @@ class BasicMemory(GenericModule):
                     return None
                 if data_section is None:
                     return None
-                value = (value >> data_width) | (data_section & data_mask)
+                value = (value << content_width) | (data_section & data_mask)
             return value
 
         def write_mem(addr:int, value: int, data_width: int):
             burst_size = data_width // content_width
             start_addr = addr * burst_size
-            data_mask = (1 << data_width) - 1
+            data_mask = (1 << content_width) - 1
             burst_value = value
             for burst_addr in range(start_addr, start_addr + burst_size):
                 if burst_value is not None:
                     content[burst_addr] = burst_value & data_mask
-                    burst_value >>= data_width
+                    burst_value >>= content_width
                 else:
                     content[burst_addr] = None
 
         while True:
             yield trigger_ports
 
-            def log(*args, **kwargs):
-                print(f"{simulator.now:4d}:{simulator.delta:4d} ", end="")
-                print(*args, **kwargs)
-
-            log("Memory got triggered")
+            if self.do_log: simulator.log("Memory got triggered")
             # This is an asynchronous memory with 'read-old-value' behavior.
             # However, if any writes are performed, that will trigger a 'content_trigger' change
             # So we will come back in the next delta step and do another read. This behavior
             # is good enough to capture the output in registers, if needed, but also properly
             # simulates the fact that this is an asynchronous array
-            for port in self.mem_ports:
+            for idx, port in enumerate(self.mem_ports):
                 # Read ports should only care about content and address changes
                 if port.addr.get_sim_edge() == EdgeType.NoEdge and self.content_trigger.get_sim_edge() == EdgeType.NoEdge:
                     continue
@@ -122,10 +119,12 @@ class BasicMemory(GenericModule):
                     port.data_out <<= None
                     continue
                 raw_value = read_mem(addr, port.width)
-                log(f"reading {addr} with value {raw_value}")
+                if self.do_log: simulator.log(f"reading port {idx} addr {addr} returning value {raw_value}")
+                #if idx == 1:
+                #    if self.do_log: simulator.log(f"     content: {content}")
                 port.data_out <<= raw_value
 
-            for port in self.mem_ports:
+            for idx, port in enumerate(self.mem_ports):
                 we_edge_type = port.write_en.get_sim_edge()
                 if we_edge_type == EdgeType.Undefined:
                     # We don't know if there was an edge: clear the whole memory
@@ -143,7 +142,7 @@ class BasicMemory(GenericModule):
                     except (TypeError, ValueError):
                         raw_value = None
 
-                    log(f"writing {addr} with value {raw_value}")
+                    if self.do_log: simulator.log(f"writing port {idx} addr {addr} with value {raw_value}")
                     write_mem(addr, raw_value, port.width)
 
                     self.content_trigger <<= 1 if self.content_trigger == 0 else 0
@@ -177,10 +176,17 @@ def test_simple():
                 self.write_en <<= 0
                 yield 5
                 assert self.data_out == i
+            if self.do_log: simulator.log("================================")
             for i in range(10):
                 self.data_in <<= i+100
                 self.addr <<= i
-                yield 1
+                # We need two ordering delays here.
+                # The first one lets the read happen, while the second one allows the input to Reg to settle before the clock-edge.
+                # With only one, the data and the clock would change at the same time and the Reg would (rightly so) set its output to None.
+                # NOTE: while read is asynchronous, it still takes time. The value update from the read happens, and *has to* happen
+                #       one delta after the address change.
+                yield 0
+                yield 0
                 self.write_en <<= 1
                 yield 5
                 self.write_en <<= 0
@@ -190,6 +196,142 @@ def test_simple():
 
     Build.simulation(Top, "test_simple.vcd", add_unnamed_scopes=True)
 
+
+def test_dual_port():
+    class Top(Module):
+        def body(self):
+            self.data_in_1 = Wire(Unsigned(8))
+            self.data_out_1 = Wire(Unsigned(8))
+            self.addr_1 = Wire(Unsigned(7))
+            self.write_en_1 = Wire(logic)
+
+            self.data_in_2 = Wire(Unsigned(8))
+            self.data_out_2 = Wire(Unsigned(8))
+            self.addr_2 = Wire(Unsigned(7))
+            self.write_en_2 = Wire(logic)
+
+            self.reg_data_1 = Reg(self.data_out_1, clock_port=self.write_en_2)
+            self.reg_data_2 = Reg(self.data_out_2, clock_port=self.write_en_2)
+
+            mem = BasicMemory(port_cnt=2)
+            mem.set_port_type(0, Unsigned(8))
+            mem.set_port_type(1, Unsigned(8))
+
+            mem.data_in_0_port <<= self.data_in_1
+            self.data_out_1 <<= mem.data_out_0_port
+            mem.addr_0_port <<= self.addr_1
+            mem.write_en_0_port <<= self.write_en_1
+
+            mem.data_in_1_port <<= self.data_in_2
+            self.data_out_2 <<= mem.data_out_1_port
+            mem.addr_1_port <<= self.addr_2
+            mem.write_en_1_port <<= self.write_en_2
+
+        def simulate(self, simulator):
+            self.write_en_1 <<= 0
+            self.write_en_2 <<= 0
+            yield 10
+            for i in range(10):
+                self.data_in_1 <<= i
+                self.addr_1 <<= i
+                self.addr_2 <<= i
+                self.write_en_1 <<= 1
+                yield 5
+                self.write_en_1 <<= 0
+                yield 5
+                assert self.data_out_1 == i
+                assert self.data_out_2 == i
+            simulator.log("================================")
+            for i in range(10):
+                self.data_in_2 <<= i+100
+                self.addr_1 <<= i
+                self.addr_2 <<= i
+                # We need two ordering delays here.
+                # The first one lets the read happen, while the second one allows the input to Reg to settle before the clock-edge.
+                # With only one, the data and the clock would change at the same time and the Reg would (rightly so) set its output to None.
+                # NOTE: while read is asynchronous, it still takes time. The value update from the read happens, and *has to* happen
+                #       one delta after the address change.
+                yield 0
+                yield 0
+                self.write_en_2 <<= 1
+                yield 5
+                self.write_en_2 <<= 0
+                yield 5
+                assert self.data_out_1 == i+100
+                assert self.reg_data_1 == i
+                assert self.data_out_2 == i+100
+                assert self.reg_data_2 == i
+
+    Build.simulation(Top, "test_dual_port.vcd", add_unnamed_scopes=True)
+
+
+def test_dual_size():
+    class Top(Module):
+        def body(self):
+            self.data_in_1 = Wire(Unsigned(8))
+            self.data_out_1 = Wire(Unsigned(8))
+            self.addr_1 = Wire(Unsigned(7))
+            self.write_en_1 = Wire(logic)
+
+            self.data_in_2 = Wire(Unsigned(16))
+            self.data_out_2 = Wire(Unsigned(16))
+            self.addr_2 = Wire(Unsigned(6))
+            self.write_en_2 = Wire(logic)
+
+            mem = BasicMemory(port_cnt=2)
+            mem.set_port_type(0, Unsigned(8))
+            mem.set_port_type(1, Unsigned(16))
+            mem.do_log = True
+
+            mem.data_in_0_port <<= self.data_in_1
+            self.data_out_1 <<= mem.data_out_0_port
+            mem.addr_0_port <<= self.addr_1
+            mem.write_en_0_port <<= self.write_en_1
+
+            mem.data_in_1_port <<= self.data_in_2
+            self.data_out_2 <<= mem.data_out_1_port
+            mem.addr_1_port <<= self.addr_2
+            mem.write_en_1_port <<= self.write_en_2
+
+        def simulate(self, simulator):
+            self.write_en_1 <<= 0
+            self.write_en_2 <<= 0
+            yield 10
+            # Write on narrow port
+            for i in range(10):
+                self.data_in_1 <<= i
+                self.addr_1 <<= i
+                self.addr_2 <<= i // 2
+                self.write_en_1 <<= 1
+                yield 5
+                self.write_en_1 <<= 0
+                yield 5
+                assert self.data_out_1 == i
+                if i % 2 == 1:
+                    assert self.data_out_2 == i << 8 | (i - 1)
+
+            simulator.log("==========================")
+            # Write on wide port
+            for i in range(10):
+                self.addr_1 <<= i
+                if i % 2 == 0:
+                    self.data_in_2 <<= (i + 100) | ((i + 101) << 8)
+                    self.addr_2 <<= i // 2
+                    self.write_en_2 <<= 1
+                    yield 5
+                    self.write_en_2 <<= 0
+                    yield 5
+                else:
+                    yield 10
+                assert self.data_out_1 == i + 100
+                if i % 2 == 1:
+                    assert self.data_out_2 == (i + 100) << 8 | (i + 99)
+
+    Build.simulation(Top, "test_dual_size.vcd", add_unnamed_scopes=True)
+
+
 if __name__ == "__main__":
-    test_simple()
+    #test_simple()
+    #test_dual_port()
+    test_dual_size()
 
