@@ -487,7 +487,7 @@ class _Memory(GenericModule):
         self._setup()
 
         inner_mem = _BasicMemory(len(self.config.port_configs), self.config.reset_content)
-        inner_mem.do_log = True
+        #inner_mem.do_log = True
         for idx, port_config in enumerate(self.config.port_configs):
             inner_mem.set_port_type(idx, Unsigned(port_config.data_type.get_num_bits()))
             data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
@@ -944,5 +944,63 @@ always@(posedge clk)
 
 always @(posedge clk)
     if (en & we) mem[addr] <= data_in;
+
+================================================
+Microchip (Lattice) has a relatively decent in-depth paper on memory timings:
+
+https://ww1.microchip.com/downloads/aemDocuments/documents/FPGA/ProductDocuments/ProductBrief/AC374_Read-Write+Operations+in+Dual-Port+SRAM+for+Flash-Based+cSoCs+and+FPGAs.pdf
+
+Here they say that reads happen on the rising edge of the clock and writes on the falling edge.
+They also say though that the write-enable signals are asserted while clock is high, so it's possible that they refer to the latching
+edge as opposed to the capture edge. This is in contrast though with their claim that the flow-through data doesn't change when the other
+port writes. They are very clear though: even flow-through data is edge-captured.
+
+So, what they seem to be saying is:
+- If a port writes, the data on its read port will be the data written.
+
+
+
+Xilinx has another decent description: https://docs.xilinx.com/r/en-US/am007-versal-memory/Read-Operation?tocId=E7AyV9qShOdfqivIFnq8hQ
+
+Here they say that without pipeline registers:
+- Read address is registered on the read port and data is loaded into the output latch
+- Write address is registered and data is written to memory. Read data is 'holding' the previous value???
+
+There's also a diagram about the pipeline registers a little further down. They claim, they can selectively register:
+- ADDR, EN, BWE, RDb_WR on the input
+- DIN on the input
+- DOUT *twice* potentially on the output
+
+There's a diagram showing that even with all pipeline registers off, the output is still one cycle delayed (that is, registered) inside
+the array. This is for UltraRAMs BTW...
+
+It also shows that cell content changes on the rising edge of clock (same with DOUT).
+
+For BRAMs, they have some waveforms here: https://docs.xilinx.com/r/en-US/am007-versal-memory/WRITE_FIRST-or-Transparent-Mode
+
+This shows the output *NOT* registered.
+
+This link shows: https://docs.xilinx.com/r/en-US/am007-versal-memory/Address-Collision something interesting:
+In case of a write-first write on port A, a simultaneous read on port B results in X-es. In other words the only way to guarantee
+ordering between ports is if:
+- Write port is read-first mode.
+- Read port is in whatever mode.
+
+They show the following block-diagram:
+https://docs.xilinx.com/r/en-US/am007-versal-memory/Optional-Output-Registers?tocId=2emHhSSsphiR8E~JhZJhcg
+
+According to that, they truly can generate either sequence of read-after-write or write-after-read strobes.
+They always have input registers and have an optional output register.
+
+For Altera, apparently memories differ. The underlying block sometimes uses different edges for reads and writes (MLAB, M512, M4k),
+some sometimes the same edge (M9k and above, also MLABs for V-series). Even when different edges are used, write data is latched
+on the rising edge, but written on the falling one. In their table, they also claim that the only way cross-port read-write collisions
+result in reliable output is if old data output is requested.
+
+For me, old data output means registered input...
+In those cases, cross input reads indeed give old data back, so that's good.
+In fact, the only case when I violate expectations is when both ports are in new data mode.
+
+So, my model actually matches at least Xilinx and Altera expectations. It's unclear what Microchip is doing...
 
 """

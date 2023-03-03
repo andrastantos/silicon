@@ -437,17 +437,17 @@ def test_simple_dual_port_ram_sim(mode = "sim", read_new_data_a = True, read_new
                 # There's a one-cycle latency in getting the data back, so can't test the first loop in this simple manner
                 if i > 0:
                     if read_new_data_a and read_new_data_b:
-                        assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
                         assert self.data_out_a == new_data, f"{self.data_out_a} == {new_data} failed"
+                        assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
                     elif not read_new_data_a and read_new_data_b:
+                        assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
                         assert self.data_out_b == new_data, f"{self.data_out_b} == {new_old_data} failed"
-                        assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
                     elif read_new_data_a and not read_new_data_b:
-                        assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
                         assert self.data_out_a == new_data, f"{self.data_out_a} == {new_data} failed"
-                    else:
                         assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
+                    else:
                         assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
+                        assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
                 new_data = data
                 new_old_data = old_data
 
@@ -465,17 +465,17 @@ def test_simple_dual_port_ram_sim(mode = "sim", read_new_data_a = True, read_new
                 simulator.log(f"testing")
                 if i > 0:
                     if read_new_data_a and read_new_data_b:
-                        assert self.data_out_b == new_data, f"{self.data_out_b} == {new_data} failed"
                         assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
+                        assert self.data_out_b == new_data, f"{self.data_out_b} == {new_data} failed"
                     elif not read_new_data_a and read_new_data_b:
+                        assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
                         assert self.data_out_b == new_data, f"{self.data_out_b} == {new_data} failed"
-                        assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
                     elif read_new_data_a and not read_new_data_b:
-                        assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
                         assert self.data_out_a == new_data, f"{self.data_out_a} == {new_data} failed"
-                    else:
                         assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
+                    else:
                         assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
+                        assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
                 new_data = data
                 new_old_data = old_data
 
