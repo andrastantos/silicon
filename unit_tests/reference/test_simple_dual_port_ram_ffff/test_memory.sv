@@ -29,3 +29,43 @@ module Top (
 endmodule
 
 
+////////////////////////////////////////////////////////////////////////////////
+// Memory
+////////////////////////////////////////////////////////////////////////////////
+module Memory (
+	input logic [5:0] port1_addr,
+	input logic port1_clk,
+	input logic [5:0] port2_addr,
+	input logic port2_clk,
+	output logic [13:0] port1_data_out,
+	input logic [13:0] port1_data_in,
+	input logic port1_write_en,
+	output logic [13:0] port2_data_out,
+	input logic [13:0] port2_data_in,
+	input logic port2_write_en
+);
+
+	reg [13:0] mem[0:63];
+
+	initial begin
+		$readmemb("config.bin", mem);
+	end
+
+	always @(posedge port1_clk) begin
+		if (port1_write_en) begin
+			mem[port1_addr] <= port1_data_in;
+		end
+	end
+	assign port1_data_out = mem[port1_addr];
+
+	always @(posedge port1_clk) begin
+		if (port2_write_en) begin
+			mem[port2_addr] <= port2_data_in;
+		end
+	end
+	assign port2_data_out = mem[port2_addr];
+
+
+endmodule
+
+
