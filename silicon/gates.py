@@ -98,7 +98,8 @@ class NInputGate(Gate):
 
     def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
         assert len(self.get_outputs()) == 1
-        yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+        verilog_bit_width = max(port.get_net_type().get_num_bits() for port in self.get_inputs().values())
+        yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace), verilog_bit_width)
 
     def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
@@ -327,7 +328,7 @@ class BinaryGate(Gate):
 
     def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
         assert len(self.get_outputs()) == 1
-        yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+        yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace), self.get_verilog_bit_width())
 
     def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
         assert back_end.language == "SystemVerilog"
@@ -348,6 +349,8 @@ class BinaryGate(Gate):
         while True:
             yield self.get_inputs().values()
             self.output_port <<= self.sim_op(self.input_port_0, self.input_port_1)
+    def get_verilog_bit_width(self) -> int:
+        raise NotImplementedError()
 
 class sub_gate(BinaryGate):
     def sim_op(cls, input_0: Port, input_1: Any) -> Any:
@@ -363,6 +366,8 @@ class sub_gate(BinaryGate):
         return "SUB"
     def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
         return adjust_precision(input, input_expression, input_precedence, self.output_port.precision, back_end)
+    def get_verilog_bit_width(self) -> int:
+        return max(port.get_net_type().get_num_bits() for port in self.get_inputs().values())
 
 class lshift_gate(BinaryGate):
     def sim_op(cls, input_0: Port, input_1: Any) -> Any:
@@ -381,6 +386,8 @@ class lshift_gate(BinaryGate):
         return "SHL"
     def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
         return input_expression, input_precedence
+    def get_verilog_bit_width(self) -> int:
+        return self.input_port_0.get_num_bits()
 
 class rshift_gate(BinaryGate):
     def sim_op(cls, input_0: Port, input_1: Any) -> Any:
@@ -405,6 +412,8 @@ class rshift_gate(BinaryGate):
         return "SHR"
     def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
         return input_expression, input_precedence
+    def get_verilog_bit_width(self) -> int:
+        return self.input_port_0.get_num_bits()
 
 
 class ComparisonGate(BinaryGate):
@@ -414,6 +423,8 @@ class ComparisonGate(BinaryGate):
         self.output_port.set_net_type(logic)
     def generate_output_type(self) -> Optional['NumberMeta']:
         return None
+    def get_verilog_bit_width(self) -> int:
+        return 1
 
 class lt_gate(ComparisonGate):
     def sim_op(cls, input_0: Port, input_1: Any) -> Any:

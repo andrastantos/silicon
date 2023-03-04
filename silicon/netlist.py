@@ -77,13 +77,15 @@ class XNet(object):
     def num_junctions(self, *, include_source: bool) -> int:
         return len(self._sinks) + len(self._aliases) + len(self._transitions) + int(self._source is not None and include_source)
 
-    def add_rhs_expression(self, scope: 'Module', expr: str, precedence: int) -> None:
+    def add_rhs_expression(self, scope: 'Module', expr: str, precedence: int, verilog_bit_width: Optional[int]) -> None:
+        if verilog_bit_width is None:
+            verilog_bit_width = self.get_num_bits()
         assert scope is None or is_module(scope)
         if scope not in self.rhs_expressions:
-            self.rhs_expressions[scope] = (expr, precedence)
+            self.rhs_expressions[scope] = (expr, precedence, verilog_bit_width)
         else:
             current = self.rhs_expressions[scope]
-            assert current[0] == expr and current[1] == precedence
+            assert current[0] == expr and current[1] == precedence and current[2] == verilog_bit_width
 
     def get_rhs_expression(self, scope: 'Module', back_end: 'BackEnd', allow_expression: bool = True) -> Tuple[str, int]:
         assert scope is None or is_module(scope)
@@ -97,7 +99,21 @@ class XNet(object):
             return self.assigned_names[scope], 0
         make_name_used = False
         if scope in self.rhs_expressions and allow_expression:
-            return self.rhs_expressions[scope]
+            # If the Verilog width is not the same as our width, that means that (depending on the context)
+            # Verilog might not evaluate the expression at the right width. There are two ways to fix that.
+            # 1. Add the right-sized 0 to the expression (i.e. a*b + 16'b0)
+            # 2. Break the sub-expression out into it's own (i.e. logic [15:0] something; something = a*b;)
+            # We will do #2 if a name exists, and #1 otherwise
+            expr, precedence, verilog_bit_count = self.rhs_expressions[scope]
+            if verilog_bit_count >= self.get_num_bits():
+                return expr, precedence
+            name = self.get_lhs_name(scope, allow_implicit=False, mark_assigned=True)
+            if name is not None:
+                return name, 0
+            op_prec = back_end.get_operator_precedence("+", False)
+            expr, _ = back_end.wrap_expression(expr, precedence, op_prec)
+            expr = f"{expr} + {self.get_num_bits()}'b0"
+            return expr, op_prec
         else:
             # We are going to return a name. We have to make sure that an eventual assignment to that name is made
             make_name_used = True

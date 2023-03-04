@@ -891,9 +891,14 @@ def test_mul_size(mode="sim"):
         i2 = si.Input(si.Unsigned(8))
         i3 = si.Input(si.Unsigned(2))
         o = si.Output(si.Unsigned(14))
+        o2 = si.Output(si.Unsigned(14))
+        o3 = si.Output(si.Unsigned(14))
 
         def body(self):
+            prod = self.i2 * self.i3
             self.o <<= si.Unsigned(14)((self.i2 * self.i1) >> self.i3)
+            self.o2 <<= si.Unsigned(14)((self.i2 * self.i1 * self.i3) >> self.i3)
+            self.o3 <<= si.Unsigned(14)((prod * self.i1) >> self.i3)
 
         def simulate(self) -> si.TSimEvent:
             self.i3 <<= 0
@@ -959,4 +964,4 @@ if __name__ == "__main__":
     #test_unsigned_cast()
     #test_right_shift()
     #test_precedence("rtl")
-    test_mul_size("sim")
+    test_mul_size("rtl")

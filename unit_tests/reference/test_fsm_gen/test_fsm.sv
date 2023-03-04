@@ -66,8 +66,8 @@ module UseFSM (
 		.input_get_first_data_to_send_data(data_in_valid & data_last)
 	);
 
-	assign u30_output_port = my_sum + data_in;
-	assign u35_output_port = my_sum + data_in;
+	assign u30_output_port = my_sum + data_in + 9'b0;
+	assign u35_output_port = my_sum + data_in + 9'b0;
 	assign data_out = my_sum;
 endmodule
 

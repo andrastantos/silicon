@@ -28,10 +28,11 @@ class InlineBlock(object):
         self.target_ports = target_ports
 
 class InlineExpression(InlineBlock):
-    def __init__(self, target_port: Port, expression: str, precedence: int):
+    def __init__(self, target_port: Port, expression: str, precedence: int, verilog_bit_width: Optional[int] = None):
         super().__init__((target_port, ))
         self.expression = expression
         self.precedence = precedence
+        self.verilog_bit_width = verilog_bit_width
     def get_inline_assignments(self, back_end: 'BackEnd') -> str:
         assert len(self.target_ports) == 1
         return f"assign {first(first(self.target_ports).get_interface_names())} = {self.expression};\n"
@@ -40,13 +41,20 @@ class InlineExpression(InlineBlock):
         inline_port = first(self.target_ports)
         assert not inline_port.is_composite()
         xnet = netlist.get_xnet_for_junction(inline_port)
-        xnet.add_rhs_expression(scope, self.expression, self.precedence)
+        xnet.add_rhs_expression(scope, self.expression, self.precedence, self.verilog_bit_width)
         inline_port_name = xnet.get_lhs_name(scope, allow_implicit=False)
         if inline_port_name is not None:
             return f"{xnet.generate_assign(inline_port_name, self.expression, back_end)}\n"
         else:
             return None
 
+
+def inline_statement_from_expression(back_end: 'BackEnd', target_namespace: 'Module', expr: InlineExpression, output_port: Port):
+    assert back_end.language == "SystemVerilog"
+
+    output_name = output_port.get_lhs_name(back_end, target_namespace)
+    assert output_name is not None
+    return InlineStatement((output_port, ), f"{output_name} = {expr.expression}\n")
 
 class InlineStatement(InlineBlock):
     def __init__(self, target_ports: Sequence[Port], statement = str):

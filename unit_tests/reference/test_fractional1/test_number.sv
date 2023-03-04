@@ -7,7 +7,7 @@ module Top (
 	output logic [9:0] outp
 );
 
-	assign outp = { in1, 1'b0 } + in2;
+	assign outp = { in1, 1'b0 } + in2 + 10'b0;
 
 endmodule
 

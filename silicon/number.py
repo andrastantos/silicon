@@ -1,7 +1,7 @@
 from typing import Optional, Any, Tuple, Generator, Union, Dict, Set, Sequence, Union
 from .exceptions import FixmeException, SyntaxErrorException, SimulationException, AdaptTypeError, InvalidPortError
 from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta
-from .module import GenericModule, Module, InlineBlock, InlineExpression
+from .module import GenericModule, Module, InlineBlock, InlineExpression, inline_statement_from_expression
 from .port import Input, Output, Junction, Port
 from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, NetValue, is_junction_base
 from collections import OrderedDict
@@ -670,7 +670,11 @@ class Number(NetTypeFactory):
             self.input_port = Input(input_type)
             self.output_port = Output(output_type)
         def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
-            yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+            expr = InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
+            if back_end.support_cast:
+                yield expr
+            else:
+                yield inline_statement_from_expression(back_end, target_namespace, expr, self.output_port)
         def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
             assert back_end.language == "SystemVerilog"
 
@@ -678,15 +682,15 @@ class Number(NetTypeFactory):
             need_sign_cast = self.input_port.signed and not self.output_port.signed
             need_int_size_cast = self.input_port.get_net_type().int_length > self.output_port.get_net_type().int_length
             need_fract_size_cast = self.input_port.precision != self.output_port.precision
-            if need_int_size_cast:
+            if need_int_size_cast and back_end.support_cast:
                 ret_val += f"{self.output_port.length}'("
             rhs_name, precedence = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
             rhs_name, precedence = adjust_precision(self.input_port, rhs_name, precedence, self.output_port.precision, back_end)
             ret_val += rhs_name
-            if need_int_size_cast:
+            if need_int_size_cast and back_end.support_cast:
                 precedence = 0
                 ret_val += ")"
-            if need_sign_cast:
+            if need_sign_cast and back_end.support_cast:
                 precedence = 0
                 if self.output_port.signed:
                     ret_val = back_end.signed_cast(ret_val)

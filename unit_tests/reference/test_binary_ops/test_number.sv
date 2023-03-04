@@ -66,10 +66,10 @@ module top (
 	assign uout9 = {uin1[3] & (uin2[0] | uin5[3]), uin1[2] & (uin2[1] | uin5[2]), uin1[1] & (uin2[2] | uin5[1]), uin1[0] & (uin2[3] | uin5[0])};
 	assign uout10 = {u57_output_port[3], u46_output_port[2], u35_output_port[1], u24_output_port[0]};
 	assign uout11 = {u27_output_port[0], u38_output_port[1], u49_output_port[2], u60_output_port[3]};
-	assign sout2 = sin1 + sin2;
-	assign sout3 = sin1 - sin2;
-	assign slsh_out = sin1 <<< uin1;
-	assign ulsh_out = uin1 << uin1;
+	assign sout2 = sin1 + sin2 + 5'b0;
+	assign sout3 = sin1 - sin2 + 5'b0;
+	assign slsh_out = (sin1 <<< uin1) + 19'b0;
+	assign ulsh_out = (uin1 << uin1) + 19'b0;
 	assign srsh_out = $signed(sin1 >>> uin1);
 	assign ursh_out = uin1 >> uin1;
 

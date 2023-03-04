@@ -100,6 +100,7 @@ class EnumNet(Number):
                 yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
             def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
                 assert back_end.language == "SystemVerilog"
+                assert back_end.support_cast;
 
                 rhs_name, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), allow_expression = True)
                 if back_end.support_enum:

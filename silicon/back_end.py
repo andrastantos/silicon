@@ -57,6 +57,7 @@ class SystemVerilog(BackEnd):
         self.support_always_comb = False
         self.support_always_ff = True
         self.support_unique_case = True
+        self.support_cast = True
         self.yosys_fix = False
 
     def _generate_file_name_for_module(self, module: 'Module', file_names: Optional[Union[str, Dict[type, str]]] = None) -> str:

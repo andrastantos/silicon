@@ -91,7 +91,7 @@ It can be supported, but maybe we should start by asserting in those...
 ## Combining the two.
 
 Notice how both LHS and RHS contexts involve `__getitem__`. So, whatever that returns, it has to be a two-face entity.
-It should work as a `JunctionBase` object in the sense that it should have `__getitem__` (and `__getattr__`) 
+It should work as a `JunctionBase` object in the sense that it should have `__getitem__` (and `__getattr__`)
 on it to support further sub-slicing as well as `__ilshift__` to support assignment.
 
 It is not a `JunctionBase` however in the sense that *its* `__ilshift__` should start collecting the info for the
@@ -115,7 +115,7 @@ class UniSlicer(JunctionBase):
         self.key = key
         self.key_kind = key_kind
         self._slice = None
-    
+
     def convert_to_junction(self, type_hint: Optional['NetType']=None) -> Optional[Junction]:
         # If this is called, we're in a RHS context, that is, we're binding to another port as its source.
         # We can create a Slice object with the proper key even without knowing the net-types of anything.
@@ -152,7 +152,7 @@ class Slice(GenericModule):
         self.key_kind = key_kind
 
     def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
-        return self.implementation.get_inline_block(back_end, target_namespace)
+        yield from self.implementation.get_inline_block(back_end, target_namespace)
 
     def body(self) -> None:
         self.implementation = self.input_port.get_rhs_slicer(self.key, self.key_kind)
@@ -194,5 +194,5 @@ class PhiSlice(GenericModule):
         self.output_port <<= self.implementation(*self.get_inputs().values())
 
     def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
-        return self.implementation.get_inline_block(back_end, target_namespace)
+        yield from self.implementation.get_inline_block(back_end, target_namespace)
 

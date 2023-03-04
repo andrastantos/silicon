@@ -24,9 +24,9 @@ module AlphaBender (
 	assign outp_g = u13_output_port[19:8];
 	assign outp_b = u21_output_port[19:8];
 
-	assign u5_output_port = in1_r * alpha + in2_r * (8'hff - alpha) + 7'h7f;
-	assign u13_output_port = in1_g * alpha + in2_g * (8'hff - alpha) + 7'h7f;
-	assign u21_output_port = in1_b * alpha + in2_b * (8'hff - alpha) + 7'h7f;
+	assign u5_output_port = in1_r * alpha + 20'b0 + in2_r * (8'hff - alpha) + 20'b0 + 21'b0 + 7'h7f;
+	assign u13_output_port = in1_g * alpha + 20'b0 + in2_g * (8'hff - alpha) + 20'b0 + 21'b0 + 7'h7f;
+	assign u21_output_port = in1_b * alpha + 20'b0 + in2_b * (8'hff - alpha) + 20'b0 + 21'b0 + 7'h7f;
 endmodule
 
 

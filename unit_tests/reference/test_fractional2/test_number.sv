@@ -7,7 +7,7 @@ module Top (
 	output logic signed [9:0] outp
 );
 
-	assign outp = { in1, 1'b0 } + in2 >>> 1;
+	assign outp = { in1, 1'b0 } + in2 + 10'b0 >>> 1;
 
 endmodule
 
