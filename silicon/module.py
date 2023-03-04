@@ -49,12 +49,15 @@ class InlineExpression(InlineBlock):
             return None
 
 
-def inline_statement_from_expression(back_end: 'BackEnd', target_namespace: 'Module', expr: InlineExpression, output_port: Port):
+def inline_statement_from_expression(back_end: 'BackEnd', target_namespace: 'Module', expr: Union[InlineExpression, str], output_port: Port):
     assert back_end.language == "SystemVerilog"
 
     output_name = output_port.get_lhs_name(back_end, target_namespace)
     assert output_name is not None
-    return InlineStatement((output_port, ), f"{output_name} = {expr.expression}\n")
+    if isinstance(expr, str):
+        return InlineStatement((output_port, ), f"assign {output_name} = {expr};\n")
+    else:
+        return InlineStatement((output_port, ), f"assign {output_name} = {expr.expression};\n")
 
 class InlineStatement(InlineBlock):
     def __init__(self, target_ports: Sequence[Port], statement = str):

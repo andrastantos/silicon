@@ -130,6 +130,28 @@ def test_enum_adapt():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_enum_adapt_95():
+    class E1(Enum):
+        zero=0
+        first=1
+        second=2
+        third=3
+
+    class top(Module):
+        in_a = Input(Unsigned(15))
+        out_a = Output(EnumNet(E1))
+        out_b = Output(Unsigned(15))
+
+        def body(self):
+            self.out_a <<= explicit_adapt(self.in_a, EnumNet(E1))
+            self.out_b <<= explicit_adapt(self.out_a, Unsigned(15))
+
+    def customizer(back_end):
+        back_end.support_cast = False
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name, back_en_customizer=customizer)
+
+
 
 @skip_iverilog
 def test_enum_adapt2(mode = "rtl"):
@@ -173,4 +195,5 @@ if __name__ == "__main__":
     #test_enum_and1()
     #test_enum_and2()
     #test_enum_adapt()
-    test_enum_adapt2("sim")
+    test_enum_adapt_95()
+    #test_enum_adapt2("sim")

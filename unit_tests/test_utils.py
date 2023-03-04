@@ -62,7 +62,7 @@ class test(Build):
             return ret_val
 
     @staticmethod
-    def rtl_generation(top_class: Callable, test_name: str = None, allow_new_attributes: bool = False):
+    def rtl_generation(top_class: Callable, test_name: str = None, allow_new_attributes: bool = False, back_en_customizer: Callable = None):
         if test_name is None:
             test_name = top_class.__name__.lower()
         import os
@@ -72,6 +72,8 @@ class test(Build):
         with Netlist().elaborate() as netlist:
             top_class()
         logged_system_verilog = SystemVerilog(stream_class = test.DiffedFile)
+        if back_en_customizer is not None:
+            back_en_customizer(logged_system_verilog)
         netlist.generate(logged_system_verilog)
         test_diff = ""
         success = True
@@ -98,7 +100,7 @@ class test(Build):
 
     @staticmethod
     def simulation(
-        top_class: Callable, 
+        top_class: Callable,
         test_name: str = None,
         *,
         end_time: Optional[int] = None,
@@ -116,7 +118,7 @@ class test(Build):
         test.output_dir.mkdir(parents=True, exist_ok=True)
         vcd_filename = test.output_dir / Path(f"{test_name}.vcd")
         netlist.simulate(
-            vcd_filename, 
+            vcd_filename,
             end_time = end_time,
             timescale = timescale,
             signal_pattern = signal_pattern,

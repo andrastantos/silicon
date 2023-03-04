@@ -885,7 +885,7 @@ def test_precedence(mode="sim"):
         t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 
-def test_mul_size(mode="sim"):
+def test_mul_size(mode="rtl"):
     class Top(si.Module):
         i1 = si.Input(si.Unsigned(8))
         i2 = si.Input(si.Unsigned(8))
@@ -927,6 +927,31 @@ def test_mul_size(mode="sim"):
 
 
 
+def test_size_cast_95_size(mode="rtl"):
+    class Top(si.Module):
+        i1 = si.Input(si.Unsigned(8))
+        i2 = si.Input(si.Unsigned(8))
+        i3 = si.Input(si.Unsigned(2))
+        o = si.Output(si.Unsigned(14))
+        o2 = si.Output(si.Unsigned(14))
+        o3 = si.Output(si.Unsigned(14))
+
+        def body(self):
+            prod = self.i2 * self.i3
+            self.o <<= si.Unsigned(14)((self.i2 * self.i1) >> self.i3)
+            self.o2 <<= si.Unsigned(14)((self.i2 * self.i1 * self.i3) >> self.i3)
+            self.o3 <<= si.Unsigned(14)((prod * self.i1) >> self.i3)
+
+    def customizer(back_end):
+        back_end.support_cast = False
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name, back_en_customizer=customizer)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
 if __name__ == "__main__":
     #test_module_decorator1()
     #test_module_decorator()
@@ -964,4 +989,5 @@ if __name__ == "__main__":
     #test_unsigned_cast()
     #test_right_shift()
     #test_precedence("rtl")
-    test_mul_size("rtl")
+    #test_mul_size("rtl")
+    test_size_cast_95_size("rtl")

@@ -670,12 +670,6 @@ class Number(NetTypeFactory):
             self.input_port = Input(input_type)
             self.output_port = Output(output_type)
         def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
-            expr = InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
-            if back_end.support_cast:
-                yield expr
-            else:
-                yield inline_statement_from_expression(back_end, target_namespace, expr, self.output_port)
-        def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
             assert back_end.language == "SystemVerilog"
 
             ret_val = ""
@@ -696,7 +690,11 @@ class Number(NetTypeFactory):
                     ret_val = back_end.signed_cast(ret_val)
                 else:
                     ret_val = back_end.unsigned_cast(ret_val)
-            return ret_val, precedence
+
+            if back_end.support_cast or (not need_int_size_cast and not need_sign_cast):
+                yield InlineExpression(self.output_port, ret_val, precedence)
+            else:
+                yield inline_statement_from_expression(back_end, target_namespace, ret_val, self.output_port)
         def simulate(self) -> TSimEvent:
             while True:
                 yield self.input_port

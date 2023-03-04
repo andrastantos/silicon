@@ -5,7 +5,7 @@ from .net_type import NetType
 from .utils import first, TSimEvent, Context, is_junction_base
 from .exceptions import SimulationException, SyntaxErrorException, AdaptTypeError
 from .netlist import Netlist
-from .module import Module, InlineBlock, InlineExpression
+from .module import Module, InlineBlock, InlineExpression, inline_statement_from_expression
 from .port import Input, Output, Junction
 from .constant import NoneNetType
 
@@ -97,33 +97,37 @@ class EnumNet(Number):
                 self.input_port = Input(input_type)
                 self.output_port = Output(output_type)
             def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
-                yield InlineExpression(self.output_port, *self.generate_inline_expression(back_end, target_namespace))
-            def generate_inline_expression(self, back_end: 'BackEnd', target_namespace: Module) -> Tuple[str, int]:
                 assert back_end.language == "SystemVerilog"
-                assert back_end.support_cast;
 
                 rhs_name, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), allow_expression = True)
                 if back_end.support_enum:
+                    assert back_end.support_cast;
                     ret_val = f"{self.output_port.get_net_type().get_type_name()}'({rhs_name})"
+                    precedence = 0
+                    yield InlineExpression(self.output_port, ret_val, precedence)
+
+                ret_val = ""
+                need_sign_cast = self.input_port.signed and not self.output_port.signed
+                need_int_size_cast = self.input_port.get_net_type().int_length > self.output_port.get_net_type().int_length
+                if need_int_size_cast and back_end.support_cast:
+                    ret_val += f"{self.output_port.length}'("
+                rhs_name, precedence = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
+                ret_val += rhs_name
+                if need_int_size_cast and back_end.support_cast:
+                    precedence = 0
+                    ret_val += ")"
+                if need_sign_cast and back_end.support_cast:
+                    precedence = 0
+                    if self.output_port.signed:
+                        ret_val = back_end.signed_cast(ret_val)
+                    else:
+                        ret_val = back_end.unsigned_cast(ret_val)
+
+                if back_end.support_cast or (not need_int_size_cast and not need_sign_cast):
+                    yield InlineExpression(self.output_port, ret_val, precedence)
                 else:
-                    ret_val = ""
-                    need_sign_cast = self.input_port.signed and not self.output_port.signed
-                    need_int_size_cast = self.input_port.get_net_type().int_length > self.output_port.get_net_type().int_length
-                    if need_int_size_cast:
-                        ret_val += f"{self.output_port.length}'("
-                    rhs_name, precedence = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
-                    ret_val += rhs_name
-                    if need_int_size_cast:
-                        precedence = 0
-                        ret_val += ")"
-                    if need_sign_cast:
-                        precedence = 0
-                        if self.output_port.signed:
-                            ret_val = back_end.signed_cast(ret_val)
-                        else:
-                            ret_val = back_end.unsigned_cast(ret_val)
-                    return ret_val, precedence
-                return ret_val, 0
+                    yield inline_statement_from_expression(back_end, target_namespace, ret_val, self.output_port)
+
             def simulate(self) -> TSimEvent:
                 while True:
                     yield self.input_port
