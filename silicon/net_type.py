@@ -96,18 +96,18 @@ class NetType(object, metaclass=NetTypeMeta):
         for name, value in kwargs.items():
             setattr(cls, name, value)
 
-    def __new__(cls, input_port: Optional['Junction'] = None, /, **kwargs) -> Union['NetType', 'Junction']:
+    def __new__(cls, *args) -> Union['NetType', 'Junction']:
         """
-        If called with parameters, this is the explicit type-conversion case.
+        If called with a single, positional parameters, this is the explicit type-conversion case.
 
         If called without parameters, it's (eventually) the port or wire instance creation case.
         In this case we should simply return a NetType instance.
         """
-        assert len(kwargs) == 0
+        assert len(args) < 2
         from .utils import cast
-        if input_port is None:
+        if len(args) == 0:
             return super().__new__(cls)
-        ret_val = cast(input_port, cls)
+        ret_val = cast(args[0], cls)
         # We'll have to do a trick here: ret_val is an OutputPort instance. However, Ports derive from NetType, so
         # if we simply returned it, Python would call __init__ on it, which is not what we want.
         # So we'll create an intermediary type, that overrides __init__ and return that.
