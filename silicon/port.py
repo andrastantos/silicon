@@ -980,7 +980,7 @@ class Junction(JunctionBase):
 
 
     ############################################
-    # Compund type support
+    # Compound type support
     ############################################
     @classmethod
     def get_member_junction_kind(cls, is_reversed: bool) -> Type:
