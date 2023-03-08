@@ -297,6 +297,12 @@ class Module(object):
         else:
             return super().__str__()
 
+    def __repr__(self) -> str:
+        if "_impl" in self.__dict__:
+            return self._impl.get_diagnostic_name(add_location = True)
+        else:
+            return super().__str__()
+
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         """
         Default implementation is to generate recursive sub-modules. Primitives will override this behavior to terminate the recursion
