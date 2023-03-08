@@ -154,6 +154,10 @@ class NoneNetType(NetType):
         return 'X'
 
     @classmethod
+    def get_default_sim_value(cls) -> Any:
+        return None
+
+    @classmethod
     def get_iterator(cls, parent_junction: 'Junction') -> Any:
         class Iterator(object):
             def __init__(self):
