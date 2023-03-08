@@ -17,9 +17,10 @@ class Tracer(object):
     context = Stack()
     debug_print_level: int = 0
 
+    from .netlist import Netlist
+
     @staticmethod
     def trace_event_handler(frame, event, arg):
-        from .netlist import Netlist
         def chain():
             if Tracer.old_tracer is not None:
                 return Tracer.old_tracer(frame, event, arg)
@@ -70,7 +71,7 @@ class Tracer(object):
             stack_frame = frame.f_code
             func_name = stack_frame.co_name
             header_printed = False
-            parent_module = Netlist.get_current_scope()
+            parent_module = Tracer.Netlist.get_current_scope()
             if parent_module is None:
                 # We can't really assert in tracer, I don't think. So we simply terminate with a nasty message
                 print(f"Tracer is enabled outside of module bodies. THIS IS REALLY BAD!!!", file=sys.stderr)
