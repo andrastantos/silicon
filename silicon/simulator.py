@@ -398,7 +398,15 @@ class Simulator(object):
         print(f"{prefix:>7} ", end="")
         print(*args, **kwargs)
 
-
+    def sim_assert(self, condition, *args, **kwargs):
+        if not condition:
+            prefix = f"{self.now}:{self.delta}"
+            print(f"{prefix:>7} ASSERT FAILED ", end="")
+            from io import StringIO
+            msg = StringIO()
+            print(*args, **kwargs, file=msg)
+            print(msg)
+            raise SimulationException(msg)
 
 
 
