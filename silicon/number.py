@@ -1,4 +1,5 @@
 from typing import Optional, Any, Tuple, Generator, Union, Dict, Set, Sequence, Union
+import enum
 from .exceptions import FixmeException, SyntaxErrorException, SimulationException, AdaptTypeError, InvalidPortError
 from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta
 from .module import GenericModule, Module, InlineBlock, InlineExpression, inline_statement_from_expression
@@ -143,6 +144,8 @@ class Number(NetTypeFactory):
         def _precision_and_value(thing: Union[int, float, 'Number.NetValue', 'Junction']) -> Tuple[int]:
             if isinstance(thing, int):
                 return 0, thing
+            if issubclass(type(thing), enum.Enum):
+                return 0, thing.value
             if isinstance(thing, float):
                 if thing == 0.0:
                     return 0, 0
