@@ -405,7 +405,10 @@ class Simulator(object):
             from io import StringIO
             msg = StringIO()
             print(*args, **kwargs, file=msg)
+            msg = msg.getvalue()
             print(msg)
+            if msg == "\n":
+                raise SimulationException()
             raise SimulationException(msg)
 
 
