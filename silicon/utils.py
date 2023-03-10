@@ -467,3 +467,20 @@ def no_rtl(junction: 'JunctionBase') -> 'JunctionBase':
         raise SyntaxErrorException(f"no_rtl can only be set on a junction")
     junction._no_rtl = True
     return junction
+
+def raise_for_caller(exception: Exception):
+    try:
+        raise exception
+    except Exception as ex:
+        import sys
+        import traceback
+        import types
+        traceback = sys.exc_info()[2]
+        back_frame = traceback.tb_frame.f_back.f_back
+        back_tb = types.TracebackType(
+            tb_next=None,
+            tb_frame=back_frame,
+            tb_lasti=back_frame.f_lasti,
+            tb_lineno=back_frame.f_lineno
+        )
+        raise ex.with_traceback(back_tb)

@@ -4,7 +4,7 @@ from vcd import VCDWriter
 from .netlist import Netlist, XNet
 from .ordered_set import OrderedSet
 from collections import OrderedDict
-from .utils import Context, is_junction_base
+from .utils import Context, is_junction_base, raise_for_caller
 from .exceptions import SimulationException, SyntaxErrorException
 from pathlib import Path
 
@@ -404,12 +404,11 @@ class Simulator(object):
             print(f"{prefix:>7} ASSERT FAILED ", end="")
             from io import StringIO
             msg = StringIO()
-            print(*args, **kwargs, file=msg)
+            print(*args, **kwargs, file=msg, end="")
             msg = msg.getvalue()
             print(msg)
-            if msg == "\n":
-                raise SimulationException()
-            raise SimulationException(msg)
+            raise_for_caller(SimulationException() if msg == "" else SimulationException(msg))
+
 
 
 
