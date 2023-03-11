@@ -579,6 +579,9 @@ class Number(NetTypeFactory):
             op_precedence = back_end.get_operator_precedence("[]")
             # Apparently Verilog really doesn't like cascaded [] expressions. So we explicitly disallow it
             rhs_name, _ = self.input_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence, allow_expression = False)
+            if self.key.start < 0 or self.key.end < 0:
+                raise FixmeException("Number slices with negative ranges are not yet supported!!")
+            assert self.key.start >= self.key.end
             if self.key.start >= self.input_port.get_net_type().length:
                 raise FixmeException("Accessing slices of a Number outside it's length is not yet supported!!")
             if end == start:

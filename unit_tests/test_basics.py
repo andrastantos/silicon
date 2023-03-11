@@ -952,6 +952,41 @@ def test_size_cast_95_size(mode="rtl"):
         t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 
+def test_negative_slice(mode="rtl"):
+    class Top(si.Module):
+        i1 = si.Input(si.Unsigned(8))
+        o = si.Output(si.logic)
+
+        def body(self):
+            self.o <<= self.i1[-1:0]
+
+        def simulate(self) -> si.TSimEvent:
+            pass
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    with t.ExpectError(si.FixmeException):
+        if mode == "rtl":
+            t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+        else:
+            t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+def test_inverted_slice(mode="rtl"):
+    class Top(si.Module):
+        i1 = si.Input(si.Unsigned(8))
+        o = si.Output(si.Unsigned(5))
+
+        def body(self):
+            self.o <<= self.i1[0:4]
+
+        def simulate(self) -> si.TSimEvent:
+            pass
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
 if __name__ == "__main__":
     #test_module_decorator1()
     #test_module_decorator()
@@ -990,4 +1025,6 @@ if __name__ == "__main__":
     #test_right_shift()
     #test_precedence("rtl")
     #test_mul_size("rtl")
-    test_size_cast_95_size("rtl")
+    #test_size_cast_95_size("rtl")
+    #test_negative_slice("rtl")
+    test_inverted_slice("rtl")
