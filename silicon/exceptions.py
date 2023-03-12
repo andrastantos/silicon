@@ -29,7 +29,7 @@ class FixmeException(SyntaxErrorException):
         super().__init__(f"FIXME: {message}", context)
 
 class SimulationException(Exception):
-    def __init__(self, message, context: Optional['Module'] = None):
+    def __init__(self, message = None, context: Optional['Module'] = None):
         loc = None
         try:
             loc = context.get_diagnostic_name(add_location=True)

@@ -85,6 +85,101 @@ def test_select_one_first():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_select_first_sim():
+    class top(Module):
+        selectors = Input(Unsigned(4))
+        in1 = Input(Unsigned(8))
+        in2 = Input(Unsigned(8))
+        in3 = Input(Unsigned(8))
+        in4 = Input(Unsigned(8))
+        o = Output(Unsigned(8))
+
+        def body(self):
+            self.o <<= SelectFirst(
+                self.selectors[0], self.in1,
+                self.selectors[1], self.in2,
+                self.selectors[2], self.in3,
+                self.selectors[3], self.in4,
+            )
+
+        def simulate(self, simulator):
+            self.in1 <<= 1
+            self.in2 <<= 2
+            self.in3 <<= 3
+            self.in4 <<= 4
+            self.selectors <<= 0b0001
+            yield 0 # FIXME: Not sure exactly why we need a double-delta wait here.
+            yield 0
+            simulator.sim_assert(self.o == self.in1)
+            self.selectors <<= 0b0010
+            yield 0
+            simulator.sim_assert(self.o == self.in2)
+            self.selectors <<= 0b0100
+            yield 0
+            simulator.sim_assert(self.o == self.in3)
+            self.selectors <<= 0b1000
+            yield 0
+            simulator.sim_assert(self.o == self.in4)
+
+    test.simulation(top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+class Sel(Interface):
+    sel1 = logic
+    sel2 = logic
+    sel3 = logic
+    sel4 = logic
+
+def test_select_first_sim2():
+    class top(Module):
+        selectors = Input(Sel)
+        in1 = Input(Unsigned(8))
+        in2 = Input(Unsigned(8))
+        in3 = Input(Unsigned(8))
+        in4 = Input(Unsigned(8))
+        o = Output(Unsigned(8))
+
+        def body(self):
+            self.o <<= SelectFirst(
+                self.selectors.sel1, self.in1,
+                self.selectors.sel2, self.in2,
+                self.selectors.sel3, self.in3,
+                self.selectors.sel4, self.in4,
+            )
+
+        def simulate(self, simulator):
+            self.in1 <<= 1
+            self.in2 <<= 2
+            self.in3 <<= 3
+            self.in4 <<= 4
+            self.selectors.sel1 <<= 1
+            self.selectors.sel2 <<= 0
+            self.selectors.sel3 <<= 0
+            self.selectors.sel4 <<= 0
+            yield 0 # FIXME: Not sure exactly why we need a double-delta wait here.
+            yield 0
+            simulator.sim_assert(self.o == self.in1)
+            self.selectors.sel1 <<= 0
+            self.selectors.sel2 <<= 1
+            self.selectors.sel3 <<= 0
+            self.selectors.sel4 <<= 0
+            yield 0
+            simulator.sim_assert(self.o == self.in2)
+            self.selectors.sel1 <<= 0
+            self.selectors.sel2 <<= 0
+            self.selectors.sel3 <<= 1
+            self.selectors.sel4 <<= 0
+            yield 0
+            simulator.sim_assert(self.o == self.in3)
+            self.selectors.sel1 <<= 0
+            self.selectors.sel2 <<= 0
+            self.selectors.sel3 <<= 0
+            self.selectors.sel4 <<= 1
+            yield 0
+            simulator.sim_assert(self.o == self.in4)
+
+    test.simulation(top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
 def test_reg():
     class top(Module):
         sout1 = Output(Signed(length=5))
@@ -305,4 +400,6 @@ if __name__ == "__main__":
     #test_const_cast()
     #test_large_select()
     #test_default_select()
-    test_large_select_one()
+    #test_large_select_one()
+    #test_select_first_sim()
+    test_select_first_sim2()

@@ -290,7 +290,7 @@ class SelectOne(_SelectOneHot):
     """
     outline_limit = 4
 
-    def simulate(self) -> TSimEvent:
+    def simulate(self, simulator) -> TSimEvent:
         self.init_map()
         while True:
             yield self.get_inputs().values()
@@ -378,7 +378,7 @@ class SelectFirst(_SelectOneHot):
     """
     Priority encoded selector
     """
-    def simulate(self) -> TSimEvent:
+    def simulate(self, simulator) -> TSimEvent:
         self.init_map()
         while True:
             yield self.get_inputs().values()
@@ -394,7 +394,7 @@ class SelectFirst(_SelectOneHot):
                     raise SimulationException(f"SelectFirst is missing input value for index {idx}", self)
                 if selector.sim_value is None:
                     use_default = False
-                    self.output_port <<= self.default_port
+                    self.output_port <<= None
                     break
                 if selector.sim_value != 0:
                     use_default = False
