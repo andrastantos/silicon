@@ -20,3 +20,4 @@ from .common_constructs import trigger
 from .build_utils import Build, skip_iverilog
 from .auto_input import AutoInput, ClkPort, ClkEnPort, RstPort, RstValPort
 from .sim_asserts import AssertAlways, AssertOnNegClk, AssertOnClk, AssertOnPosClk
+from .arbiters import RoundRobinArbiter
