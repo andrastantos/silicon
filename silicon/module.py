@@ -566,6 +566,9 @@ class Module(object):
                 self._unordered_sub_modules = [] # Sub-modules first get inserted into this list. Once an output of a sub-module is accessed, it is moved into _sub_modules. Finally, when all is done, the rest of the sub-modules are moved over as well.
                 self.parent = parent
 
+        def __repr__(self) -> str:
+            return f"IMPL for {self.get_diagnostic_name(add_location = True)}"
+
         def _init_phase2(self, *args, **kwargs):
             with ScopedAttr(self, "setattr__impl", self._setattr__construction):
                 from copy import deepcopy
@@ -1110,6 +1113,8 @@ class Module(object):
                         if junction.is_specialized() and old_source is not None and old_source.is_specialized():
                             if junction.get_net_type() is not old_source.get_net_type():
                                 insert_adaptor(old_source, junction, junction.get_net_type(), junction.source_scope, force=False)
+                        elif old_source is not None and old_source.is_specialized():
+                            junction.set_net_type(old_source.get_net_type())
                 # We also need to insert adaptors for loopbacks: This forces XNets with loopbacks to be broken up into
                 # multiple pieces thus generating proper RTL and simulation.
                 # Consider the following cenario:
@@ -1336,7 +1341,7 @@ class Module(object):
                         all_inputs_specialized = all(tuple(input.is_specialized() or input.is_deleted() for input in sub_module.get_inputs().values()))
                         if all_inputs_specialized:
                             with Module.Context(sub_module._impl):
-                                print(f"Elaborationing {sub_module}")
+                                print(f"Elaborating {sub_module}")
                                 sub_module._impl._elaborate(trace)
                             changes = True
                             incomplete_sub_modules.remove(sub_module)

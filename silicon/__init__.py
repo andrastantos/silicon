@@ -12,7 +12,7 @@ from .primitives import *
 from .utils import get_common_net_type, explicit_adapt, cast, set_verbosity_level, VerbosityLevels
 from .simulator import Simulator
 from .fsm import FSM
-from .composite import Reverse, Interface, Struct, Array
+from .composite import Reverse, Interface, Struct, Array, GenericMember
 from .memory import MemoryConfig, Memory, MemoryPortConfig
 from .rv_interface import ReadyValid, RvSimSource, RvSimSink
 from .rv_buffers import ForwardBuf, ReverseBuf, Fifo, DelayLine, Pacer, ForwardBufLogic, Stage

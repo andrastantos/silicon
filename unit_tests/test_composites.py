@@ -460,6 +460,37 @@ def test_bidir_interface(mode: str = "rtl"):
 
 
 
+class GenIf(Interface):
+    fwd = GenericMember
+    rev = Reverse(GenericMember)
+
+def test_generic_interface(mode: str = "rtl"):
+
+    class mod(Module):
+        mod_out = Output(GenIf)
+
+        def body(self):
+            x = Wire(Unsigned(8))
+            x <<= 42 & self.mod_out.rev
+            self.mod_out.fwd <<= x
+
+    class top(Module):
+        o = Output()
+        i = Input(Unsigned(4))
+
+        def body(self):
+            top_if = Wire(GenIf)
+
+            mmm = mod()
+            top_if <<= mmm.mod_out
+            top_if.rev <<= self.i
+
+            self.o <<= top_if.fwd
+
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+
 if __name__ == "__main__":
     #test_select_struct()
     #test_select_one_struct()
@@ -482,7 +513,8 @@ if __name__ == "__main__":
     #test_select_one_struct_default()
     #test_type_propagation()
     #test_bidir_interface()
-    test_illegal_branch()
+    #test_illegal_branch()
+    test_generic_interface()
 
 """
 Additional tests needed:

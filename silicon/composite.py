@@ -16,21 +16,26 @@ import types
 
 # TODO: interface nesting in SystemVerilog is not supported. What to do about that? Maybe it's better if interfaces are modelled as individual wires???
 
+class GenericMember(object):
+    pass
 class Reverse(object):
     """
     If added to an interface member, it reverses the direction of the member. Useful for handshake signals.
     """
     def __init__(self, net_type: NetType):
-        if not is_net_type(net_type):
+        if not is_net_type(net_type) and not is_generic_member(net_type):
             raise SyntaxErrorException(f"Can only reverse Net types. {net_type} is of type {type(net_type)}.")
-        self.net_type = net_type
+        self.net_type = net_type if not is_generic_member(net_type) else None
 
 def is_reverse(thing: Any) -> bool:
     return isinstance(thing, Reverse)
 
+def is_generic_member(thing: Any) -> bool:
+    return thing is GenericMember
+
 def is_composite_member(thing: Any) -> bool:
-    if is_net_type(thing):
-        return True
+    if is_net_type(thing): return True
+    if is_generic_member(thing): return True
     return is_reverse(thing)
 class Composite(NetType):
     """
@@ -65,6 +70,8 @@ class Composite(NetType):
             raise SyntaxErrorException(f"Member {name} already exists on composite type {cls}")
         if is_net_type(member):
             cls.members[name] = (member, False)
+        elif is_generic_member(member):
+            cls.members[name] = (None, False)
         elif is_reverse(member):
             if cls._support_reverse:
                 cls.members[name] = (member.net_type, True)
