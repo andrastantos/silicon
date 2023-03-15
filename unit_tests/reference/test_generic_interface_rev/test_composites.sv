@@ -2,16 +2,19 @@
 // top
 ////////////////////////////////////////////////////////////////////////////////
 module top (
-	output logic [7:0] o
+	input logic [3:0] i,
+	output logic [5:0] o
 );
 
-	logic [7:0] top_if_fwd;
+	logic [3:0] top_if_rev;
 
 	mod mmm (
-		.mod_out_fwd(top_if_fwd)
+		.mod_out_rev(i),
+
+		.x(o)
 	);
 
-	assign o = top_if_fwd;
+	assign top_if_rev = i;
 endmodule
 
 
@@ -19,14 +22,12 @@ endmodule
 // mod
 ////////////////////////////////////////////////////////////////////////////////
 module mod (
-	output logic [7:0] mod_out_fwd
+	input logic [3:0] mod_out_rev,
+	output logic [5:0] x
 );
 
-	logic [7:0] x;
+	assign x = 6'h2a & mod_out_rev;
 
-	assign x = 6'h2a;
-
-	assign mod_out_fwd = x;
 endmodule
 
 

@@ -462,7 +462,6 @@ def test_bidir_interface(mode: str = "rtl"):
 
 class GenIf(Interface):
     fwd = GenericMember
-    rev = Reverse(GenericMember)
 
 def test_generic_interface(mode: str = "rtl"):
 
@@ -471,25 +470,86 @@ def test_generic_interface(mode: str = "rtl"):
 
         def body(self):
             x = Wire(Unsigned(8))
-            x <<= 42 & self.mod_out.rev
+            x <<= 42
             self.mod_out.fwd <<= x
 
     class top(Module):
         o = Output()
-        i = Input(Unsigned(4))
 
         def body(self):
             top_if = Wire(GenIf)
 
             mmm = mod()
             top_if <<= mmm.mod_out
-            top_if.rev <<= self.i
 
             self.o <<= top_if.fwd
 
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+
+
+class GenIfR(Interface):
+    rev = Reverse(GenericMember)
+
+def test_generic_interface_rev(mode: str = "rtl"):
+
+    class mod(Module):
+        mod_out = Output(GenIfR)
+        x = Output()
+        def body(self):
+            self.x <<= 42 & self.mod_out.rev
+
+    class top(Module):
+        i = Input(Unsigned(4))
+        o = Output()
+        def body(self):
+            top_if = Wire(GenIfR)
+
+            mmm = mod()
+            top_if <<= mmm.mod_out
+            top_if.rev <<= self.i
+            self.o <<= mmm.x
+
+
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+
+class GenIf2(Interface):
+    fwd = GenericMember
+
+
+def test_generic_interface2():
+    class Consumer(Module):
+        clk = ClkPort()
+        rst = RstPort()
+        inp = Input(GenIf2)
+
+        def body(self):
+            self.x = Reg(self.inp.fwd)
+
+
+    class Producer(Module):
+        clk = ClkPort()
+        rst = RstPort()
+        outp = Output(GenIf2)
+
+        def body(self):
+            x = Wire(Unsigned(8))
+            x <<= Reg(Unsigned(8)(x+1))
+            self.outp.fwd <<= x
+
+    class top(Module):
+        clk = ClkPort()
+        rst = RstPort()
+
+        def body(self):
+            c = Consumer()
+            p = Producer()
+            c.inp <<= p.outp
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 if __name__ == "__main__":
     #test_select_struct()
@@ -514,7 +574,9 @@ if __name__ == "__main__":
     #test_type_propagation()
     #test_bidir_interface()
     #test_illegal_branch()
-    test_generic_interface()
+    #test_generic_interface()
+    test_generic_interface_rev()
+    #test_generic_interface2()
 
 """
 Additional tests needed:

@@ -690,18 +690,42 @@ class Module(object):
             return self._ports
         def get_inputs(self) -> 'OrderedDict[str, Port]':
             return self._inputs
+        def get_input_ports(self, recursive: bool = False) -> 'Sequence[Port]':
+            if not recursive:
+                return self._inputs.values()
+            ret_val = []
+            for i in self._inputs.values():
+                ret_val += i.get_all_member_junctions(add_self=True, reversed=False)
+            for o in self._outputs.values():
+                ret_val += o.get_all_member_junctions(add_self=False, reversed=True)
+            return ret_val
         def get_positional_inputs(self) -> 'OrderedDict[str, Port]':
             return self._positional_inputs
         def get_outputs(self) -> 'OrderedDict[str, Port]':
             return self._outputs
+        def get_output_ports(self, recursive: bool = False) -> 'Sequence[Port]':
+            if not recursive:
+                return self._outputs.values()
+            ret_val = []
+            for i in self._inputs.values():
+                ret_val += i.get_all_member_junctions(add_self=False, reversed=True)
+            for o in self._outputs.values():
+                ret_val += o.get_all_member_junctions(add_self=True, reversed=False)
+            return ret_val
         def get_positional_outputs(self) -> 'OrderedDict[str, Port]':
             return self._positional_outputs
         def get_wires(self) -> 'OrderedDict[str, Wire]':
             return self._wires
         def get_local_wires(self) -> Sequence[Wire]:
             return self._local_wires.values
-        def get_junctions(self) -> Sequence[Junction]:
-            return chain(self._junctions.values(), self._local_wires.values())
+        def get_junctions(self, recursive: bool = False) -> Sequence[Junction]:
+            if not recursive:
+                return chain(self._junctions.values(), self._local_wires.values())
+            ret_val = []
+            for j in self.get_junctions(False):
+                ret_val += j.get_all_member_junctions(add_self=True)
+            return ret_val
+
         def get_fully_qualified_name(self) -> str:
             from .utils import FQN_DELIMITER
             node = self
@@ -943,17 +967,6 @@ class Module(object):
                         return convert_to_junction(parent_wires[name])
             return None
 
-        def get_all_junctions(self) -> Sequence[Junction]:
-            """
-            Returns all junctions that are in the scope of this module.
-
-            This includes ports and wires of the module itself, plus all the ports of all sub-modules
-            """
-            return chain(
-                self.get_junctions(),
-                chain(*(sub_module.get_inputs().values() for sub_module in self._sub_modules))
-            )
-
         def call_and_trace(self, do_trace: bool, fn: Callable , *args, **kwargs):
             scope_table = self.netlist.symbol_table[self._true_module]
             old_attr_list = set(dir(self._true_module))
@@ -1094,9 +1107,20 @@ class Module(object):
                             else:
                                 sink.set_source(new_source, scope)
 
+                def get_all_junctions() -> Sequence[Junction]:
+                    """
+                    Returns all junctions that are in the scope of this module.
+
+                    This includes ports and wires of the module itself, plus all the ports of all sub-modules
+                    """
+                    return chain(
+                        self.get_junctions(recursive=True),
+                        chain(*(sub_module._impl.get_input_ports(recursive=True) for sub_module in self._sub_modules))
+                    )
+
+
                 # First set net types on junctions where the source has a type, but the sink doesn't
-                #incomplete_junctions = set(junction for junction in chain(self.get_junctions()) if not junction.is_specialized() and junction.has_source())
-                incomplete_junctions = set(junction for junction in self.get_all_junctions() if not junction.is_specialized() and junction.has_source(allow_partials=False))
+                incomplete_junctions = set(junction for junction in get_all_junctions() if not junction.is_specialized() and junction.has_source(allow_partials=False))
                 changes = True
                 while len(incomplete_junctions) > 0 and changes:
                     changes = False
@@ -1107,7 +1131,7 @@ class Module(object):
                             changes = True
                             incomplete_junctions.remove(junction)
                 # Look through all junctions for incompatible source-sink types and insert adaptors as needed
-                for composite_junction in tuple(self.get_all_junctions()):
+                for composite_junction in tuple(get_all_junctions()):
                     for junction in composite_junction.get_all_member_junctions(add_self=True):
                         old_source = junction.get_source()
                         if junction.is_specialized() and old_source is not None and old_source.is_specialized():
@@ -1338,7 +1362,7 @@ class Module(object):
                                 # This is an unconnected optional input that can't be deleted:
                                 # create and insert a constant source for it in ourselves
                                 input.assign_default_value(self._true_module)
-                        all_inputs_specialized = all(tuple(input.is_specialized() or input.is_deleted() for input in sub_module.get_inputs().values()))
+                        all_inputs_specialized = all(tuple(input.is_specialized() or input.is_deleted() for input in sub_module._impl.get_input_ports(recursive=True)))
                         if all_inputs_specialized:
                             with Module.Context(sub_module._impl):
                                 print(f"Elaborating {sub_module}")
@@ -1354,7 +1378,7 @@ class Module(object):
                 # Collect all nets that don't have a type, but must to continue
                 input_list = []
                 for sub_module in tuple(incomplete_sub_modules):
-                    input_list += (input for input in sub_module.get_inputs().values() if not (input.is_specialized() or input.is_deleted()))
+                    input_list += (input for input in sub_module._impl.get_input_ports(recursive=True) if not (input.is_specialized() or input.is_deleted()))
                 if len(input_list) > 10:
                     list_str = "\n    ".join(i.get_diagnostic_name() for i in input_list[:5]) + "\n    ...\n    " + "\n    ".join(i.get_diagnostic_name() for i in input_list[-5:])
                 else:
@@ -1365,7 +1389,7 @@ class Module(object):
             for output in self.get_outputs().values():
                 if not output.is_specialized():
                     raise SyntaxErrorException(f"Output port {output} is not fully specialized after body call. Can't finalize interface")
-            assert all((output.is_specialized() or not output.has_source()) for output in self.get_outputs().values())
+            assert all((output.is_specialized() or not output.has_source()) for output in self.get_output_ports(recursive=True))
 
         def is_top_level(self) -> bool:
             return self.netlist.top_level is self._true_module

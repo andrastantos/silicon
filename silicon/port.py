@@ -1025,14 +1025,18 @@ class Junction(JunctionBase):
     def get_member_junctions(self) -> Dict[str, Tuple['Junction', bool]]:
         return self._member_junctions
 
-    def get_all_member_junctions(self, add_self: bool) -> Sequence['Junction']:
+    def get_all_member_junctions(self, add_self: bool, reversed: Optional[bool] = None) -> Sequence['Junction']:
         """
         Returns all member junctions, whether directly or indirectly within this port
+
+        If 'reversed' is specified and False, only non-reversed members are returned. If specified True only reversed members are returned.
+        Recursive calls deal with 'reversed' reversal as needed
         """
         ret_val = OrderedSet()
         if self.is_composite():
-            for member, _ in self.get_member_junctions().values():
-                ret_val |= member.get_all_member_junctions(True)
+            for member, member_reversed in self.get_member_junctions().values():
+                sub_reversed = None if reversed is None else reversed ^ member_reversed
+                ret_val |= member.get_all_member_junctions(reversed is None or member_reversed == reversed, sub_reversed)
         if add_self:
             ret_val.add(self)
         return ret_val
