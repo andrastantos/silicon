@@ -284,6 +284,8 @@ class Netlist(object):
         self._parent_modules = Stack()
         self.enter_depth = 0
         self.symbol_table = SymbolTable()
+        self.rank_list = None
+        self.rank_map = None
 
     @staticmethod
     def get_global_netlist() -> 'Netlist':
@@ -321,6 +323,30 @@ class Netlist(object):
         if self.enter_depth == 1:
             del globals()["netlist"]
         self.enter_depth -= 1
+
+    #def __getstate__(self):
+    #    state = self.__dict__.copy()
+    #    del state["top_level"]
+    #    del state["modules"]
+    #    del state["net_types"]
+    #    del state["ports"]
+    #    del state["simulator_context"]
+    #    del state["module_variants"]
+    #    del state["module_to_class_map"]
+    #    del state["module_class_short_name_map"]
+    #    del state["xnets"]
+    #    del state["junction_to_xnet_map"]
+    #    del state["module_to_xnet_map"]
+    #    del state["_parent_modules"]
+    #    del state["enter_depth"]
+    #    del state["symbol_table"]
+    #    del state["rank_list"]
+    #    del state["rank_map"]
+    #    return state
+    #
+    #def __setstate__(self, state):
+    #    self.__dict__.update(state)
+    #    # TODO: restore everything...
 
     def _register_net_type(self, net_type: 'NetType'):
         type_name = net_type.get_type_name()
