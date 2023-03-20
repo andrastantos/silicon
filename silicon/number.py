@@ -536,6 +536,8 @@ class Number(NetTypeFactory):
             return str(self)
 
         def __format__(self, format_spec) -> str:
+            if self.value is None:
+                return "None"
             if self.precision == 0:
                 return format(self.value, format_spec)
             return format(self.value / (1 << self.precision), format_spec)
@@ -1148,7 +1150,7 @@ class Number(NetTypeFactory):
             context = Context.current()
 
             if context == Context.simulation:
-                if input is None:
+                if input is None or input.value is None:
                     return None
                 if is_junction_base(input):
                     input = input.sim_value

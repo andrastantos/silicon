@@ -279,13 +279,29 @@ class JunctionBase(object):
             return self._unary_op(gate, "__invert__")
 
 
-    #def __complex__(self) -> Any:
-    #def __int__(self) -> Any:
-    #def __long__(self) -> Any:
-    #def __float__(self) -> Any:
-    #def __oct__(self) -> Any:
-    #def __hex__(self) -> Any:
-    #def __index__(self) -> Any:
+    def __complex__(self) -> Any:
+        context = Context.current()
+        if context == Context.simulation:
+            return complex(self.sim_value)
+        raise ValueError
+
+    def __int__(self) -> Any:
+        context = Context.current()
+        if context == Context.simulation:
+            return int(self.sim_value)
+        raise ValueError
+
+    def __float__(self) -> Any:
+        context = Context.current()
+        if context == Context.simulation:
+            return float(self.sim_value)
+        raise ValueError
+
+    def __index__(self) -> Any:
+        context = Context.current()
+        if context == Context.simulation:
+            return self.sim_value.__index__()
+        raise ValueError
 
 
     def __bool__(self) -> bool:
