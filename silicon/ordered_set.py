@@ -49,7 +49,7 @@ class OrderedSet(collections.abc.MutableSet):
 
     def __ior__(self, other):
         if isinstance(other, OrderedSet):
-            self.map |= other.map
+            self.map.update(other.map)
         else:
             for x in other:
                 self.add(x)
