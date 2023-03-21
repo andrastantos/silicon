@@ -295,13 +295,13 @@ class Module(object):
         if "_impl" in self.__dict__:
             return self._impl.get_diagnostic_name(add_location = True)
         else:
-            return super().__str__()
+            return f"Module object {type(self)} under construction"
 
     def __repr__(self) -> str:
         if "_impl" in self.__dict__:
             return self._impl.get_diagnostic_name(add_location = True)
         else:
-            return super().__str__()
+            return f"Module object {type(self)} under construction"
 
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         """

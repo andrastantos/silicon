@@ -441,7 +441,10 @@ class Junction(JunctionBase):
         ret_val += ": " + str(self.get_net_type())
         if not hasattr(self, "_xnet") or self._xnet is None:
             return ret_val
-        ret_val += f" = {self._xnet.sim_state.value}"
+        try:
+            ret_val += f" = {self._xnet.sim_state.value}"
+        except AttributeError:
+            pass
         return ret_val
 
     def __repr__(self) -> str:
@@ -451,7 +454,10 @@ class Junction(JunctionBase):
         ret_val += ": " + str(self.get_net_type())
         if not hasattr(self, "_xnet") or self._xnet is None:
             return ret_val
-        ret_val += f" = {self._xnet.sim_state.value}"
+        try:
+            ret_val += f" = {self._xnet.sim_state.value}"
+        except AttributeError:
+            pass
         return ret_val
 
     def ilshift__elab(self, other: Any) -> 'Junction':
