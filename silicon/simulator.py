@@ -4,7 +4,8 @@ from vcd import VCDWriter
 from .netlist import Netlist, XNet
 from .ordered_set import OrderedSet
 from collections import OrderedDict
-from .utils import Context, is_junction_base, raise_for_caller
+from .port import is_junction_base
+from .utils import Context, raise_for_caller, profile
 from .exceptions import SimulationException, SyntaxErrorException
 from pathlib import Path
 
@@ -303,6 +304,7 @@ class Simulator(object):
             now = self.now
             self.simulator.current_event.trigger(self, now)
 
+        @profile
         def simulate(self, end_time: Optional[int] = None) -> int:
             while len(self.simulator.timeline) > 0 and (end_time is None or self.simulator.now < end_time):
                 self.tick()

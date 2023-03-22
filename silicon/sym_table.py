@@ -13,7 +13,8 @@ WeakSet = OrderedSet
 frozenset = OrderedSet
 
 def _dump_obj(obj) -> str:
-    from .utils import is_module, is_junction_base, is_junction, is_port, is_input_port, is_output_port, is_wire
+    from .utils import is_module, is_junction, is_input_port, is_output_port, is_wire
+    from .port import is_port, is_junction_base
     if is_module(obj): kind = "module "
     elif is_wire(obj): kind = "wire "
     elif is_output_port(obj): kind = "output "
@@ -94,7 +95,9 @@ class ScopeTable(object):
         # If there is a hard symbol with the same name, don't bother adding a soft-symbol
         if name in self.hard_symbols and obj is self.hard_symbols[name]:
             return
+        self._add_soft_symbol(obj, name)
 
+    def _add_soft_symbol(self, obj: object, name: str) -> None:
         try:
             self.soft_symbols[name].add(obj)
         except KeyError:
@@ -214,11 +217,11 @@ class ScopeTable(object):
             return False
 
         # First let's deal with unnamed objects. These can create further name collisions that we'll resolve in the next loop
-        for auto_obj in tuple(self.auto_symbols):
+        for auto_obj in self.auto_symbols:
             auto_name = auto_obj.get_default_name(scope)
-            self.add_soft_symbol(auto_obj, auto_name)
+            self._add_soft_symbol(auto_obj, auto_name)
             self.named_auto_symbols.add(auto_obj)
-        assert len(self.auto_symbols) == 0
+        self.auto_symbols.clear()
         # We can now resolve all remaining name collisions
         for name, objects in tuple(self.soft_symbols.items()):
             have_hard_symbol = name in self.hard_symbols

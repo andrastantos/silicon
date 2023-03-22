@@ -3,8 +3,8 @@ import enum
 from .exceptions import FixmeException, SyntaxErrorException, SimulationException, AdaptTypeError, InvalidPortError
 from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta
 from .module import GenericModule, Module, InlineBlock, InlineExpression, inline_statement_from_expression
-from .port import Input, Output, Junction, Port
-from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, NetValue, is_junction_base
+from .port import Input, Output, Junction, Port, is_junction_base
+from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, NetValue
 from collections import OrderedDict
 import re
 try:

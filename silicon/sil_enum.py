@@ -2,7 +2,8 @@ from .number import Number, is_number, NumberMeta
 from enum import Enum, EnumMeta
 from typing import Tuple, Union, Optional, Any, Sequence, Generator
 from .net_type import NetType
-from .utils import first, TSimEvent, Context, is_junction_base
+from .port import is_junction_base
+from .utils import first, TSimEvent, Context
 from .exceptions import SimulationException, SyntaxErrorException, AdaptTypeError
 from .netlist import Netlist
 from .module import Module, InlineBlock, InlineExpression, inline_statement_from_expression

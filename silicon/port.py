@@ -4,7 +4,7 @@ import inspect
 from .net_type import NetType, KeyKind, NetTypeMeta
 from .ordered_set import OrderedSet
 from .exceptions import SyntaxErrorException, SimulationException
-from .utils import convert_to_junction, is_iterable, is_junction_base, is_input_port, is_output_port, get_caller_local_junctions, is_module, MEMBER_DELIMITER, Context, is_net_type, first
+from .utils import convert_to_junction, is_iterable, is_input_port, is_output_port, get_caller_local_junctions, is_module, MEMBER_DELIMITER, Context, is_net_type, first
 from .port import KeyKind
 from collections import OrderedDict
 from enum import Enum
@@ -1386,4 +1386,11 @@ def Output(net_type: Optional[NetTypeMeta] = None, *args, **kwargs) -> OutputPor
 
 def Wire(net_type: Optional[NetTypeMeta] = None, *args, **kwargs) -> WireJunction:
     return create_junction(WireJunction, net_type, *args, **kwargs)
+
+def is_port(thing: Any) -> bool:
+    return isinstance(thing, Port)
+
+def is_junction_base(thing: Any) -> bool:
+    #return hasattr(thing, "junction_kind")
+    return isinstance(thing, JunctionBase)
 

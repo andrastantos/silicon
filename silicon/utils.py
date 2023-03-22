@@ -71,19 +71,10 @@ def is_iterable(thing: Any) -> bool:
 def is_subscriptable(thing: Any) -> bool:
     return hasattr(thing, "__getitem__")
 
-def is_junction_base(thing: Any) -> bool:
-    #return hasattr(thing, "junction_kind")
-    from .port import JunctionBase
-    return isinstance(thing, JunctionBase)
-
 def is_junction(thing: Any) -> bool:
     #return hasattr(thing, "junction_kind")
     from .port import Junction
     return isinstance(thing, Junction)
-
-def is_port(thing: Any) -> bool:
-    from .port import Port
-    return isinstance(thing, Port)
 
 def is_output_port(thing: Any) -> bool:
     return hasattr(thing, "junction_kind") and thing.junction_kind == "output"
@@ -332,6 +323,7 @@ def get_common_net_type(junctions: Sequence['Junction'], partial_results: bool =
 
 def get_caller_local_junctions(frame_cnt: int = 1) -> Dict[str, 'Junction']:
     import inspect as inspect
+    from .port import is_junction_base
     caller_frame = inspect.currentframe()
     while frame_cnt > 0:
         caller_frame = caller_frame.f_back
@@ -463,6 +455,7 @@ class ScopedAttr(object):
         del self.old_value
 
 def no_rtl(junction: 'JunctionBase') -> 'JunctionBase':
+    from .port import is_junction_base
     if not is_junction_base(junction):
         raise SyntaxErrorException(f"no_rtl can only be set on a junction")
     junction._no_rtl = True
@@ -484,3 +477,38 @@ def raise_for_caller(exception: Exception):
             tb_lineno=back_frame.f_lineno
         )
         raise ex.with_traceback(back_tb)
+
+def profile(func):
+    def wrapper(*args, **kwargs):
+        def _finalize_profile(profiler, file_name):
+            import pstats as pstats
+            import io as io
+            nonlocal old_profiler
+
+            try:
+                profiler.disable()
+            except AttributeError:
+                import sys
+                sys.setprofile(old_profiler)
+            s = io.StringIO()
+            sortby = 'cumulative'
+            ps = pstats.Stats(profiler, stream=s).sort_stats(sortby)
+            #ps.print_stats()
+            ps.dump_stats(file_name)
+            #print(s.getvalue())
+
+        import cProfile as profile
+        #import profile
+        pr = profile.Profile()
+        try:
+            pr.enable()
+        except AttributeError:
+            import sys
+            old_profiler = sys.getprofile()
+            sys.setprofile(pr.dispatcher)
+        try:
+            return func(*args, **kwargs)
+        finally:
+            _finalize_profile(pr,f"{func.__name__}.profile.out")
+            pass
+    return wrapper

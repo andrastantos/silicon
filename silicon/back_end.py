@@ -69,7 +69,8 @@ class SystemVerilog(BackEnd):
             except AttributeError:
                 pass
         import os
-        return os.path.splitext(module._impl._class_filename)[0] + ".sv"
+        class_filename = module._impl.get_class_filename()
+        return os.path.splitext(class_filename)[0] + ".sv" if class_filename is not None else "anonymous.sv"
     def get_unconnected_value(self) -> str:
         return f"'X"
     def generate_order(self, netlist: 'Netlist', file_names: Optional[Union[str, Dict[type, str]]] = None) -> Dict[Any, Tuple[Sequence['Module'], Sequence['NetType']]]:

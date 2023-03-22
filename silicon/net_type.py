@@ -1,6 +1,5 @@
 from abc import abstractmethod
 from typing import Optional, Any, Sequence, Union
-from .netlist import Netlist
 from .exceptions import AdaptTypeError, SyntaxErrorException
 from enum import Enum as PyEnum
 
@@ -142,7 +141,7 @@ class NetType(object, metaclass=NetTypeMeta):
         """
         return cls.__name__
     @classmethod
-    def generate(cls, netlist: Netlist, back_end: 'BackEnd') -> str:
+    def generate(cls, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         """
         Generates definition (if needed) for the type.
         """

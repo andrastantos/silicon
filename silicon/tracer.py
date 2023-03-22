@@ -5,6 +5,12 @@ import traceback
 
 from .exceptions import SyntaxErrorException
 from .stack import Stack
+try:
+    import cProfile
+except ImportError:
+    class cProfile(object):
+        Profile = cProfile
+
 class Tracer(object):
     class ContextInfo(object):
         def __init__(self, name, trace):
@@ -18,10 +24,20 @@ class Tracer(object):
     debug_print_level: int = 0
 
     from .netlist import Netlist
+    from .port import is_junction_base
+    from .utils import is_module
 
     @staticmethod
     def trace_event_handler(frame, event, arg):
         def chain():
+            # Unfortunately can't trace through cProfile.
+            # That profiler is installed with a custom C trampoline
+            # which takes an object, not a callable.
+            #
+            # see 'profiler_enable' in _lsprof.c
+            #
+            if isinstance(Tracer.old_tracer, cProfile.Profile):
+                return
             if Tracer.old_tracer is not None:
                 return Tracer.old_tracer(frame, event, arg)
             return
@@ -53,7 +69,8 @@ class Tracer(object):
             return True
 
         if event == 'call':
-            #print(f">=== {func_name} at {filename}:{line_no}")
+            if Tracer.debug_print_level > 3:
+                print(f">=== {func_name} at {filename}:{line_no}")
             Tracer.context.push(Tracer.ContextInfo(func_name, False))
             return chain()
         elif event == 'return':
@@ -64,7 +81,8 @@ class Tracer(object):
             if is_reserved():
                 return chain()
             if not Tracer.context.top().trace:
-                #print(f"<--- {func_name} at {filename}:{line_no}")
+                if Tracer.debug_print_level > 3:
+                    print(f"<--- {func_name} at {filename}:{line_no}")
                 return chain()
             if Tracer.debug_print_level > 2:
                 print(f"<<<< {func_name} at {filename}:{line_no}")
@@ -81,8 +99,7 @@ class Tracer(object):
                 local_value = frame.f_locals[local_name]
                 if local_name == "self":
                     continue
-                from .utils import is_junction_base, is_module
-                if is_junction_base(local_value):
+                if Tracer.is_junction_base(local_value):
                     if Tracer.debug_print_level > 1:
                         print(f"     adding local {local_name} with value {local_value}")
                     try:
@@ -92,7 +109,7 @@ class Tracer(object):
                         sys.exit(-1)
 
 
-                elif is_module(local_value):
+                elif Tracer.is_module(local_value):
                     header_printed = print_header()
                     if Tracer.debug_print_level > 1:
                         print(f"\tModule {local_name} = {local_value}")
@@ -142,7 +159,10 @@ class Tracer(object):
     def __exit__(self, type, value, traceback):
         if self.tracer_save is None:
             # We are the top-level tracer: we should uninstall
-            sys.setprofile(Tracer.old_tracer)
+            if isinstance(Tracer.old_tracer, cProfile.Profile):
+                sys.setprofile(None)
+            else:
+                sys.setprofile(Tracer.old_tracer)
             if type is None:
                 assert len(Tracer.context) == 2 # We still have the __exit__ call on the context
             while not Tracer.context.is_empty():

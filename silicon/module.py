@@ -3,7 +3,7 @@
 from typing import Union, Set, Tuple, Dict, Any, Optional, List, Iterable, Generator, Sequence, Callable
 import typing
 from collections import OrderedDict
-from .port import Junction, Port, Output, Input, Wire, JunctionBase
+from .port import Junction, Port, Output, Input, Wire, JunctionBase, is_port, is_junction_base
 from .net_type import NetType, NetTypeMeta
 from .utils import is_junction, str_block, TSimEvent, ContextMarker, first, Context
 from .tracer import Tracer
@@ -13,7 +13,7 @@ from .ordered_set import OrderedSet
 from .exceptions import SimulationException, SyntaxErrorException, InvalidPortError
 from threading import RLock
 from itertools import chain, zip_longest
-from .utils import is_port, is_input_port, is_output_port, is_wire, is_module, fill_arg_names, is_junction_base, is_iterable, MEMBER_DELIMITER, first, implicit_adapt, convert_to_junction
+from .utils import is_input_port, is_output_port, is_wire, is_module, fill_arg_names, is_iterable, MEMBER_DELIMITER, first, implicit_adapt, convert_to_junction
 from .utils import ScopedAttr
 from .state_stack import StateStackElement
 import inspect
@@ -488,8 +488,6 @@ class Module(object):
             all that happens with them is that they're passed through to the 'construct' call, we can leave it as-is.
             """
             import inspect
-            import os
-            import pathlib
 
             self.netlist: 'Netlist' = Netlist.get_global_netlist()
             self.netlist.register_module(true_module)
@@ -497,16 +495,6 @@ class Module(object):
             if parent is not None:
                 parent._impl.register_sub_module(true_module)
 
-            # We have to work around a problem under windows where subst can create a confusion about drive letters and various paths pointing to the same file
-            try:
-                class_path = pathlib.Path(inspect.getfile(true_module.__class__)).absolute().resolve()
-                try:
-                    cur_path = pathlib.Path().absolute().resolve()
-                    self._class_filename = str(class_path.relative_to(cur_path))
-                except ValueError:
-                    self._class_filename = str(class_path)
-            except:
-                self._class_filename = "<unknown>"
             current_frame = inspect.currentframe()
             current_code = current_frame.f_code
             caller_frame = current_frame.f_back
@@ -566,6 +554,23 @@ class Module(object):
                 self._unordered_sub_modules = [] # Sub-modules first get inserted into this list. Once an output of a sub-module is accessed, it is moved into _sub_modules. Finally, when all is done, the rest of the sub-modules are moved over as well.
                 self.parent = parent
 
+        def get_class_filename(self):
+            import inspect
+            import pathlib
+            try:
+                return self._class_filename
+            except AttributeError:
+                # We have to work around a problem under windows where subst can create a confusion about drive letters and various paths pointing to the same file
+                try:
+                    class_path = pathlib.Path(inspect.getfile(self._true_module.__class__)).absolute().resolve()
+                    try:
+                        cur_path = pathlib.Path().absolute().resolve()
+                        self._class_filename = str(class_path.relative_to(cur_path))
+                    except ValueError:
+                        self._class_filename = str(class_path)
+                except:
+                    self._class_filename = None
+            return self._class_filename
         def __repr__(self) -> str:
             return f"IMPL for {self.get_diagnostic_name(add_location = True)}"
 

@@ -2,8 +2,10 @@ from typing import Union, Set, Tuple, Dict, Any, Optional, List, Iterable, Named
 import typing
 from .ordered_set import OrderedSet
 from collections import OrderedDict
-from .utils import is_input_port, is_output_port, is_wire, is_module, is_port, MEMBER_DELIMITER, ContextMarker, Context
-from .utils import vprint, verbose_enough, VerbosityLevels
+from .port import is_port
+from .port import Junction
+from .utils import is_input_port, is_output_port, is_wire, is_module, MEMBER_DELIMITER, ContextMarker, Context
+from .utils import vprint, verbose_enough, VerbosityLevels, profile
 from itertools import chain
 from .exceptions import SyntaxErrorException
 from .stack import Stack
@@ -429,8 +431,6 @@ class Netlist(object):
                         x_net.add_source(for_junction)
                     return [x_net]
 
-        from .port import Junction, Wire, Input, Output
-        from .utils import is_port
         for module in self.modules:
             for junction in chain(module.get_junctions()):
                 self.xnets |= create_xnets_for_junction(junction)
@@ -588,6 +588,7 @@ class Netlist(object):
     def elaborate(self) -> 'Netlist.Elaborator':
         return Netlist.Elaborator(self)
 
+    @profile
     def _elaborate(self) -> None:
         from .module import Module
 
@@ -616,16 +617,6 @@ class Netlist(object):
         #   TODO: in fact, this shouldn't happen at all this way: it's way too brittle. I think a better way of dealing with this is to
         #         str-compare the generated guts after the fact and eject the identical ones.
         def populate_names(module: 'Module'):
-            def delimiter(obj: object) -> str:
-                if is_module(obj):
-                    return ""
-                return "_"
-
-            for sub_module in module._impl._sub_modules:
-                assert self.symbol_table[module].exists(sub_module)
-
-            self.symbol_table.make_unique(delimiter)
-            from .module import Module
             module._impl.populate_xnet_names(self)
             for sub_module in module._impl.get_sub_modules():
                 populate_names(sub_module)
@@ -682,6 +673,16 @@ class Netlist(object):
             for junction in module.get_junctions():
                 self._register_junction(junction)
         self._create_xnets()
+
+        def delimiter(obj: object) -> str:
+            if is_module(obj):
+                return ""
+            return "_"
+
+        for sub_module in module._impl._sub_modules:
+            assert self.symbol_table[module].exists(sub_module)
+
+        self.symbol_table.make_unique(delimiter)
         populate_names(self.top_level)
         self._fill_xnet_names()
 
@@ -704,7 +705,7 @@ class Netlist(object):
         vprint(VerbosityLevels.instantiation, "Module hierarchy:")
         print_submodules(self.top_level)
 
-
+    @profile
     def generate(self, back_end: 'BackEnd', file_names: Optional[Union[str, Dict[type, str]]] = None) -> None:
         from .utils import str_block
 
@@ -742,29 +743,8 @@ class Netlist(object):
     ) -> int:
         from .simulator import Simulator
         with Simulator(self, str(vcd_file_name), timescale) as context:
-            def finalize_profile():
-                import pstats as pstats
-                import io as io
-
-                pr.disable()
-                s = io.StringIO()
-                sortby = 'cumulative'
-                ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-                #ps.print_stats()
-                ps.dump_stats("profile.out")
-                #print(s.getvalue())
-
             context.dump_signals(signal_pattern=signal_pattern, add_unnamed_scopes=add_unnamed_scopes)
-            import cProfile as profile
-            pr = profile.Profile()
-            pr.enable()
-            try:
-                ret_val = context.simulate(end_time)
-            except:
-                finalize_profile()
-                raise
-            finalize_profile()
-            return ret_val
+            return context.simulate(end_time)
 
     def lint(self):
         for module in self.modules:

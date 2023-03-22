@@ -4,11 +4,10 @@
 # Below, I spelled things out using SelectOne though...
 
 from .module import GenericModule, Module
-from .port import Input, Output, Wire, Junction
+from .port import Input, Output, Wire, Junction, is_junction_base
 from .auto_input import ClkPort, RstPort, RstValPort, ClkEnPort
 from .primitives import SelectOne, Reg
 from .exceptions import SyntaxErrorException
-from .utils import is_junction_base
 from .number import logic
 from .constant import get_net_type_for_const
 from .back_end import str_to_id
