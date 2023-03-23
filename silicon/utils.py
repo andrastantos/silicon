@@ -478,6 +478,7 @@ def raise_for_caller(exception: Exception):
         )
         raise ex.with_traceback(back_tb)
 
+support_profile = False
 def profile(func):
     def wrapper(*args, **kwargs):
         def _finalize_profile(profiler, file_name):
@@ -498,7 +499,6 @@ def profile(func):
             #print(s.getvalue())
 
         import cProfile as profile
-        #import profile
         pr = profile.Profile()
         try:
             pr.enable()
@@ -511,4 +511,6 @@ def profile(func):
         finally:
             _finalize_profile(pr,f"{func.__name__}.profile.out")
             pass
-    return wrapper
+    if support_profile:
+        return wrapper
+    return func
