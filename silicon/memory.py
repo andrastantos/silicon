@@ -491,6 +491,7 @@ class _Memory(GenericModule):
         for idx, port_config in enumerate(self.config.port_configs):
             inner_mem.set_port_type(idx, Unsigned(port_config.data_type.get_num_bits()))
             data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
+            if write_en_port is None: write_en_port = 0
             if port_config.registered_input:
                 addr_port = Reg(addr_port, clock_port=clk_port)
                 data_in_port = Reg(data_in_port, clock_port=clk_port)
