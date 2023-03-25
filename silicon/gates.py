@@ -89,9 +89,23 @@ class NInputGate(Gate):
         while True:
             yield self.get_inputs().values()
             inputs = list(self.get_inputs().values())
-            out_val = _sim_value(inputs[0])
-            for input in inputs[1:]:
-                out_val = self.sim_op(input, out_val)
+            # We take all the non-None elements first, then a final None if there were any of those.
+            # The reason is the following: let's assume we compute the two-bit OR of None | 1 | 2.
+            # In this case, the result should be 3. But, if we initialize the partial output with
+            # None first, then we never arrive at the right conclusion
+            some_none = False
+            first = True
+            for input in inputs:
+                if input is None:
+                    some_none = True
+                else:
+                    if first:
+                        out_val = _sim_value(inputs[0])
+                        first = False
+                    else:
+                        out_val = self.sim_op(input, out_val)
+            if some_none:
+                out_val = self.sim_op(None, out_val)
             self.output_port <<= out_val
     def generate_op(self, back_end: str) -> Tuple[str, int]:
         raise NotImplementedError
@@ -152,8 +166,8 @@ class or_gate(NInputGate):
             else:
                 return None
         if partial_output is None:
-            if all_ones(_sim_value(partial_output)):
-                return partial_output
+            if all_ones(_sim_value(next_input)):
+                return next_input
             else:
                 return None
         return next_input | partial_output
