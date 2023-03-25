@@ -77,7 +77,8 @@ class RoundRobinArbiter(Module):
         )
 
         unmasked_selector = SelectFirst(
-            *(RoundRobinArbiter._chain.from_iterable((req, idx) for req, idx in zip(reversed(self.requestors), (1<< i for i in range(requestor_cnt-1,-1,-1)))))
+            *(RoundRobinArbiter._chain.from_iterable((req, idx) for req, idx in zip(reversed(self.requestors), (1<< i for i in range(requestor_cnt-1,-1,-1))))),
+            default_port = 0
         )
 
         self.grants <<= Select(
