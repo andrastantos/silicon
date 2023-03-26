@@ -67,7 +67,9 @@ module Fifo (
 	logic empty;
 	logic full;
 	logic looped;
-	logic [7:0] u93_output_port_data;
+	logic u93_output_port;
+	logic out_data_selector;
+	logic [7:0] u95_output_port_data;
 	logic [7:0] output_data_data;
 	logic [7:0] buffer_mem_port2_data_out_data;
 
@@ -96,8 +98,10 @@ module Fifo (
 	always_ff @(posedge clock_port) empty <= reset_port ? 1'h1 : clear ? 1'h1 : next_empty;
 	always_ff @(posedge clock_port) full <= reset_port ? 1'h0 : clear ? 1'h0 : next_full;
 	always_ff @(posedge clock_port) looped <= reset_port ? 1'h0 : clear ? 1'h0 : next_looped;
-	always_ff @(posedge clock_port) u93_output_port_data <= reset_port ? 8'h0 : input_port_data;
-	assign output_data_data = push_addr == next_pop_addr ? u93_output_port_data : buffer_mem_port2_data_out_data;
+	always_ff @(posedge clock_port) u93_output_port <= reset_port ? 1'h0 : push;
+	assign out_data_selector = push_addr == next_pop_addr & u93_output_port;
+	always_ff @(posedge clock_port) u95_output_port_data <= reset_port ? 8'h0 : input_port_data;
+	assign output_data_data = out_data_selector ? u95_output_port_data : buffer_mem_port2_data_out_data;
 
 	Memory buffer_mem (
 		.port1_addr(push_addr),

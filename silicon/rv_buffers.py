@@ -228,8 +228,9 @@ class Fifo(GenericModule):
             # we need a bypass pass to get rid of the extra cycle of latency.
             # TODO: Can we do better? We could probably change the logic to take the extra cycle into account.
             #       This way output_data is not registered.
+            out_data_selector = (push_addr == next_pop_addr) & Reg(push)
             output_data <<= Select(
-                push_addr == next_pop_addr,
+                out_data_selector,
                 buffer_mem.port2_data_out,
                 Reg(input_data)
             )
