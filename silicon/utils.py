@@ -514,3 +514,12 @@ def profile(func):
     if support_profile:
         return wrapper
     return func
+
+def increment(wire):
+    net_type = wire.get_net_type()
+    return net_type(wire+1)
+
+def decrement(wire):
+    net_type = wire.get_net_type()
+    return net_type(wire-1)
+
