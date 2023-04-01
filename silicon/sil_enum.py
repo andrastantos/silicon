@@ -91,10 +91,10 @@ class EnumNet(Number):
         from .module import GenericModule
         class EnumAdaptor(GenericModule):
             def construct(self, input_type: 'NumberMeta', output_type: 'EnumNet') -> None:
-                if not is_number(input_type):
-                    raise SyntaxErrorException("Can only adapt the size of numbers")
+                if not is_number(input_type) and input_type is not None:
+                    raise SyntaxErrorException("Can only create Enums from numbers")
                 if not is_enum(output_type):
-                    raise SyntaxErrorException("Can only adapt the size of numbers")
+                    raise SyntaxErrorException("Can only create Enums")
                 self.input_port = Input(input_type)
                 self.output_port = Output(output_type)
             def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
@@ -173,10 +173,13 @@ class EnumNet(Number):
                 return input
             elif context == Context.elaboration:
                 # We only support adaption from the same type (trivial) or from Numbers, explicitly
+                # We also support adaption from unknown net types to Numbers, but only explicitly. This will blow up later, in case of a type mismatch
                 input_type = input.get_net_type()
                 if input_type is cls:
                     return input
                 if is_number(input_type) and not implicit:
+                    return EnumNet.Instance.EnumAdaptor(input_type, cls)(input)
+                if not input.is_specialized() and not implicit:
                     return EnumNet.Instance.EnumAdaptor(input_type, cls)(input)
                 raise AdaptTypeError
 
