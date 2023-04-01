@@ -303,6 +303,9 @@ class Module(object):
         else:
             return f"Module object {type(self)} under construction"
 
+    def get_inner_objects(self, name) -> Sequence[Any]:
+        return self._impl.netlist.symbol_table[self].get_objects(name)
+
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         """
         Default implementation is to generate recursive sub-modules. Primitives will override this behavior to terminate the recursion
