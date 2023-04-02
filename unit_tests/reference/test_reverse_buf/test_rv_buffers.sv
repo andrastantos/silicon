@@ -14,6 +14,8 @@ module top (
 	input logic rst
 );
 
+	logic u_clear;
+
 	ReverseBuf u (
 		.input_port_data(in1_data),
 		.input_port_ready(in1_ready),
@@ -24,9 +26,11 @@ module top (
 		.output_port_valid(out1_valid),
 
 		.clock_port(clk),
-		.reset_port(rst)
+		.reset_port(rst),
+		.clear(u_clear)
 	);
 
+	assign u_clear = u_clear;
 endmodule
 
 
@@ -43,7 +47,8 @@ module ReverseBuf (
 	output logic output_port_valid,
 
 	input logic clock_port,
-	input logic reset_port
+	input logic reset_port,
+	input logic clear
 );
 
 	logic [7:0] buf_data_data;
@@ -53,7 +58,7 @@ module ReverseBuf (
 	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 8'h0 : buf_load ? input_port_data : buf_data_data;
 	always_ff @(posedge clock_port) input_port_ready <= reset_port ? 1'h0 : output_port_ready;
 	assign buf_load = input_port_valid & input_port_ready &  ~ output_port_ready;
-	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : output_port_ready ? 1'h0 : buf_load ? 1'h1 : buf_valid;
+	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : clear ? 1'h0 : output_port_ready ? 1'h0 : buf_load ? 1'h1 : buf_valid;
 	assign output_port_valid = (output_port_ready &  ~ buf_valid) ? input_port_valid & input_port_ready : buf_valid;
 	assign output_port_data = (output_port_ready &  ~ buf_valid) ? input_port_data : buf_data_data;
 

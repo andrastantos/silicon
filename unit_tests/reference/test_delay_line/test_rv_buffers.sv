@@ -47,6 +47,11 @@ module DelayLine (
 );
 
 	logic intermediate_ready;
+	logic u_clear;
+	logic u1_clear;
+	logic u2_clear;
+	logic u3_clear;
+	logic u4_clear;
 	logic [7:0] u_output_port_data;
 	logic u_output_port_valid;
 	logic [7:0] u1_output_port_data;
@@ -72,7 +77,8 @@ module DelayLine (
 		.output_port_valid(u_output_port_valid),
 
 		.clock_port(clock_port),
-		.reset_port(reset_port)
+		.reset_port(reset_port),
+		.clear(u_clear)
 	);
 
 	ForwardBuf_2 u1 (
@@ -85,7 +91,8 @@ module DelayLine (
 		.output_port_valid(u1_output_port_valid),
 
 		.clock_port(clock_port),
-		.reset_port(reset_port)
+		.reset_port(reset_port),
+		.clear(u1_clear)
 	);
 
 	ForwardBuf_3 u2 (
@@ -98,7 +105,8 @@ module DelayLine (
 		.output_port_valid(u2_output_port_valid),
 
 		.clock_port(clock_port),
-		.reset_port(reset_port)
+		.reset_port(reset_port),
+		.clear(u2_clear)
 	);
 
 	ForwardBuf_4 u3 (
@@ -111,7 +119,8 @@ module DelayLine (
 		.output_port_valid(u3_output_port_valid),
 
 		.clock_port(clock_port),
-		.reset_port(reset_port)
+		.reset_port(reset_port),
+		.clear(u3_clear)
 	);
 
 	ForwardBuf_5 u4 (
@@ -124,10 +133,16 @@ module DelayLine (
 		.output_port_valid(intermediate_valid),
 
 		.clock_port(clock_port),
-		.reset_port(reset_port)
+		.reset_port(reset_port),
+		.clear(u4_clear)
 	);
 
 	assign intermediate_ready = output_port_ready;
+	assign u_clear = u_clear;
+	assign u1_clear = u1_clear;
+	assign u2_clear = u2_clear;
+	assign u3_clear = u3_clear;
+	assign u4_clear = u4_clear;
 	assign output_port_data = intermediate_data;
 	assign output_port_valid = intermediate_valid;
 endmodule
@@ -146,7 +161,8 @@ module ForwardBuf_5 (
 	output logic output_port_valid,
 
 	input logic clock_port,
-	input logic reset_port
+	input logic reset_port,
+	input logic clear
 );
 
 	logic [7:0] buf_data_data;
@@ -161,7 +177,8 @@ module ForwardBuf_5 (
 		.input_ready(input_port_ready),
 		.output_valid(output_port_valid),
 		.output_ready(output_port_ready),
-		.out_reg_en(fsm_out_reg_en)
+		.out_reg_en(fsm_out_reg_en),
+		.clear(clear)
 	);
 
 	assign output_port_data = buf_data_data;
@@ -181,7 +198,8 @@ module ForwardBuf_4 (
 	output logic output_port_valid,
 
 	input logic clock_port,
-	input logic reset_port
+	input logic reset_port,
+	input logic clear
 );
 
 	logic [7:0] buf_data_data;
@@ -196,7 +214,8 @@ module ForwardBuf_4 (
 		.input_ready(input_port_ready),
 		.output_valid(output_port_valid),
 		.output_ready(output_port_ready),
-		.out_reg_en(fsm_out_reg_en)
+		.out_reg_en(fsm_out_reg_en),
+		.clear(clear)
 	);
 
 	assign output_port_data = buf_data_data;
@@ -216,7 +235,8 @@ module ForwardBuf_3 (
 	output logic output_port_valid,
 
 	input logic clock_port,
-	input logic reset_port
+	input logic reset_port,
+	input logic clear
 );
 
 	logic [7:0] buf_data_data;
@@ -231,7 +251,8 @@ module ForwardBuf_3 (
 		.input_ready(input_port_ready),
 		.output_valid(output_port_valid),
 		.output_ready(output_port_ready),
-		.out_reg_en(fsm_out_reg_en)
+		.out_reg_en(fsm_out_reg_en),
+		.clear(clear)
 	);
 
 	assign output_port_data = buf_data_data;
@@ -251,7 +272,8 @@ module ForwardBuf_2 (
 	output logic output_port_valid,
 
 	input logic clock_port,
-	input logic reset_port
+	input logic reset_port,
+	input logic clear
 );
 
 	logic [7:0] buf_data_data;
@@ -266,7 +288,8 @@ module ForwardBuf_2 (
 		.input_ready(input_port_ready),
 		.output_valid(output_port_valid),
 		.output_ready(output_port_ready),
-		.out_reg_en(fsm_out_reg_en)
+		.out_reg_en(fsm_out_reg_en),
+		.clear(clear)
 	);
 
 	assign output_port_data = buf_data_data;
@@ -286,7 +309,8 @@ module ForwardBuf (
 	output logic output_port_valid,
 
 	input logic clock_port,
-	input logic reset_port
+	input logic reset_port,
+	input logic clear
 );
 
 	logic [7:0] buf_data_data;
@@ -301,7 +325,8 @@ module ForwardBuf (
 		.input_ready(input_port_ready),
 		.output_valid(output_port_valid),
 		.output_ready(output_port_ready),
-		.out_reg_en(fsm_out_reg_en)
+		.out_reg_en(fsm_out_reg_en),
+		.clear(clear)
 	);
 
 	assign output_port_data = buf_data_data;
@@ -318,13 +343,14 @@ module ForwardBufLogic_5 (
 	output logic input_ready,
 	output logic output_valid,
 	input logic output_ready,
-	output logic out_reg_en
+	output logic out_reg_en,
+	input logic clear
 );
 
 	logic buf_valid;
 
 	assign out_reg_en = input_valid & input_ready;
-	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : (input_valid & input_ready) ? 1'h1 : (output_ready & buf_valid) ? 1'h0 : buf_valid;
+	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : clear ? 1'h0 : (input_valid & input_ready) ? 1'h1 : (output_ready & buf_valid) ? 1'h0 : buf_valid;
 	assign input_ready =  ~ buf_valid | output_ready;
 
 	assign output_valid = buf_valid;
@@ -341,13 +367,14 @@ module ForwardBufLogic_4 (
 	output logic input_ready,
 	output logic output_valid,
 	input logic output_ready,
-	output logic out_reg_en
+	output logic out_reg_en,
+	input logic clear
 );
 
 	logic buf_valid;
 
 	assign out_reg_en = input_valid & input_ready;
-	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : (input_valid & input_ready) ? 1'h1 : (output_ready & buf_valid) ? 1'h0 : buf_valid;
+	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : clear ? 1'h0 : (input_valid & input_ready) ? 1'h1 : (output_ready & buf_valid) ? 1'h0 : buf_valid;
 	assign input_ready =  ~ buf_valid | output_ready;
 
 	assign output_valid = buf_valid;
@@ -364,13 +391,14 @@ module ForwardBufLogic_3 (
 	output logic input_ready,
 	output logic output_valid,
 	input logic output_ready,
-	output logic out_reg_en
+	output logic out_reg_en,
+	input logic clear
 );
 
 	logic buf_valid;
 
 	assign out_reg_en = input_valid & input_ready;
-	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : (input_valid & input_ready) ? 1'h1 : (output_ready & buf_valid) ? 1'h0 : buf_valid;
+	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : clear ? 1'h0 : (input_valid & input_ready) ? 1'h1 : (output_ready & buf_valid) ? 1'h0 : buf_valid;
 	assign input_ready =  ~ buf_valid | output_ready;
 
 	assign output_valid = buf_valid;
@@ -387,13 +415,14 @@ module ForwardBufLogic_2 (
 	output logic input_ready,
 	output logic output_valid,
 	input logic output_ready,
-	output logic out_reg_en
+	output logic out_reg_en,
+	input logic clear
 );
 
 	logic buf_valid;
 
 	assign out_reg_en = input_valid & input_ready;
-	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : (input_valid & input_ready) ? 1'h1 : (output_ready & buf_valid) ? 1'h0 : buf_valid;
+	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : clear ? 1'h0 : (input_valid & input_ready) ? 1'h1 : (output_ready & buf_valid) ? 1'h0 : buf_valid;
 	assign input_ready =  ~ buf_valid | output_ready;
 
 	assign output_valid = buf_valid;
@@ -410,13 +439,14 @@ module ForwardBufLogic (
 	output logic input_ready,
 	output logic output_valid,
 	input logic output_ready,
-	output logic out_reg_en
+	output logic out_reg_en,
+	input logic clear
 );
 
 	logic buf_valid;
 
 	assign out_reg_en = input_valid & input_ready;
-	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : (input_valid & input_ready) ? 1'h1 : (output_ready & buf_valid) ? 1'h0 : buf_valid;
+	always_ff @(posedge clock_port) buf_valid <= reset_port ? 1'h0 : clear ? 1'h0 : (input_valid & input_ready) ? 1'h1 : (output_ready & buf_valid) ? 1'h0 : buf_valid;
 	assign input_ready =  ~ buf_valid | output_ready;
 
 	assign output_valid = buf_valid;

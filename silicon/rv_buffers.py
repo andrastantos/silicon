@@ -24,6 +24,8 @@ class ForwardBufLogic(Module):
 
     out_reg_en = Output(logic)
 
+    clear = Input(logic, default_port_value=0)
+
     def body(self):
         in_ready = self.input_ready
         in_valid = self.input_valid
@@ -32,7 +34,7 @@ class ForwardBufLogic(Module):
         buf_valid = Wire(logic)
 
         self.out_reg_en <<= in_valid & in_ready
-        buf_valid <<= Reg(Select(in_valid & in_ready, Select(out_ready & buf_valid, buf_valid, 0), 1))
+        buf_valid <<= Reg(Select(self.clear, Select(in_valid & in_ready, Select(out_ready & buf_valid, buf_valid, 0), 1), 0))
 
         self.output_valid <<= buf_valid
         out_ready <<= self.output_ready
@@ -48,6 +50,8 @@ class ForwardBuf(Module):
     output_port = Output()
     clock_port = ClkPort()
     reset_port = RstPort()
+
+    clear = Input(logic, default_port_value=0)
 
     '''
     This old implementation generates better RTL at the moment.
@@ -87,6 +91,7 @@ class ForwardBuf(Module):
         fsm.input_valid <<= self.input_port.valid
         fsm.output_ready <<= self.output_port.ready
         self.output_port.valid <<= fsm.output_valid
+        fsm.clear <<= self.clear
 
         data = self.input_port.get_data_members()
 
@@ -107,6 +112,8 @@ class ReverseBuf(Module):
     clock_port = ClkPort()
     reset_port = RstPort()
 
+    clear = Input(logic, default_port_value=0)
+
     def body(self):
         buf_valid = Wire(logic)
         buf_load = Wire(logic)
@@ -125,7 +132,7 @@ class ReverseBuf(Module):
 
         buf_load <<= in_valid & in_ready & ~out_ready
 
-        buf_valid <<= Reg(Select(out_ready, Select(buf_load, buf_valid, 1), 0))
+        buf_valid <<= Reg(Select(self.clear, Select(out_ready, Select(buf_load, buf_valid, 1), 0), 0))
 
         self.output_port.valid <<= Select(out_ready & ~buf_valid, buf_valid, in_valid & in_ready)
 
