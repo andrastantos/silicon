@@ -99,7 +99,7 @@ class Butterfly(Module):
                 registered_input = True,
                 registered_output = False
             ),),
-            reset_content = "xxx.bin"
+            init_content = "xxx.bin"
         )
         mem = Memory(config)
 

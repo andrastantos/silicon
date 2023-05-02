@@ -85,13 +85,82 @@ from .utils import str_block, is_power_of_two, first
 from .sym_table import SymbolTable
 from .netlist import Netlist
 from .exceptions import SyntaxErrorException, InvalidPortError
-from typing import Optional, Sequence, Generator, Any, List, BinaryIO
+from typing import Optional, Sequence, Generator, Union, List, BinaryIO, Callable
 from .number import logic, Unsigned
 from .utils import TSimEvent, explicit_adapt
 from textwrap import indent
 from .number import Unsigned, is_number
 from .primitives import Reg, Select
+from io import BytesIO
 
+
+def init_mem(init_content, content_width, content_depth):
+    leftover_bit_cnt = 0
+    leftover_bits = 0
+    def mask(bits) -> int: return (1 << bits) - 1
+    def read_bits(f: BinaryIO, count: int) -> int:
+        nonlocal leftover_bit_cnt, leftover_bits
+        bytes_to_read = (count - leftover_bit_cnt + 7) // 8
+        new_bytes = f.read(bytes_to_read)
+        eof = len(new_bytes) < bytes_to_read
+        if eof:
+            count = len(new_bytes) * 8 + leftover_bit_cnt
+        if count == 0 and len(new_bytes) == 0:
+            raise EOFError()
+        if count <= leftover_bit_cnt:
+            ret_val = leftover_bits & mask(count)
+            leftover_bit_cnt -= count
+            leftover_bits >>= count
+            return ret_val
+        ret_val = leftover_bits
+        count -= leftover_bit_cnt
+        shift = leftover_bit_cnt
+        idx = 0
+        while count > 8:
+            ret_val |= new_bytes[idx] << shift
+            count -= 8
+            idx += 1
+            shift += 8
+        ret_val |= (new_bytes[idx] & mask(count)) << shift
+        leftover_bit_cnt = 8-count
+        leftover_bits = new_bytes[idx] >> (8-count)
+        return ret_val
+
+    content = {}
+    if init_content is not None:
+        if callable(init_content):
+            generator = init_content(content_width, content_depth)
+            try:
+                for idx in range(content_depth):
+                    data = next(generator)
+                    content[idx] = data
+            except StopIteration:
+                pass # memory content is only partially specified
+            generator.close()
+        elif isinstance(init_content, str):
+            f = open(init_content, "rt")
+            with f:
+                try:
+                    idx = 0
+                    for line in f:
+                        values = line.split()
+                        for value in values:
+                            int_val = int(value, base=16)
+                            content[idx] = int_val
+                            idx += 1
+                            if idx > content_depth:
+                                break
+                except EOFError:
+                    pass
+        else:
+            f = BytesIO(init_content)
+            with f:
+                try:
+                    for idx in range(content_depth):
+                        content[idx] = read_bits(f, content_width)
+                except EOFError:
+                    pass
+    return content
 class _BasicMemory(GenericModule):
     class MemoryPort(object):
         def __init__(self):
@@ -101,10 +170,10 @@ class _BasicMemory(GenericModule):
             self.addr = Input()
             self.data_out = Output()
 
-    def construct(self, port_cnt: int, reset_content: Optional[str] = None):
+    def construct(self, port_cnt: int, init_content: Optional[Union[str, Callable]] = None):
         self.mem_ports: List[_BasicMemory.MemoryPort] = []
         self.do_log = False
-        self.reset_content = reset_content
+        self.init_content = init_content
         for idx in range(port_cnt):
             port = _BasicMemory.MemoryPort()
             setattr(self, f"data_in_{idx}_port", port.data_in)
@@ -148,11 +217,14 @@ class _BasicMemory(GenericModule):
             except AttributeError:
                 raise SyntaxErrorException(f"Memory port {idx} for {self} has doesn't have its address port connected")
             port.has_read = port.data_out.get_net_type() is not None # Not precise, but good enough: the only reason reads would fail if the output junction has no type
+            port.mem_size_in_bits = port.depth * port.width
 
         max_width = max(port.width for port in self.mem_ports)
         for idx, port in enumerate(self.mem_ports):
             if max_width % port.width != 0:
                 raise SyntaxErrorException(f"Memory width {max_width} is not divisible by width {port.width} of port {idx} for {self}.")
+
+
 
     def simulate(self, simulator: 'Simulator') -> TSimEvent:
         # We have some optional ports, but those would have drivers by this stage: a constant 'None' or '0' driver
@@ -164,49 +236,16 @@ class _BasicMemory(GenericModule):
         trigger_ports.append(self.content_trigger)
 
         self._setup()
-
-        leftover_bit_cnt = 0
-        leftover_bits = 0
-        def mask(bits) -> int: return (1 << bits) - 1
-        def read_bits(f: BinaryIO, count: int) -> int:
-            nonlocal leftover_bit_cnt, leftover_bits
-            bytes_to_read = (count - leftover_bit_cnt + 7) // 8
-            new_bytes = f.read(bytes_to_read)
-            eof = len(new_bytes) < bytes_to_read
-            if eof:
-                count = len(new_bytes) * 8 + leftover_bit_cnt
-            if count == 0 and len(new_bytes) == 0:
-                raise EOFError()
-            if count <= leftover_bit_cnt:
-                ret_val = leftover_bits & mask(count)
-                leftover_bit_cnt -= count
-                leftover_bits >>= count
-                return ret_val
-            ret_val = leftover_bits
-            count -= leftover_bit_cnt
-            shift = leftover_bit_cnt
-            idx = 0
-            while count > 8:
-                ret_val |= new_bytes[idx] << shift
-                count -= 8
-                idx += 1
-                shift += 8
-            ret_val |= (new_bytes[idx] & mask(count)) << shift
-            leftover_bit_cnt = 8-count
-            leftover_bits = new_bytes[idx] >> (8-count)
-            return ret_val
-
-        content = {}
         content_width = min(port.width for port in self.mem_ports)
-        if self.reset_content is not None:
-            idx = 0
-            with open(self.reset_content, "rb") as f:
-                try:
-                    while True:
-                        content[idx] = read_bits(f, content_width)
-                        idx += 1
-                except EOFError:
-                    pass
+        content_depth = 0
+        for port in self.mem_ports:
+            content_depth = max(content_depth, port.mem_size_in_bits//content_width)
+        content = init_mem(
+            self.init_content,
+            content_width,
+            content_depth
+        )
+
 
         def read_mem(addr: int, data_width: int) -> int:
             value = 0
@@ -303,7 +342,7 @@ class MemoryPortConfig:
 @dataclass
 class MemoryConfig:
     port_configs: Sequence[MemoryPortConfig]
-    reset_content: Optional[str] = None
+    init_content: Optional[Union[str, Callable]] = None
 
 # TODO:
 # - Add read-enable port
@@ -327,6 +366,7 @@ class _Memory(GenericModule):
         self.secondary_port_configs = []
         self.mem_size = None
         self.mem_data_bits = None
+        self.mem_max_data_bits = None
         self.mem_addr_range = None
         self.addr_reg_symbols = []
         for idx, port_config in enumerate(self.config.port_configs):
@@ -440,25 +480,27 @@ class _Memory(GenericModule):
             port_config.addr_bits = addr_bits
             port_config.data_bits = data_bits
 
-        if not has_data_in and self.config.reset_content is None:
-            raise SyntaxErrorException(f"For ROMs, reset_content must be specified")
+        if not has_data_in and self.config.init_content is None:
+            raise SyntaxErrorException(f"For ROMs, init_content must be specified")
 
         # Determine memory size
         self.mem_size = 0
-        self.mem_data_bits = 0
+        self.mem_max_data_bits = 0
+        self.mem_data_bits = None
         for port_config in self.config.port_configs:
             data_bits = port_config.data_bits
             addr_bits = port_config.addr_bits
             self.mem_size = max(self.mem_size, data_bits * (1 << addr_bits))
-            self.mem_data_bits = max(data_bits, self.mem_data_bits)
+            self.mem_max_data_bits = max(data_bits, self.mem_max_data_bits)
+            self.mem_data_bits = data_bits if self.mem_data_bits is None else min(data_bits, self.mem_data_bits)
         self.mem_addr_range = self.mem_size // self.mem_data_bits
 
         # Finding primary and secondary ports, while checking for port compatibility
         for port_config in self.config.port_configs:
             data_bits = port_config.data_bits
-            if self.mem_data_bits % data_bits != 0:
+            if self.mem_max_data_bits % data_bits != 0:
                 raise SyntaxErrorException(f"For multi-port memories, data sizes on all ports must be integer multiples of one another")
-            ratio = self.mem_data_bits // data_bits
+            ratio = self.mem_max_data_bits // data_bits
             if not is_power_of_two(ratio):
                 raise SyntaxErrorException(f"For multi-port memories, data size ratios must be powers of 2")
 
@@ -480,13 +522,13 @@ class _Memory(GenericModule):
 
         if not has_data_in and not has_data_out:
             raise SyntaxErrorException(f"Memory has neither its read nor its write data connected. That's not a valid use of a memory")
-        if not has_data_in and self.config.reset_content is None:
-            raise SyntaxErrorException(f"For ROMs, reset_content must be specified")
+        if not has_data_in and self.config.init_content is None:
+            raise SyntaxErrorException(f"For ROMs, init_content must be specified")
 
     def body(self):
         self._setup()
 
-        inner_mem = _BasicMemory(len(self.config.port_configs), self.config.reset_content)
+        inner_mem = _BasicMemory(len(self.config.port_configs), self.config.init_content)
         #inner_mem.do_log = True
         for idx, port_config in enumerate(self.config.port_configs):
             inner_mem.set_port_type(idx, Unsigned(port_config.data_type.get_num_bits()))
@@ -508,21 +550,22 @@ class _Memory(GenericModule):
             inner_write_en <<= write_en_port
             inner_write_clk <<= clk_port
 
-    def generate_reset_content(self, back_end: 'BackEnd', memory_name: str) -> str:
+    def generate_init_content(self, back_end: 'BackEnd', memory_name: str) -> str:
         rtl_body = ""
-        if self.config.reset_content is not None:
+        if self.config.init_content is not None:
             rtl_body += f"initial begin\n"
-            if callable(self.config.reset_content):
-                generator = self.config.reset_content(self.mem_data_bits, self.mem_addr_range)
-                try:
-                    for addr in range(self.mem_addr_range):
-                        data = next(generator)
-                        rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {self.mem_data_bits}'h{data:x};\n")
-                except StopIteration:
-                    pass # memory content is only partially specified
-                generator.close()
+            if isinstance(self.config.init_content, str):
+                rtl_body += back_end.indent(f'$readmemh("{self.config.init_content}", mem);\n')
             else:
-                rtl_body += back_end.indent(f'$readmemb("{self.config.reset_content}", mem);\n')
+                content = init_mem(self.config.init_content, self.mem_data_bits, self.mem_addr_range)
+                factor2d = self.mem_max_data_bits // self.mem_data_bits
+                for addr, data in content.items():
+                    if factor2d != 1:
+                        outer_addr = addr // factor2d
+                        inner_addr = addr % factor2d
+                        rtl_body += back_end.indent(f"{memory_name}[{outer_addr}][{inner_addr}] <= {self.mem_data_bits}'h{data:x};\n")
+                    else:
+                        rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {self.mem_data_bits}'h{data:x};\n")
             rtl_body += f"end\n"
             rtl_body += f"\n"
 
@@ -549,7 +592,7 @@ class _Memory(GenericModule):
 
         rtl_body =  f"logic [{data_bits-1}:0] {memory_name} [{(1 << addr_bits)-1}:0];\n"
 
-        rtl_body += self.generate_reset_content(back_end, memory_name)
+        rtl_body += self.generate_init_content(back_end, memory_name)
 
         data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
 
@@ -601,12 +644,12 @@ class _Memory(GenericModule):
         mem_ratio = self.secondary_port_configs[0].mem_ratio
 
         if mixed_ratios:
-            rtl_body =  f"reg [{mem_ratio-1}:0] [{self.mem_data_bits/mem_ratio-1}:0] {memory_name}[0:{self.mem_addr_range-1}];\n"
+            rtl_body =  f"reg [{mem_ratio-1}:0] [{self.mem_data_bits-1}:0] {memory_name}[0:{self.mem_addr_range-1}];\n"
         else:
             rtl_body =  f"reg [{self.mem_data_bits-1}:0] {memory_name}[0:{self.mem_addr_range-1}];\n"
         rtl_body += f"\n"
 
-        rtl_body += self.generate_reset_content(back_end, memory_name)
+        rtl_body += self.generate_init_content(back_end, memory_name)
 
         for idx, port_config in enumerate(self.config.port_configs):
             data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
@@ -802,7 +845,7 @@ class SimpleDualPortMemory(Memory):
         registered_output_a: bool = False,
         registered_input_b: bool = True,
         registered_output_b: bool = False,
-        reset_content: Optional[str] = None
+        init_content: Optional[Union[str, Callable]] = None
     ):
         config = MemoryConfig(
             (MemoryPortConfig(
@@ -817,7 +860,7 @@ class SimpleDualPortMemory(Memory):
                 registered_input = registered_input_b,
                 registered_output = registered_output_b
             ),),
-            reset_content = reset_content
+            init_content = init_content
         )
         return super().construct(config)
     def _get_prefix_for_port(self, default_idx: int, port: Optional[str] = None) -> str:

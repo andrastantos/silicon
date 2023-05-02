@@ -48,7 +48,7 @@ module Memory (
 	reg [13:0] mem[0:63];
 
 	initial begin
-		$readmemb("config.bin", mem);
+		$readmemh("config.bin", mem);
 	end
 
 	logic [5:0] port1_addr_reg;

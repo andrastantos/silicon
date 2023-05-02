@@ -27,7 +27,7 @@ module Memory (
 
 	logic [7:0] mem [255:0];
 	initial begin
-		$readmemb("xxx.bin", mem);
+		$readmemh("xxx.bin", mem);
 	end
 
 	assign data_out = mem[addr];

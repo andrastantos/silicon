@@ -21,7 +21,7 @@ def test_single_port_ram_no_ports(mode: str = "rtl"):
             registered_input = True,
             registered_output = False
         ),),
-        reset_content = None
+        init_content = None
     )
 
     if mode == "rtl":
@@ -45,7 +45,7 @@ def _test_single_port_ram(mode: str, registered_input: bool, registered_output: 
                     registered_input = registered_input,
                     registered_output = registered_output
                 ),),
-                reset_content = None
+                init_content = None
             )
             mem = Memory(config)
             mem.data_in <<= self.data_in
@@ -122,7 +122,7 @@ def test_single_port_async_rom(mode: str = "rtl"):
                     registered_input = False,
                     registered_output = False
                 ),),
-                reset_content = "xxx.bin"
+                init_content = "xxx.bin"
             )
             mem = Memory(config)
             self.data_out <<= mem.data_out
@@ -146,7 +146,7 @@ def test_single_port_rom(mode: str = "rtl"):
                     registered_input = True,
                     registered_output = False
                 ),),
-                reset_content = "xxx.bin"
+                init_content = "xxx.bin"
             )
             mem = Memory(config)
             self.data_out <<= mem.data_out
@@ -176,7 +176,7 @@ def test_single_port_rom2(mode: str = "rtl"):
                     registered_input = True,
                     registered_output = False
                 ),),
-                reset_content = rom_content
+                init_content = rom_content
             )
             mem = Memory(config)
             self.data_out <<= mem.data_out
@@ -206,7 +206,7 @@ def test_single_port_rom3(mode: str = "rtl"):
                     registered_input = True,
                     registered_output = False
                 ),),
-                reset_content = rom_content
+                init_content = rom_content
             )
             mem = Memory(config)
             self.data_out <<= mem.data_out
@@ -236,7 +236,7 @@ def test_single_port_rom4(mode: str = "rtl"):
                     registered_input = True,
                     registered_output = True
                 ),),
-                reset_content = rom_content
+                init_content = rom_content
             )
             mem = Memory(config)
             self.data_out <<= mem.data_out
@@ -275,7 +275,7 @@ def _test_simple_dual_port_ram(mode: str, registered_input_a: bool, registered_o
                     registered_input = registered_input_b,
                     registered_output = registered_output_b
                 ),),
-                reset_content = "config.bin"
+                init_content = "config.bin"
             )
             mem = Memory(config)
             if port_a & READ != 0:
@@ -379,7 +379,7 @@ def test_simple_dual_port_ram_sim(mode = "sim", read_new_data_a = True, read_new
                     registered_input = read_new_data_b,
                     registered_output = not read_new_data_b
                 ),),
-                reset_content = "config.bin"
+                init_content = "config.bin"
             )
             mem = Memory(config)
             self.data_out_a <<= mem.port1_data_out
@@ -517,7 +517,7 @@ def test_struct_ram(mode: str = "rtl", registered_input: bool = True, registered
                     registered_input = registered_input,
                     registered_output = registered_output
                 ),),
-                reset_content = None
+                init_content = None
             )
             mem = Memory(config)
             mem.data_in <<= self.data_in
@@ -778,7 +778,7 @@ if __name__ == "__main__":
     #test_single_port_ram_tf("rtl")
     #test_single_port_ram_tt("rtl")
     #test_single_port_rom("rtl")
-    #test_single_port_rom2("rtl")
+    test_single_port_rom2("rtl")
     #test_single_port_rom3("rtl")
     #test_single_port_rom4("rtl")
     #test_simple_dual_port_ram_ftft("rtl")
@@ -788,7 +788,7 @@ if __name__ == "__main__":
     #test_simple_dual_port_ram_tttf("rtl")
     #test_simple_dual_port_ram_tttt("rtl")
     #test_single_port_async_rom("rtl")
-    test_simple_dual_port_ram_rw("rtl")
+    #test_simple_dual_port_ram_rw("rtl")
     #test_simple_dual_port_ram_sim()
     #test_single_port_ram_tt("sim")
     #test_struct_ram("rtl")
