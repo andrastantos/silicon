@@ -123,7 +123,7 @@ def init_mem(init_content, content_width, content_depth):
             shift += 8
         ret_val |= (new_bytes[idx] & mask(count)) << shift
         leftover_bit_cnt = 8-count
-        leftover_bits = new_bytes[idx] >> (8-count)
+        leftover_bits = new_bytes[idx] >> (8-count) if count < 8 else 0
         return ret_val
 
     content = {}
@@ -302,7 +302,8 @@ class _BasicMemory(GenericModule):
                 we_edge_type = port.write_clk.get_sim_edge()
                 if we_edge_type == EdgeType.Undefined:
                     # We don't know if there was an edge: clear the whole memory
-                    content.clear()
+                    if port.write_en != 0 and simulator.now > 0:
+                        content.clear()
                     self.content_trigger <<= 1 if self.content_trigger == 0 else 0
                     continue
                 if we_edge_type == EdgeType.Positive:
