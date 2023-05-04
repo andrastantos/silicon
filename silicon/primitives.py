@@ -363,8 +363,16 @@ class SelectOne(_SelectOneHot):
             ret_val += f"{prefix}({selector_expression} ? {value_expression} : {zero}) | "
         assert default_member is None or default_member.is_specialized()
         if default_member is not None:
+            default_selector = ""
+            op_precedence = back_end.get_operator_precedence("&", False)
+            for selector, value in selector_to_value_map.items():
+                selector_expression, _ = selector.get_rhs_expression(back_end, target_namespace, None, op_precedence)
+                default_selector += f"{selector_expression} | "
+            # delete the last '&'
+            assert default_selector[-3:] == " | "
+            default_selector = default_selector[:-3]
             default_expression, _ = default_member.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
-            ret_val += f"{prefix}{default_expression}"
+            ret_val += f"{prefix}({default_selector} ? {zero} : {default_expression})"
         else:
             assert ret_val[-2:] == "| "
             ret_val = ret_val[:-2] # delete the last '|'

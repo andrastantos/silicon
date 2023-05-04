@@ -161,12 +161,12 @@ module FSMLogic (
 	logic [2:0] state_send_data_selector;
 	logic [2:0] state_get_first_data_selector;
 
-	assign state_reset_selector = (input_reset_to_idle ? `States__idle : 3'b0) | `States__reset;
-	assign state_idle_selector = (input_idle_to_get_first_data ? `States__get_first_data : 3'b0) | (input_idle_to_send_data ? `States__send_data : 3'b0) | `States__idle;
-	assign state_get_data_selector = (input_get_data_to_get_wait ? `States__get_wait : 3'b0) | (input_get_data_to_get_data ? `States__get_data : 3'b0) | (input_get_data_to_send_data ? `States__send_data : 3'b0) | `States__get_data;
-	assign state_get_wait_selector = (input_get_wait_to_get_wait ? `States__get_wait : 3'b0) | (input_get_wait_to_get_data ? `States__get_data : 3'b0) | (input_get_wait_to_send_data ? `States__send_data : 3'b0) | `States__get_wait;
-	assign state_send_data_selector = (input_send_data_to_idle ? `States__idle : 3'b0) | (input_send_data_to_get_first_data ? `States__get_first_data : 3'b0) | (input_send_data_to_send_data ? `States__send_data : 3'b0) | `States__send_data;
-	assign state_get_first_data_selector = (input_get_first_data_to_get_wait ? `States__get_wait : 3'b0) | (input_get_first_data_to_get_data ? `States__get_data : 3'b0) | (input_get_first_data_to_send_data ? `States__send_data : 3'b0) | `States__get_first_data;
+	assign state_reset_selector = (input_reset_to_idle ? `States__idle : 3'b0) | (input_reset_to_idle ? 3'b0 : `States__reset);
+	assign state_idle_selector = (input_idle_to_get_first_data ? `States__get_first_data : 3'b0) | (input_idle_to_send_data ? `States__send_data : 3'b0) | (input_idle_to_get_first_data | input_idle_to_send_data ? 3'b0 : `States__idle);
+	assign state_get_data_selector = (input_get_data_to_get_wait ? `States__get_wait : 3'b0) | (input_get_data_to_get_data ? `States__get_data : 3'b0) | (input_get_data_to_send_data ? `States__send_data : 3'b0) | (input_get_data_to_get_wait | input_get_data_to_get_data | input_get_data_to_send_data ? 3'b0 : `States__get_data);
+	assign state_get_wait_selector = (input_get_wait_to_get_wait ? `States__get_wait : 3'b0) | (input_get_wait_to_get_data ? `States__get_data : 3'b0) | (input_get_wait_to_send_data ? `States__send_data : 3'b0) | (input_get_wait_to_get_wait | input_get_wait_to_get_data | input_get_wait_to_send_data ? 3'b0 : `States__get_wait);
+	assign state_send_data_selector = (input_send_data_to_idle ? `States__idle : 3'b0) | (input_send_data_to_get_first_data ? `States__get_first_data : 3'b0) | (input_send_data_to_send_data ? `States__send_data : 3'b0) | (input_send_data_to_idle | input_send_data_to_get_first_data | input_send_data_to_send_data ? 3'b0 : `States__send_data);
+	assign state_get_first_data_selector = (input_get_first_data_to_get_wait ? `States__get_wait : 3'b0) | (input_get_first_data_to_get_data ? `States__get_data : 3'b0) | (input_get_first_data_to_send_data ? `States__send_data : 3'b0) | (input_get_first_data_to_get_wait | input_get_first_data_to_get_data | input_get_first_data_to_send_data ? 3'b0 : `States__get_first_data);
 	assign next_state = 
 		(state == `States__reset ? state_reset_selector : 3'b0) | 
 		(state == `States__idle ? state_idle_selector : 3'b0) | 
@@ -174,7 +174,7 @@ module FSMLogic (
 		(state == `States__get_wait ? state_get_wait_selector : 3'b0) | 
 		(state == `States__send_data ? state_send_data_selector : 3'b0) | 
 		(state == `States__get_first_data ? state_get_first_data_selector : 3'b0) | 
-		default_state;
+		(state == `States__reset | state == `States__idle | state == `States__get_data | state == `States__get_wait | state == `States__send_data | state == `States__get_first_data ? 3'b0 : default_state);
 
 endmodule
 

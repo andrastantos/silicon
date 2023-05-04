@@ -73,8 +73,8 @@ module FSMLogic (
 
 	logic [1:0] state_0_selector;
 
-	assign state_0_selector = (input_0_to_1 ? 1'h1 : 2'b0) | (input_0_to_3 ? 2'h3 : 2'b0) | 1'h0;
-	assign next_state = (state == 1'h0 ? state_0_selector : 2'b0) | default_state;
+	assign state_0_selector = (input_0_to_1 ? 1'h1 : 2'b0) | (input_0_to_3 ? 2'h3 : 2'b0) | (input_0_to_1 | input_0_to_3 ? 2'b0 : 1'h0);
+	assign next_state = (state == 1'h0 ? state_0_selector : 2'b0) | (state == 1'h0 ? 2'b0 : default_state);
 
 endmodule
 

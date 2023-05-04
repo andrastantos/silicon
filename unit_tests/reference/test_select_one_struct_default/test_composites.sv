@@ -30,19 +30,19 @@ module top (
 		(sel_in[1] ? in2_b : 8'b0) | 
 		(sel_in[2] ? in3_b : 8'b0) | 
 		(sel_in[3] ? in4_b : 8'b0) | 
-		in2_b;
+		(sel_in[0] | sel_in[1] | sel_in[2] | sel_in[3] ? 8'b0 : in2_b);
 	assign out_port_g = 
 		(sel_in[0] ? in1_g : 8'b0) | 
 		(sel_in[1] ? in2_g : 8'b0) | 
 		(sel_in[2] ? in3_g : 8'b0) | 
 		(sel_in[3] ? in4_g : 8'b0) | 
-		in2_g;
+		(sel_in[0] | sel_in[1] | sel_in[2] | sel_in[3] ? 8'b0 : in2_g);
 	assign out_port_r = 
 		(sel_in[0] ? in1_r : 8'b0) | 
 		(sel_in[1] ? in2_r : 8'b0) | 
 		(sel_in[2] ? in3_r : 8'b0) | 
 		(sel_in[3] ? in4_r : 8'b0) | 
-		in2_r;
+		(sel_in[0] | sel_in[1] | sel_in[2] | sel_in[3] ? 8'b0 : in2_r);
 
 endmodule
 
