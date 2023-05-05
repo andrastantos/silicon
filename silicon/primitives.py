@@ -643,6 +643,8 @@ class GenericReg(GenericModule):
             else:
                 ret_val = f"{always} @({edge} {clk} or {rst_sensitivity_expression})"
             ret_val += f" {output_name} <= {rst_test_expression} ? {rst_val_expression} : {input_expression};\n"
+        if self.reset_value_port.is_specialized():
+            ret_val += f"initial {output_name} <= {rst_val_expression};\n"
         return ret_val
 
     def simulate(self) -> TSimEvent:

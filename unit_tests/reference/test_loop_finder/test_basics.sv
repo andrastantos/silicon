@@ -46,6 +46,7 @@ module FSM (
 	logic [1:0] local_next_state;
 
 	always_ff @(posedge clock_port) local_state <= reset_port ? reset_value : local_next_state;
+	initial local_state <= reset_value;
 
 	FSMLogic fsm_logic (
 		.state(local_state),

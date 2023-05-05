@@ -27,7 +27,9 @@ module top (
 	always_ff @(posedge clk2) u8_output_port <= u8_reset_port ? 4'h0 : uin2;
 	always_ff @(posedge clk1) u9_output_port <= u8_reset_port ? 2'h0 : uin1;
 	always_ff @(posedge clk1) reset_reg <= uin2[1] ? 2'h3 : uin1;
+	initial reset_reg <= 2'h3;
 	always_ff @(posedge clk1) reset_reg2 <= u8_reset_port ? 2'h2 : uin1;
+	initial reset_reg2 <= 2'h2;
 	assign sout1 = u_output_port;
 	assign registered_1 = registered;
 	assign uout2 = u8_output_port;
