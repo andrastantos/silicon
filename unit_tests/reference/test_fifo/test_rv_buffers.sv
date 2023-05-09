@@ -135,7 +135,7 @@ module Memory (
 
 	logic [7:0] real_mem_port2_data_out;
 
-	reg [7:0] mem[0:15];
+	reg [7:0] mem [0:15];
 
 	always @(posedge port1_clk) begin
 		if (port1_write_en) begin

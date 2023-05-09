@@ -591,7 +591,7 @@ class _Memory(GenericModule):
         data_bits = port_config.data_bits
         addr_bits = port_config.addr_bits
 
-        rtl_body =  f"logic [{data_bits-1}:0] {memory_name} [{(1 << addr_bits)-1}:0];\n"
+        rtl_body =  f"logic [{data_bits-1}:0] {memory_name} [0:{(1 << addr_bits)-1}];\n"
 
         rtl_body += self.generate_init_content(back_end, memory_name)
 
@@ -645,9 +645,9 @@ class _Memory(GenericModule):
         mem_ratio = self.secondary_port_configs[0].mem_ratio
 
         if mixed_ratios:
-            rtl_body =  f"reg [{mem_ratio-1}:0] [{self.mem_data_bits-1}:0] {memory_name}[0:{self.mem_addr_range-1}];\n"
+            rtl_body =  f"reg [{mem_ratio-1}:0] [{self.mem_data_bits-1}:0] {memory_name} [0:{self.mem_addr_range-1}];\n"
         else:
-            rtl_body =  f"reg [{self.mem_data_bits-1}:0] {memory_name}[0:{self.mem_addr_range-1}];\n"
+            rtl_body =  f"reg [{self.mem_data_bits-1}:0] {memory_name} [0:{self.mem_addr_range-1}];\n"
         rtl_body += f"\n"
 
         rtl_body += self.generate_init_content(back_end, memory_name)

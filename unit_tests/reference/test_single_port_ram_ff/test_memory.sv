@@ -31,7 +31,7 @@ module Memory (
 	input logic write_en
 );
 
-	logic [7:0] mem [255:0];
+	logic [7:0] mem [0:255];
 	always @(posedge clk) begin
 		if (write_en) begin
 			mem[addr] <= data_in;

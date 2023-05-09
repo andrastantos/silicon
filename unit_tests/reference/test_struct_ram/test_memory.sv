@@ -51,7 +51,7 @@ module Memory (
 
 	logic [23:0] real_mem_data_out;
 
-	logic [23:0] mem [255:0];
+	logic [23:0] mem [0:255];
 	logic [7:0] addr_reg;
 	always @(posedge clk) begin
 		if (write_en) begin

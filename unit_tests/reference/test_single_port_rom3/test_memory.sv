@@ -25,7 +25,7 @@ module Memory (
 	output logic [7:0] data_out
 );
 
-	logic [7:0] mem [255:0];
+	logic [7:0] mem [0:255];
 	initial begin
 		mem[0] <= 8'h0;
 		mem[1] <= 8'h1;

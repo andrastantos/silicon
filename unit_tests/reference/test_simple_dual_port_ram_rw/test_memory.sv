@@ -40,7 +40,7 @@ module Memory (
 	input logic port2_write_en
 );
 
-	reg [13:0] mem[0:63];
+	reg [13:0] mem [0:63];
 
 	initial begin
 		$readmemh("config.bin", mem);
