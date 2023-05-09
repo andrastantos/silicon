@@ -277,6 +277,15 @@
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "justMyCode": false
-        }
+        },
+        {
+            "name": "Python: BREW/brew_v1",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/../brew/rtl/v1/brew_v1.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/../brew/rtl/v1",
+            "justMyCode": false
+        },
     ]
 }
