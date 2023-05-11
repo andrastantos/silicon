@@ -241,6 +241,58 @@ class ScopeTable(object):
                     self.add_soft_symbol(obj, unique_name)
                 assert len(objects) <= 1
 
+    def prefix_symbols(self, prefix: str, filter: Optional[Callable] = None, delimiter: Union[str,Callable] = "_"):
+        delimiter_str = delimiter
+        def default_delimiter(obj):
+            return delimiter_str
+        if isinstance(delimiter, str):
+            delimiter = default_delimiter
+
+        if filter is None:
+            filter = lambda x, y: True;
+
+        assert len(self.auto_symbols) == 0
+
+        new_hard_symbols = WeakValueDictionary()
+        new_hard_names = WeakKeyDictionary()
+        for name, obj in self.hard_symbols.items():
+            if filter(name, obj):
+                name = prefix+delimiter(obj)+name
+            new_hard_symbols[name] = obj
+            try:
+                new_hard_names[obj].add(name)
+            except KeyError:
+                new_hard_names[obj] = OrderedSet((name,))
+        self.hard_symbols = new_hard_symbols
+        self.hard_names = new_hard_names
+
+        new_soft_symbols = {}
+        new_soft_names = WeakKeyDictionary()
+        for name, objs in self.soft_symbols.items():
+            renamed_name = prefix+delimiter(obj)+name
+            renamed_objs = WeakSet()
+            non_renamed_objs = WeakSet()
+            for obj in objs:
+                if filter(name, obj):
+                    renamed_objs.add(obj)
+                    try:
+                        new_soft_names[obj].add(renamed_name)
+                    except KeyError:
+                        new_soft_names[obj] = OrderedSet((renamed_name,))
+                else:
+                    non_renamed_objs.add(obj)
+                    try:
+                        new_soft_names[obj].add(name)
+                    except KeyError:
+                        new_soft_names[obj] = OrderedSet((name,))
+            if len(renamed_objs) > 0:
+                new_soft_symbols[renamed_name] = renamed_objs
+            if len(non_renamed_objs) > 0:
+                new_soft_symbols[name] = non_renamed_objs
+        self.soft_symbols = new_soft_symbols
+        self.soft_names = new_soft_names
+        # We could have created new collisions, so call make_unique again...
+        self.make_unique(None, delimiter)
 
 
 class SymbolTable(object):
@@ -282,3 +334,7 @@ class SymbolTable(object):
     def make_unique(self, delimiter: Union[str,Callable] = "_") -> None:
         for scope, table in self.scopes.items():
             table.make_unique(scope, delimiter)
+
+    def prefix_symbols(self, prefix: str, filter: Optional[Callable] = None, delimiter: Union[str,Callable] = "_"):
+        for _, table in self.scopes.items():
+            table.prefix_symbols(prefix, filter, delimiter)

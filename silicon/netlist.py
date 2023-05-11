@@ -553,11 +553,23 @@ class Netlist(object):
             return set()
         return self.module_to_xnet_map[module]
 
-    def get_module_class_name(self, module_instance: 'Module') -> Optional[str]:
+    def get_module_class_name(self, module_instance: 'Module', add_prefix: bool = True) -> Optional[str]:
         assert is_module(module_instance)
+
+        prefix = ""
+        if add_prefix:
+            if module_instance is self.top_level:
+                try:
+                    prefix = self.top_level_prefix
+                except AttributeError: pass
+            else:
+                try:
+                    prefix = self.name_prefix
+                except AttributeError: pass
+
         if module_instance not in self.module_to_class_map:
             return None
-        return self.module_to_class_map[module_instance]
+        return prefix + self.module_to_class_map[module_instance]
 
     def register_module(self, module: 'Module'):
         assert is_module(module)
@@ -706,10 +718,29 @@ class Netlist(object):
         print_submodules(self.top_level)
 
     @profile
-    def generate(self, back_end: 'BackEnd', file_names: Optional[Union[str, Dict[type, str]]] = None) -> None:
+    def generate(
+        self,
+        back_end: 'BackEnd',
+        *,
+        file_names: Optional[Union[Union[str, Path], Dict[type, Union[str, Path]]]] = None,
+        out_dir: Optional[Union[str, Path]] = None,
+        name_prefix: Optional[str] = None,
+        top_level_prefix: Optional[str] = None,
+    ) -> None:
         from .utils import str_block
 
-        streams = back_end.generate_order(self, file_names)
+        streams = back_end.generate_order(self, file_names, out_dir)
+
+        #if name_prefix is not None:
+        #    def filter_symbol(_, obj) -> bool:
+        #        return is_module(obj)
+        #    self.symbol_table.prefix_symbols(name_prefix, filter_symbol)
+        #if top_level_prefix is not None:
+        #    def filter_top(_, obj) -> bool:
+        #        return obj is self.top_level
+        #    self.symbol_table.top.prefix_symbols(top_level_prefix, filter_top)
+        self.top_level_prefix = top_level_prefix + "_" if top_level_prefix is not None else ""
+        self.name_prefix = name_prefix + "_" if name_prefix is not None else ""
 
         self.top_level._impl._generate_needed = True
         for stream, (modules, types) in streams.items():
@@ -727,10 +758,13 @@ class Netlist(object):
                         strm.write(str_block(module_impl, "", "\n\n\n"))
                     # Mark all instances of the same variant as no body needed
                     module_class_base_name = fully_qualified_name(module)
-                    module_class_name = self.module_to_class_map[module]
+                    module_class_name = self.get_module_class_name(module, add_prefix=False)
                     for module_inst in self.module_variants[module_class_base_name][module_class_name]:
                         module_inst._impl._generate_needed = False
                         module_inst._impl._body_generated = True
+
+        delattr(self, "top_level_prefix")
+        delattr(self, "name_prefix")
 
     def simulate(
         self,

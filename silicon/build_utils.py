@@ -19,7 +19,15 @@ class Build:
             return super().__enter__()
 
     @staticmethod
-    def generate_rtl(top_class: Callable, file_names: Optional[Union[str, Dict[type, str]]] = None, back_end: Optional[BackEnd] = None) -> Netlist:
+    def generate_rtl(
+        top_class: Callable,
+        file_names: Optional[Union[Union[str, 'Path'], Dict[type, Union[str, 'Path']]]] = None,
+        *,
+        out_dir: Optional[Union[str, 'Path']] = None,
+        back_end: Optional[BackEnd] = None,
+        name_prefix: Optional[str] = None,
+        top_level_prefix: Optional[str] = None,
+    ) -> Netlist:
         Build.clear()
         with Netlist().elaborate() as netlist:
             top = top_class()
@@ -29,7 +37,7 @@ class Build:
         else:
             back_end.stream_class = Build.RegisteredFile
 
-        netlist.generate(back_end, file_names)
+        netlist.generate(back_end, file_names=file_names, out_dir=out_dir, name_prefix=name_prefix, top_level_prefix=top_level_prefix)
         if not Build._skip_iverilog:
             from shutil import which
             iverilog_path = which("iverilog", mode=os.X_OK)
