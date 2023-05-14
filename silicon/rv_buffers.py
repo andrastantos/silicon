@@ -24,7 +24,7 @@ class ForwardBufLogic(Module):
 
     out_reg_en = Output(logic)
 
-    clear = Input(logic, default_port_value=0)
+    clear = Input(logic, default_value=0)
 
     def body(self):
         in_ready = self.input_ready
@@ -51,7 +51,7 @@ class ForwardBuf(Module):
     clock_port = ClkPort()
     reset_port = RstPort()
 
-    clear = Input(logic, default_port_value=0)
+    clear = Input(logic, default_value=0)
 
     '''
     This old implementation generates better RTL at the moment.
@@ -112,7 +112,7 @@ class ReverseBuf(Module):
     clock_port = ClkPort()
     reset_port = RstPort()
 
-    clear = Input(logic, default_port_value=0)
+    clear = Input(logic, default_value=0)
 
     def body(self):
         buf_valid = Wire(logic)
