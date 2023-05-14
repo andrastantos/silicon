@@ -1089,9 +1089,14 @@ class Junction(JunctionBase):
 
 
 class Port(Junction):
+    def validate_init_args(self, kwargs: Dict[str, Any]):
+        for param_name in kwargs.keys():
+            if param_name not in ("default_value", ):
+                raise SyntaxErrorException(f"Invalid port argument: {param_name}")
 
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False, can_be_deleted: bool = False, **kwargs):
         super().__init__(net_type, parent_module, keyword_only=keyword_only)
+        self.validate_init_args(kwargs)
         self._auto = False # Set to true for auto-ports
         self._can_be_deleted = can_be_deleted
         self._has_default_value = "default_value" in kwargs

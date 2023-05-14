@@ -987,6 +987,20 @@ def test_inverted_slice(mode="rtl"):
     else:
         t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
+def test_invalid_port_param(mode="rtl"):
+    with t.ExpectError(si.SyntaxErrorException):
+        class Top(si.Module):
+            i1 = si.Input(si.Unsigned(8), xxxx=12)
+            #o = si.Output(si.Unsigned(5), yyy=13)
+
+            def body(self):
+                pass
+
+            def simulate(self) -> si.TSimEvent:
+                pass
+
+    pass
+
 if __name__ == "__main__":
     #test_module_decorator1()
     #test_module_decorator()
@@ -1027,4 +1041,5 @@ if __name__ == "__main__":
     #test_mul_size("rtl")
     #test_size_cast_95_size("rtl")
     #test_negative_slice("rtl")
-    test_inverted_slice("rtl")
+    #test_inverted_slice("rtl")
+    test_invalid_port_param("rtl")
