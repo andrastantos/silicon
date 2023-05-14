@@ -14,7 +14,7 @@ module top (
 	input logic rst
 );
 
-	logic fb_clear;
+	logic u1_output_port;
 
 	ForwardBuf fb (
 		.input_port_data(in1_data),
@@ -27,10 +27,10 @@ module top (
 
 		.clock_port(clk),
 		.reset_port(rst),
-		.clear(fb_clear)
+		.clear(u1_output_port)
 	);
 
-	assign fb_clear = fb_clear;
+	assign u1_output_port = 1'h0;
 endmodule
 
 

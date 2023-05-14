@@ -14,7 +14,7 @@ module top (
 	input logic rst
 );
 
-	logic u_clear;
+	logic u2_output_port;
 
 	ReverseBuf u (
 		.input_port_data(in1_data),
@@ -27,10 +27,10 @@ module top (
 
 		.clock_port(clk),
 		.reset_port(rst),
-		.clear(u_clear)
+		.clear(u2_output_port)
 	);
 
-	assign u_clear = u_clear;
+	assign u2_output_port = 1'h0;
 endmodule
 
 

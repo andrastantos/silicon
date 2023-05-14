@@ -47,13 +47,13 @@ module DelayLine (
 );
 
 	logic intermediate_ready;
-	logic u_clear;
-	logic u1_clear;
-	logic u2_clear;
-	logic u3_clear;
-	logic u4_clear;
 	logic [7:0] u_output_port_data;
+	logic u6_output_port;
 	logic u_output_port_valid;
+	logic u11_output_port;
+	logic u12_output_port;
+	logic u13_output_port;
+	logic u14_output_port;
 	logic [7:0] u1_output_port_data;
 	logic u1_output_port_valid;
 	logic u_output_port_ready;
@@ -78,7 +78,7 @@ module DelayLine (
 
 		.clock_port(clock_port),
 		.reset_port(reset_port),
-		.clear(u_clear)
+		.clear(u6_output_port)
 	);
 
 	ForwardBuf_2 u1 (
@@ -92,7 +92,7 @@ module DelayLine (
 
 		.clock_port(clock_port),
 		.reset_port(reset_port),
-		.clear(u1_clear)
+		.clear(u11_output_port)
 	);
 
 	ForwardBuf_3 u2 (
@@ -106,7 +106,7 @@ module DelayLine (
 
 		.clock_port(clock_port),
 		.reset_port(reset_port),
-		.clear(u2_clear)
+		.clear(u12_output_port)
 	);
 
 	ForwardBuf_4 u3 (
@@ -120,7 +120,7 @@ module DelayLine (
 
 		.clock_port(clock_port),
 		.reset_port(reset_port),
-		.clear(u3_clear)
+		.clear(u13_output_port)
 	);
 
 	ForwardBuf_5 u4 (
@@ -134,15 +134,15 @@ module DelayLine (
 
 		.clock_port(clock_port),
 		.reset_port(reset_port),
-		.clear(u4_clear)
+		.clear(u14_output_port)
 	);
 
 	assign intermediate_ready = output_port_ready;
-	assign u_clear = u_clear;
-	assign u1_clear = u1_clear;
-	assign u2_clear = u2_clear;
-	assign u3_clear = u3_clear;
-	assign u4_clear = u4_clear;
+	assign u6_output_port = 1'h0;
+	assign u11_output_port = 1'h0;
+	assign u12_output_port = 1'h0;
+	assign u13_output_port = 1'h0;
+	assign u14_output_port = 1'h0;
 	assign output_port_data = intermediate_data;
 	assign output_port_valid = intermediate_valid;
 endmodule
