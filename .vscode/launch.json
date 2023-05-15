@@ -279,10 +279,10 @@
             "justMyCode": false
         },
         {
-            "name": "Python: BREW/brew_v1",
+            "name": "Python: BREW/gen_anacron_fpga",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/../brew/rtl/v1/brew_v1.py",
+            "program": "${workspaceFolder}/../brew/rtl/v1/gen_anacron_fpga.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/../brew/rtl/v1",
             "justMyCode": false
