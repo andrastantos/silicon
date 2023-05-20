@@ -244,6 +244,47 @@ class Fifo(GenericModule):
             buffer_mem.port2_addr <<= next_pop_addr
             self.output_port.set_data_members(output_data)
 
+class ZeroDelayFifo(GenericModule):
+    input_port = Input()
+    output_port = Output()
+    clock_port = ClkPort()
+    reset_port = RstPort()
+
+    clear = Input(logic, default_value=0)
+
+    def construct(self, depth:int):
+        try:
+            self.depth = int(depth)
+        except TypeError:
+            raise SyntaxErrorException("Fifo depth must be an integer")
+
+    def body(self):
+        data = self.input_port.get_data_members()
+
+        fifo = Fifo(self.depth)
+
+        fifo_input = Wire(self.input_port.get_net_type())
+        fifo_output = Wire(self.input_port.get_net_type())
+        self.output_port.set_net_type(self.input_port.get_net_type())
+
+
+        fifo_input.set_data_members(data)
+        fifo_empty = ~fifo_output.valid
+
+        bypass = fifo_empty & self.output_port.ready & self.input_port.valid & ~self.clear
+        self.input_port.ready <<= fifo_input.ready
+        fifo_input.valid <<= ~bypass & self.input_port.valid
+        self.output_port.valid <<= (bypass | fifo_output.valid)
+        fifo_output.ready <<= self.output_port.ready
+
+        out_data = Wire(data.get_net_type())
+        out_data <<= Select(bypass, fifo_output.get_data_members(), data)
+        self.output_port.set_data_members(out_data)
+
+        fifo.input_port <<= fifo_input
+        fifo_output <<= fifo.output_port
+
+        fifo.clear <<= self.clear
 
 """
 TODO:

@@ -242,6 +242,66 @@ def test_fifo(mode: str = "rtl"):
     else:
         test.simulation(sim_top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
+def test_zero_delay_fifo(mode: str = "rtl"):
+    class top(Module):
+        in1 = Input(RvData)
+        out1 = Output(RvData)
+        clk = ClkPort()
+        rst = RstPort()
+
+        def body(self):
+            dut = ZeroDelayFifo(depth=10)
+            self.out1 <<= dut(self.in1)
+
+    class sim_top(Module):
+        clk = ClkPort()
+        rst = RstPort()
+        def body(self):
+            self.data = Wire(RvData)
+            self.checker_module = Checker()
+            self.generator = Generator()
+            self.data <<= self.generator.output_port
+            dut = top()
+            dut.rst <<= self.rst
+            dut.clk <<= self.clk
+            self.checker_module.input_port <<= dut(self.data)
+
+        def simulate(self) -> TSimEvent:
+            def clk() -> int:
+                yield 10
+                self.clk <<= ~self.clk & self.clk
+                yield 10
+                self.clk <<= ~self.clk
+                yield 0
+
+            print("Simulation started")
+
+            self.generator.max_wait_state = 10
+            self.checker_module.max_wait_state = 2
+            self.rst <<= 1
+            self.clk <<= 1
+            yield 10
+            for i in range(5):
+                yield from clk()
+            self.rst <<= 0
+            for i in range(500):
+                yield from clk()
+            self.generator.max_wait_state = 5
+            self.checker_module.max_wait_state = 5
+            for i in range(500):
+                yield from clk()
+            self.generator.max_wait_state = 2
+            self.checker_module.max_wait_state = 10
+            for i in range(500):
+                yield from clk()
+            now = yield 10
+            print(f"Done at {now}")
+
+    if mode == "rtl":
+        test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+    else:
+        test.simulation(sim_top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
 
 def test_delay_line(mode: str = "rtl"):
     class top(Module):
@@ -476,6 +536,9 @@ def test_reverse_buf_sim():
 def test_fifo_sim():
     test_fifo("sim")
 
+def test_zero_delay_fifo_sim():
+    test_zero_delay_fifo("sim")
+
 def test_gen_chk_sim():
     test_gen_chk("sim")
 
@@ -492,9 +555,10 @@ if __name__ == "__main__":
     #test_forward_buf("sim")
     #test_reverse_buf("sim")
     #test_fifo("sim")
+    test_zero_delay_fifo("sim")
     #test_gen_chk("rtl")
     #test_gen_chk("sim")
     #test_delay_line("sim")
     #test_pacer("sim")
-    test_stage("rtl")
+    #test_stage("rtl")
     #test_stage("sim")

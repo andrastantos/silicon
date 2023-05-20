@@ -15,7 +15,7 @@ from .fsm import FSM
 from .composite import Reverse, Interface, Struct, Array, GenericMember
 from .memory import MemoryConfig, Memory, MemoryPortConfig
 from .rv_interface import ReadyValid, RvSimSource, RvSimSink
-from .rv_buffers import ForwardBuf, ReverseBuf, Fifo, DelayLine, Pacer, ForwardBufLogic, Stage
+from .rv_buffers import ForwardBuf, ReverseBuf, Fifo, ZeroDelayFifo, DelayLine, Pacer, ForwardBufLogic, Stage
 from .common_constructs import trigger
 from .build_utils import Build, skip_iverilog
 from .auto_input import AutoInput, ClkPort, ClkEnPort, RstPort, RstValPort
