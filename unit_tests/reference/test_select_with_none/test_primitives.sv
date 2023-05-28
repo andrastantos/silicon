@@ -19,6 +19,7 @@ module top (
 			2'd2: u_output_port = sin1;
 			2'd3: u_output_port = sin2;
 			2'd4: u_output_port = $signed(1'bX);
+			default: u_output_port = 5'hx;
 		endcase
 	end
 	assign sout1 = u_output_port;

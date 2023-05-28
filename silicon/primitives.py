@@ -117,6 +117,7 @@ class Select(Module):
         assert output_name is not None
 
         selector_type = self.selector_port.get_net_type()
+        output_type = self.output_port.get_net_type()
 
         if back_end.support_always_comb:
             ret_val  = "always_comb begin\n"
@@ -135,7 +136,8 @@ class Select(Module):
         if self.has_default():
             default_expression, _ = self.default_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type())
             ret_val += f"\t\tdefault: {output_name} = {default_expression};\n"
-
+        else:
+            ret_val += f"\t\tdefault: {output_name} = {output_type.get_unconnected_value(back_end)};\n"
         ret_val += "\tendcase\n"
         ret_val += "end"
 

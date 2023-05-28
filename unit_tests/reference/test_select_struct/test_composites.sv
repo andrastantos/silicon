@@ -31,6 +31,7 @@ module top (
 			2'd1: out_port_b = in2_b;
 			2'd2: out_port_b = in3_b;
 			2'd3: out_port_b = in4_b;
+			default: out_port_b = 24'hx;
 		endcase
 	end
 	always @(*) begin
@@ -39,6 +40,7 @@ module top (
 			2'd1: out_port_g = in2_g;
 			2'd2: out_port_g = in3_g;
 			2'd3: out_port_g = in4_g;
+			default: out_port_g = 24'hx;
 		endcase
 	end
 	always @(*) begin
@@ -47,6 +49,7 @@ module top (
 			2'd1: out_port_r = in2_r;
 			2'd2: out_port_r = in3_r;
 			2'd3: out_port_r = in4_r;
+			default: out_port_r = 24'hx;
 		endcase
 	end
 

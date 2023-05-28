@@ -41,6 +41,7 @@ module top (
 			5'd29: o = i[29];
 			5'd30: o = i[30];
 			5'd31: o = i[31];
+			default: o = 1'hx;
 		endcase
 	end
 
