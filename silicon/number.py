@@ -556,7 +556,7 @@ class Number(NetTypeFactory):
         TODO: get_slice will need review
         """
         def construct(self, slice: Union[int, slice], number: 'NumberMeta') -> None:
-            self.key = Number.Instance.Key(slice)
+            self.key = Number.Instance.Key(slice, number)
             self.input_port = Input(number)
             # At least in SystemVerilog slice always returns unsigned.
             # That I think makes more sense so I'll implement it that way here too.
@@ -755,7 +755,7 @@ class Number(NetTypeFactory):
         vcd_type: str = 'wire'
 
         class Key(object):
-            def __init__(self, thing: Union[int, slice, None] = None):
+            def __init__(self, thing: Union[int, slice, None], outer_type: Union['NetType', 'Number.Key']):
                 if thing is None:
                     # We need to create a sequential key
                     self.is_sequential = True
@@ -769,8 +769,8 @@ class Number(NetTypeFactory):
                 except TypeError:
                     pass
                 try:
-                    start = int(thing.start)
-                    end = int(thing.stop)
+                    start = int(thing.start) if thing.start is not None else outer_type.get_num_bits() - 1
+                    end = int(thing.stop) if thing.stop is not None else 0
                     step = thing.step
                     if step is not None:
                         step = int(step)
@@ -809,12 +809,15 @@ class Number(NetTypeFactory):
             def length(self) -> int:
                 return self.start - self.end + 1
             def apply(self, inner_key: 'Number.Instance.Key') -> 'Number.Instance.Key':
-                result = Number.Instance.Key(0) # Just to have it initialized. We'll override members below...
+                result = Number.Instance.Key(0, None) # Just to have it initialized. We'll override members below...
                 result.end = self.end + inner_key.end
                 result.start = self.end + inner_key.start
                 if result.end > self.start or result.start > self.start:
                     raise SyntaxErrorException("Slice of slices is out of bounds. The inner slice cannot fit in the outer one")
                 return result
+            def get_num_bits(self):
+                # Return the number of bits within the slice
+                return self.start - self.end + 1
 
         # This method can only be re-enabled when Number becomes the base of Junction.
         # In that case, it would be called on the instance, and could also provide value info.
@@ -878,7 +881,7 @@ class Number(NetTypeFactory):
                     remaining_keys, final_key = common_net_type.resolve_key_sequence_for_set(raw_key)
                     if remaining_keys is not None:
                         raise FixmeException("Can't resolve all keys in a LHS context. THIS COULD BE FIXED!!!!")
-                    key = common_net_type.Key(final_key) # Convert the raw key into something that the common type understands
+                    key = common_net_type.Key(final_key, common_net_type) # Convert the raw key into something that the common type understands
                     if key in self.input_map:
                         raise SyntaxErrorException(f"Input key {raw_key} is not unique for concatenator output type {common_net_type}")
                     self.input_map[key] = input
@@ -1010,7 +1013,7 @@ class Number(NetTypeFactory):
         @classmethod
         def get_slice(cls, key: Any, junction: Junction) -> Any:
             if Context.current() == Context.simulation:
-                return Number.Accessor.static_sim(junction.sim_value, Number.Instance.Key(key), junction.get_net_type().precision)
+                return Number.Accessor.static_sim(junction.sim_value, Number.Instance.Key(key, junction.get_net_type()), junction.get_net_type().precision)
             else:
                 return Number.Accessor(slice=key, number=cls)(junction)
 
@@ -1040,8 +1043,8 @@ class Number(NetTypeFactory):
 
             def _slice_of_slice(outer_key: Any, inner_key: Any) -> Any:
                 # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing
-                outer_key = Number.Instance.Key(outer_key)
-                inner_key = Number.Instance.Key(inner_key)
+                outer_key = Number.Instance.Key(outer_key, cls)
+                inner_key = Number.Instance.Key(inner_key, outer_key)
                 result_key = outer_key.apply(inner_key)
                 if result_key.start == result_key.end:
                     return result_key.start

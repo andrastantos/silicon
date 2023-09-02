@@ -501,14 +501,14 @@ class Concatenator(Module):
             remaining_key, final_key = common_net_type.resolve_key_sequence_for_set(raw_key)
             if remaining_key is None:
                 raise FixmeException(f"We don't yet support slices that can't completely resolve within a single slice. (Example would be Array slice-followed by Number-slice)")
-            key = common_net_type.Key(raw_key) # Convert the raw key into something that the common type understands
+            key = common_net_type.Key(raw_key, common_net_type) # Convert the raw key into something that the common type understands
             if key in self.input_map:
                 raise SyntaxErrorException(f"Input key {raw_key} is not unique for concatenator output type {common_net_type}")
             self.input_map[key] = input
             keyed_inputs.add(input)
         for input in self.get_inputs().values():
             if input not in keyed_inputs:
-                key = common_net_type.Key() # Should return a unique key object for sequential inputs
+                key = common_net_type.Key(None, None) # Should return a unique key object for sequential inputs
                 if key in self.input_map:
                     raise SyntaxErrorException(f"Input key {key} is not unique for concatenator output type {common_net_type}")
                 self.input_map[key] = input
