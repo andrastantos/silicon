@@ -21,3 +21,5 @@ from .build_utils import Build, skip_iverilog
 from .auto_input import AutoInput, ClkPort, ClkEnPort, RstPort, RstValPort
 from .sim_asserts import AssertAlways, AssertOnNegClk, AssertOnClk, AssertOnPosClk
 from .arbiters import RoundRobinArbiter
+from .apb_bus import ApbIf, ApbBaseIf
+from .reg_bank_utils import RegField, RegMapEntry, create_apb_reg_map
