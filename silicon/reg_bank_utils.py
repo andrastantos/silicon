@@ -1,6 +1,6 @@
 # Contains utilities to create register banks.
 
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Optional, Union
 from .apb_bus import ApbIf, ApbBaseIf
 from .number import logic
 from .net_type import NetType
@@ -14,10 +14,10 @@ class RegField(object):
     def __init__(
         self, 
         wire: Junction = None,
-        start_bit: int | None = None,
-        length: int | None = None,
+        start_bit: Optional[int] = None,
+        length: Optional[int] = None,
         access: str = "RW", # Valid entries are: R/W
-        description: str | None = None,
+        description: Optional[str] = None,
         *,
         read_wire: Junction = None,
         write_wire: Junction = None,
@@ -46,10 +46,10 @@ class RegField(object):
 @dataclass
 class RegMapEntry(object):
     name: str
-    fields: JunctionBase | RegField | Tuple[RegField] # Fields must be listed in decrementing start-bit, i.e. from left to right
-    read_pulse: Junction | None = None
-    write_pulse: Junction | None = None
-    description: str | None = None
+    fields: Union[JunctionBase, RegField, Tuple[RegField]] # Fields must be listed in decrementing start-bit, i.e. from left to right
+    read_pulse: Optional[Junction] = None
+    write_pulse: Optional[Junction] = None
+    description: Optional[str] = None
 
     def get_fields(self):
         if isinstance(self.fields, JunctionBase):
