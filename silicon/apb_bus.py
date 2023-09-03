@@ -6,6 +6,19 @@ from .number import logic
 from .net_type import NetType
 
 class ApbBaseIf(Interface):
+    """
+    APB signalling
+
+                <-- read -->      <-- write ->
+        CLK     \__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/
+        psel    ___/^^^^^^^^^^^\_____/^^^^^^^^^^^\______
+        penable _________/^^^^^\___________/^^^^^\______
+        pready  ---------/^^^^^\-----------/^^^^^\------
+        pwrite  ---/^^^^^^^^^^^\-----\___________/------
+        paddr   ---<===========>-----<===========>------
+        prdata  ---------<=====>------------------------
+        pwdata  ---------------------<===========>------
+    """
     pwrite = logic
     psel = logic
     penable = logic
