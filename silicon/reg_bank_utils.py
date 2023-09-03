@@ -64,7 +64,7 @@ class RegMapEntry(object):
                 ret_val.append(field)
         return ret_val
     
-    def create_read_concatenation(self) -> Junction | None:
+    def create_read_concatenation(self) -> Optional[Junction]:
         top_bit_idx = 0
         concat_list = []
         used = False
