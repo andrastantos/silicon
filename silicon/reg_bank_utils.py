@@ -9,6 +9,7 @@ from .exceptions import SyntaxErrorException
 from itertools import chain
 from dataclasses import dataclass
 from .primitives import concat, SelectOne, Reg
+from .utils import convert_to_junction
 
 class RegField(object):
     def __init__(
@@ -43,13 +44,21 @@ class RegField(object):
         return self.wire if self.wire is not None else self.write_wire
     
 
-@dataclass
 class RegMapEntry(object):
-    name: str
-    fields: Union[JunctionBase, RegField, Tuple[RegField]] # Fields must be listed in decrementing start-bit, i.e. from left to right
-    read_pulse: Optional[Junction] = None
-    write_pulse: Optional[Junction] = None
-    description: Optional[str] = None
+    def __init__(
+        self,
+        name: str,
+        fields: Union[JunctionBase, RegField, Tuple[RegField]], # Fields must be listed in decrementing start-bit, i.e. from left to right
+        description: Optional[str] = None,
+        *,
+        read_pulse: Optional[Junction] = None,
+        write_pulse: Optional[Junction] = None,
+    ):
+        self.name = name
+        self.fields = fields
+        self.read_pulse = read_pulse
+        self.write_pulse = write_pulse
+        self.description = description
 
     def get_fields(self):
         if isinstance(self.fields, JunctionBase):
@@ -82,7 +91,7 @@ class RegMapEntry(object):
                 raise SyntaxErrorException(f"Field {idx} in register map entry {self.name} must have either a wire or a length specified")
             if field.length is not None and wire is not None:
                 raise SyntaxErrorException(f"Field {idx} in register map entry {self.name} can't have both a wire and length specified")
-            field_length = field.length if field.length is not None else wire.get_num_bits()
+            field_length = field.length if field.length is not None else convert_to_junction(wire).get_num_bits()
             if "R" in field.access:
                 concat_list.append(wire)
                 used = True
@@ -108,22 +117,25 @@ class RegMapEntry(object):
             if field.length is not None and wire is not None:
                 raise SyntaxErrorException(f"Field {idx} in register map entry {self.name} can't have both a wire and length specified")
             top_bit_idx = start_bit
-            field_length = field.length if field.length is not None else wire.get_num_bits()
+            field_length = field.length if field.length is not None else convert_to_junction(wire).get_num_bits()
             if "W" in field.access:
                 if wire is None:
                     raise SyntaxErrorException(f"Field {idx} in register map entry {self.name}: writable fields must have a wire specified")
                 wire <<= Reg(pwdata[top_bit_idx+field_length-1:top_bit_idx], clock_en=write_pulse)
             top_bit_idx += field_length
 
-def create_apb_reg_map(regs: Dict[int, RegMapEntry], base: int, bus: ApbBaseIf):
+def create_apb_reg_map(regs: Dict[int, RegMapEntry], bus: ApbBaseIf, base: Optional[int] = None):
     max_ofs = max(regs.keys())
     ofs_bits = max_ofs.bit_length()
-    if base & ((1 << ofs_bits)-1) != 0:
-        raise SyntaxErrorException(f"Register map base {base} needs its bottom {ofs_bits} bits cleared")
-    page = base >> ofs_bits
+    if base is not None:
+        if base & ((1 << ofs_bits)-1) != 0:
+            raise SyntaxErrorException(f"Register map base {base} needs its bottom {ofs_bits} bits cleared")
+        page = base >> ofs_bits
+        paddr_page = bus.paddr[:ofs_bits]
+        access_strobe = (paddr_page == page) & bus.psel & bus.penable
+    else:
+        access_strobe = bus.psel & bus.penable
     paddr_offs = bus.paddr[ofs_bits-1:0] if ofs_bits > 0 else None
-    paddr_page = bus.paddr[:ofs_bits]
-    access_strobe = (paddr_page == page) & bus.psel & bus.penable
     bus.pready <<= 1
     read_strobe = access_strobe & ~bus.pwrite & bus.pready
     write_strobe = access_strobe & bus.pwrite & bus.pready

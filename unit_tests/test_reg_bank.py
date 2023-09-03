@@ -40,7 +40,7 @@ def test_single_reg(mode = "rtl"):
                 #1: RegMapEntry("b2", (reg1a, reg1b))
             }
 
-            create_apb_reg_map(regs, 0x400, bus)
+            create_apb_reg_map(regs, bus, 0x400)
 
     if mode == "rtl":
         test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
@@ -79,7 +79,7 @@ def test_2_regs(mode = "rtl"):
                 1: RegMapEntry("b2", (reg1a, reg1b))
             }
 
-            create_apb_reg_map(regs, 0x400, bus)
+            create_apb_reg_map(regs, bus, 0x400)
 
     if mode == "rtl":
         test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
@@ -122,7 +122,7 @@ def test_field_regs(mode = "rtl"):
                 10: RegMapEntry("b3", (RegField(reg2a, 24), RegField(reg2b, 8)))
             }
 
-            create_apb_reg_map(regs, 0x400, bus)
+            create_apb_reg_map(regs, bus, 0x400)
 
     if mode == "rtl":
         test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
