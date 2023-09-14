@@ -8,12 +8,12 @@ from .port import Junction, JunctionBase
 from .exceptions import SyntaxErrorException
 from itertools import chain
 from dataclasses import dataclass
-from .primitives import concat, SelectOne, Reg
+from .primitives import concat, SelectOne, Reg, Select
 from .utils import convert_to_junction
 
 class RegField(object):
     def __init__(
-        self, 
+        self,
         wire: Junction = None,
         start_bit: Optional[int] = None,
         length: Optional[int] = None,
@@ -22,6 +22,7 @@ class RegField(object):
         *,
         read_wire: Junction = None,
         write_wire: Junction = None,
+        set_wire: Junction = None # Used for W1C registers; it is the input to set the bits in the register
     ) :
         if wire is not None and (read_wire is not None or write_wire is not None):
             raise SyntaxErrorException(f"If 'wire' is specified, 'read_wire' and 'write_wire' must be None")
@@ -33,16 +34,17 @@ class RegField(object):
         self.length        = length
         self.access        = access
         self.description   = description
+        self.set_wire      = set_wire
 
     def has_wire(self):
         return self.wire is not None or self.read_wire is not None or self.write_wire is not None
 
     def get_read_wire(self):
         return self.wire if self.wire is not None else self.read_wire
-    
+
     def get_write_wire(self):
         return self.wire if self.wire is not None else self.write_wire
-    
+
 
 class RegMapEntry(object):
     def __init__(
@@ -72,7 +74,7 @@ class RegMapEntry(object):
             else:
                 ret_val.append(field)
         return ret_val
-    
+
     def create_read_concatenation(self) -> Optional[Junction]:
         top_bit_idx = 0
         concat_list = []
@@ -119,9 +121,21 @@ class RegMapEntry(object):
             top_bit_idx = start_bit
             field_length = field.length if field.length is not None else convert_to_junction(wire).get_num_bits()
             if "W" in field.access:
-                if wire is None:
-                    raise SyntaxErrorException(f"Field {idx} in register map entry {self.name}: writable fields must have a wire specified")
-                wire <<= Reg(pwdata[top_bit_idx+field_length-1:top_bit_idx], clock_en=write_pulse)
+                if "W1C" in field.access:
+                    set_wire  = field.set_wire
+                    if set_wire is None:
+                        raise SyntaxErrorException(f"Field {idx} in register map entry {self.name}: write-1-to-clear fields must have a set_wire specified")
+                    if wire is None:
+                        raise SyntaxErrorException(f"Field {idx} in register map entry {self.name}: writable fields must have a wire specified")
+                    wire <<= Reg(Select(
+                        write_pulse,
+                        wire | set_wire,
+                        (wire & ~pwdata[top_bit_idx+field_length-1:top_bit_idx]) | set_wire
+                    ))
+                else:
+                    if wire is None:
+                        raise SyntaxErrorException(f"Field {idx} in register map entry {self.name}: writable fields must have a wire specified")
+                    wire <<= Reg(pwdata[top_bit_idx+field_length-1:top_bit_idx], clock_en=write_pulse)
             top_bit_idx += field_length
 
 def create_apb_reg_map(regs: Dict[int, RegMapEntry], bus: ApbBaseIf, base: Optional[int] = None):
