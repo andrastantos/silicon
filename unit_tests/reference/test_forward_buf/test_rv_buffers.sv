@@ -15,6 +15,7 @@ module top (
 );
 
 	logic u1_output_port;
+	logic fb_out_reg_en;
 
 	ForwardBuf fb (
 		.input_port_data(in1_data),
@@ -27,6 +28,7 @@ module top (
 
 		.clock_port(clk),
 		.reset_port(rst),
+		.out_reg_en(fb_out_reg_en),
 		.clear(u1_output_port)
 	);
 
@@ -48,13 +50,13 @@ module ForwardBuf (
 
 	input logic clock_port,
 	input logic reset_port,
+	output logic out_reg_en,
 	input logic clear
 );
 
 	logic [7:0] buf_data_data;
-	logic fsm_out_reg_en;
 
-	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 8'h0 : fsm_out_reg_en ? input_port_data : buf_data_data;
+	always_ff @(posedge clock_port) buf_data_data <= reset_port ? 8'h0 : out_reg_en ? input_port_data : buf_data_data;
 
 	ForwardBufLogic fsm (
 		.clock_port(clock_port),
@@ -63,7 +65,7 @@ module ForwardBuf (
 		.input_ready(input_port_ready),
 		.output_valid(output_port_valid),
 		.output_ready(output_port_ready),
-		.out_reg_en(fsm_out_reg_en),
+		.out_reg_en(out_reg_en),
 		.clear(clear)
 	);
 

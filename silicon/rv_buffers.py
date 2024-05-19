@@ -50,6 +50,7 @@ class ForwardBuf(Module):
     output_port = Output()
     clock_port = ClkPort()
     reset_port = RstPort()
+    out_reg_en = Output(keyword_only = True)
 
     clear = Input(logic, default_value=0)
 
@@ -92,12 +93,13 @@ class ForwardBuf(Module):
         fsm.output_ready <<= self.output_port.ready
         self.output_port.valid <<= fsm.output_valid
         fsm.clear <<= self.clear
+        self.out_reg_en <<= fsm.out_reg_en
 
         data = self.input_port.get_data_members()
 
         buf_data = Wire(data.get_net_type()) # At this point we have to create a typed wire. TODO: can we make it so that we don't?
 
-        buf_data <<= Reg(data, clock_en=fsm.out_reg_en)
+        buf_data <<= Reg(data, clock_en=self.out_reg_en)
 
         self.output_port.set_data_members(buf_data)
 
