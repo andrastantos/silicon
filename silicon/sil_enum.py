@@ -57,7 +57,8 @@ class EnumNet(Number):
                 base_type = super().generate_type_ref(back_end)
                 const_val_method = super().generate_const_val
                 values = ",\n".join(f"{cls.get_type_name()}__{e.name}={const_val_method(e.value, back_end)}" for e in cls.base_type)
-                return f"typedef enum {base_type} {{\n{back_end.indent(values)}\n}} {cls.get_type_name()};"
+                with back_end.indent_block():
+                    return f"typedef enum {base_type} {{\n{back_end.indent(values)}\n}} {cls.get_type_name()};"
             else:
                 ret_val = ""
                 for e in cls.base_type:

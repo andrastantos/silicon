@@ -30,7 +30,8 @@ class and_gate(Module):
         ret_val = ""
         assert back_end.language == "SystemVerilog"
         ret_val += self.generate_module_header(back_end) + "\n"
-        ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
+        with back_end.indent_block():
+            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
         ret_val += "endmodule\n\n\n"
         return ret_val
 
@@ -42,7 +43,8 @@ class or_gate(Module):
         ret_val = ""
         assert back_end.language == "SystemVerilog"
         ret_val += self.generate_module_header(back_end) + "\n"
-        ret_val += back_end.indent("assign out_a = in_a | in_b;\n")
+        with back_end.indent_block():
+            ret_val += back_end.indent("assign out_a = in_a | in_b;\n")
         ret_val += "endmodule\n\n\n"
         return ret_val
 
@@ -54,7 +56,8 @@ class xor_gate(Module):
         ret_val = ""
         assert back_end.language == "SystemVerilog"
         ret_val += self.generate_module_header(back_end) + "\n"
-        ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
+        with back_end.indent_block():
+            ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
         ret_val += "endmodule\n\n\n"
         return ret_val
 
@@ -331,7 +334,7 @@ def test_slice_slice():
             # a type-change in the middle. Now, we *could* know that by looking at the keys,
             # as type-change can only happen when a single element is selected, in fact, it
             # must happen in that case, if the slice-change is to continue, but that's for
-            # later, maybe, when Arrays come back to life. 
+            # later, maybe, when Arrays come back to life.
             self.uout1 <<= self.uin1[5:2][1]
             self.uout2 <<= self.uin1[9:3][6:1][5:1]
             self.uout3[4:1][1] <<= self.uin1[0]

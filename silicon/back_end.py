@@ -3,6 +3,7 @@ from .module import Module
 from collections import OrderedDict
 from textwrap import indent
 from pathlib import Path
+from abc import abstractmethod
 
 class BackEnd(object):
     def __init__(self):
@@ -17,6 +18,14 @@ class BackEnd(object):
         Creates default module body for given module. Only called if module doesn't offer up a specialized implementation.
         """
         raise NotImplementedError()
+
+    @abstractmethod
+    def indent(self, lines: str) -> str:
+        pass
+
+    @abstractmethod
+    def indent_block(self, level: int = 1):
+        pass
 
 class File(object):
     """
@@ -60,6 +69,7 @@ class SystemVerilog(BackEnd):
         self.support_unique_case = True
         self.support_cast = True
         self.yosys_fix = False
+        self.indent_level = 0
 
     def _generate_file_name_for_module(self, module: 'Module', file_names: Optional[Union[Union[str, Path], Dict[type, Union[str, Path]]]] = None, out_dir: Optional[Union[str, Path]] = None) -> str:
         if file_names is not None:
@@ -158,8 +168,22 @@ class SystemVerilog(BackEnd):
             expression_precedence = self.get_operator_precedence("()")
         return expression, expression_precedence
 
-    def indent(self, lines: str, indent_cnt: int = 1) -> str:
-        return indent(lines, "\t"*indent_cnt)
+    def indent(self, lines: str) -> str:
+        return indent(lines, "\t" * self.indent_level)
+
+    def indent_block(self, level: int = 1):
+        class IndentBlock(object):
+            def __init__(self, parent, level):
+                self.parent = parent
+                self.level = int(level)
+
+            def __enter__(self):
+                self.parent.indent_level += self.level
+            def __exit__(self, exception_type, exception_value, traceback):
+                assert self.parent.indent_level >= self.level
+                self.parent.indent_level -= self.level
+
+        return IndentBlock(self, level)
 
     @staticmethod
     def get_reserved_names() -> Sequence[str]:

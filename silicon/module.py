@@ -382,66 +382,67 @@ class Module(object):
                     if rtl_instantiations != "":
                         rtl_instantiations += "\n"
                     rtl_instantiations += f"{module_class_name} {sub_module._impl.get_name()} (\n"
-                    sub_module_ports = sub_module.get_ports()
-                    last_port_idx = len(sub_module_ports) - 1
-                    for idx, (sub_module_port_name, sub_module_port) in enumerate(sub_module_ports.items()):
-                        if (
-                            sub_module_port.is_deleted() or
-                            (sub_module_port.is_optional() and not sub_module_port.has_driver(allow_non_auto_inputs=True))
-                        ):
-                            continue
-                        if sub_module_port.is_composite():
-                            members = sub_module_port.get_all_member_junctions(False)
-                            last_sub_idx = len(members)
-                            for sub_idx, sub_module_port_member in enumerate(members):
-                                if is_output_port(sub_module_port_member):
+                    with back_end.indent_block():
+                        sub_module_ports = sub_module.get_ports()
+                        last_port_idx = len(sub_module_ports) - 1
+                        for idx, (sub_module_port_name, sub_module_port) in enumerate(sub_module_ports.items()):
+                            if (
+                                sub_module_port.is_deleted() or
+                                (sub_module_port.is_optional() and not sub_module_port.has_driver(allow_non_auto_inputs=True))
+                            ):
+                                continue
+                            if sub_module_port.is_composite():
+                                members = sub_module_port.get_all_member_junctions(False)
+                                last_sub_idx = len(members)
+                                for sub_idx, sub_module_port_member in enumerate(members):
+                                    if is_output_port(sub_module_port_member):
+                                        # We only generate bindings for output ports if they drive their XNet in this scope
+                                        # !!!!!!!!!
+                                        # Actually, this is not needed. I keep the code in here as it might be used
+                                        # To clean the generated RTL up a bit, but that's all it's purpose now that
+                                        # TransparentAdaptors are added
+                                        #my_xnet = netlist.get_xnet_for_junction(sub_module_port_member)
+                                        #xnet_source = my_xnet.get_source()
+                                        #if not my_xnet.is_source(sub_module_port_member) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
+                                        #    print(f"WARNING: deleting output port due to multiple drivers {module_class_name} {sub_module._impl.get_name()} {first(sub_module_port_member.get_interface_names())}")
+                                        #    continue
+                                        source_str = sub_module_port_member.get_lhs_name(back_end, self)
+                                        # Unconnected outputs are simply left out of the instance
+                                        if source_str is None:
+                                            continue
+                                    elif is_input_port(sub_module_port_member):
+                                        source_str, _ = sub_module_port_member.get_rhs_expression(back_end, self)
+                                    else:
+                                        assert False
+                                    rtl_instantiations += back_end.indent(f".{first(sub_module_port_member.get_interface_names())}({source_str})")
+                                    if idx != last_port_idx or sub_idx != last_sub_idx:
+                                        rtl_instantiations += ","
+                                    rtl_instantiations += "\n"
+                                rtl_instantiations += "\n"
+                            else:
+                                if is_output_port(sub_module_port):
                                     # We only generate bindings for output ports if they drive their XNet in this scope
                                     # !!!!!!!!!
                                     # Actually, this is not needed. I keep the code in here as it might be used
                                     # To clean the generated RTL up a bit, but that's all it's purpose now that
                                     # TransparentAdaptors are added
-                                    #my_xnet = netlist.get_xnet_for_junction(sub_module_port_member)
+                                    #my_xnet = netlist.get_xnet_for_junction(sub_module_port)
                                     #xnet_source = my_xnet.get_source()
-                                    #if not my_xnet.is_source(sub_module_port_member) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
-                                    #    print(f"WARNING: deleting output port due to multiple drivers {module_class_name} {sub_module._impl.get_name()} {first(sub_module_port_member.get_interface_names())}")
+                                    #if not my_xnet.is_source(sub_module_port) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
+                                    #    print(f"WARNING: deleting output port due to multiple drivers {module_class_name} {sub_module._impl.get_name()} {sub_module_port_name}")
                                     #    continue
-                                    source_str = sub_module_port_member.get_lhs_name(back_end, self)
+                                    source_str = sub_module_port.get_lhs_name(back_end, self)
                                     # Unconnected outputs are simply left out of the instance
                                     if source_str is None:
                                         continue
-                                elif is_input_port(sub_module_port_member):
-                                    source_str, _ = sub_module_port_member.get_rhs_expression(back_end, self)
+                                elif is_input_port(sub_module_port):
+                                    source_str, _ = sub_module_port.get_rhs_expression(back_end, self)
                                 else:
                                     assert False
-                                rtl_instantiations += back_end.indent(f".{first(sub_module_port_member.get_interface_names())}({source_str})")
-                                if idx != last_port_idx or sub_idx != last_sub_idx:
+                                rtl_instantiations += back_end.indent(f".{sub_module_port_name}({source_str})")
+                                if idx != last_port_idx:
                                     rtl_instantiations += ","
                                 rtl_instantiations += "\n"
-                            rtl_instantiations += "\n"
-                        else:
-                            if is_output_port(sub_module_port):
-                                # We only generate bindings for output ports if they drive their XNet in this scope
-                                # !!!!!!!!!
-                                # Actually, this is not needed. I keep the code in here as it might be used
-                                # To clean the generated RTL up a bit, but that's all it's purpose now that
-                                # TransparentAdaptors are added
-                                #my_xnet = netlist.get_xnet_for_junction(sub_module_port)
-                                #xnet_source = my_xnet.get_source()
-                                #if not my_xnet.is_source(sub_module_port) and (xnet_source is None or self in xnet_source.get_sink_scopes()):
-                                #    print(f"WARNING: deleting output port due to multiple drivers {module_class_name} {sub_module._impl.get_name()} {sub_module_port_name}")
-                                #    continue
-                                source_str = sub_module_port.get_lhs_name(back_end, self)
-                                # Unconnected outputs are simply left out of the instance
-                                if source_str is None:
-                                    continue
-                            elif is_input_port(sub_module_port):
-                                source_str, _ = sub_module_port.get_rhs_expression(back_end, self)
-                            else:
-                                assert False
-                            rtl_instantiations += back_end.indent(f".{sub_module_port_name}({source_str})")
-                            if idx != last_port_idx:
-                                rtl_instantiations += ","
-                            rtl_instantiations += "\n"
                     while rtl_instantiations[-1] in "\n,":
                         rtl_instantiations = rtl_instantiations[:-1]
                     rtl_instantiations += "\n);\n"
@@ -462,14 +463,15 @@ class Module(object):
                         for name in names:
                             rtl_wire_assignments += f"{xnet.generate_assign(name, xnet_rhs_expression, back_end)}\n"
 
-        ret_val = (
-            str_block(rtl_header, "", "\n\n") +
-            str_block(back_end.indent(rtl_wire_definitions), "", "\n") +
-            str_block(back_end.indent(rtl_inline_assignments), "", "\n") +
-            str_block(back_end.indent(rtl_instantiations), "", "\n") +
-            str_block(back_end.indent(rtl_wire_assignments), "", "") +
-            "endmodule"
-        )
+        with back_end.indent_block():
+            ret_val = (
+                str_block(rtl_header, "", "\n\n") +
+                str_block(back_end.indent(rtl_wire_definitions), "", "\n") +
+                str_block(back_end.indent(rtl_inline_assignments), "", "\n") +
+                str_block(back_end.indent(rtl_instantiations), "", "\n") +
+                str_block(back_end.indent(rtl_wire_assignments), "", "") +
+                "endmodule"
+            )
         return ret_val
 
     def generate_module_header(self, back_end: 'BackEnd') -> str:
@@ -1498,21 +1500,22 @@ class Module(object):
             ports = self.get_ports()
             first_port = True
             is_composite = False
-            for port_name, port in ports.items():
-                if not port.is_deleted():
-                    port_interface_strs = port.generate_interface(back_end, port_name)
-                    after_composite = is_composite
-                    is_composite = len(port_interface_strs) > 1
-                    for port_interface_str in port_interface_strs:
-                        if first_port:
-                            first_port = False
-                        else:
-                            ret_val += ","
-                            ret_val += "\n"
-                            if after_composite:
+            with back_end.indent_block():
+                for port_name, port in ports.items():
+                    if not port.is_deleted():
+                        port_interface_strs = port.generate_interface(back_end, port_name)
+                        after_composite = is_composite
+                        is_composite = len(port_interface_strs) > 1
+                        for port_interface_str in port_interface_strs:
+                            if first_port:
+                                first_port = False
+                            else:
+                                ret_val += ","
                                 ret_val += "\n"
-                                after_composite = False
-                        ret_val += back_end.indent(f"{port_interface_str}")
+                                if after_composite:
+                                    ret_val += "\n"
+                                    after_composite = False
+                            ret_val += back_end.indent(f"{port_interface_str}")
             if not first_port:
                 ret_val += "\n"
             ret_val += ");"

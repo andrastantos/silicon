@@ -211,7 +211,7 @@ class _BasicMemory(GenericModule):
                 raise SyntaxErrorException(f"Memory port {idx} for {self} has neither its data input or output connected")
 
             try:
-                port.depth = port.addr.get_net_type().get_num_bits()
+                port.depth = 2 ** port.addr.get_net_type().get_num_bits()
                 if not is_number(port.addr.get_net_type()):
                     raise SyntaxErrorException(f"_BasicMemory {self} only support Number-based interface types")
             except AttributeError:
@@ -433,7 +433,8 @@ class _Memory(GenericModule):
         write_en_port = getattr(self, f"{port_config.real_prefix}write_en", None)
         addr_port = getattr(self, f"{port_config.real_prefix}addr")
         clk_port = getattr(self, f"{port_config.real_prefix}clk", None)
-        return data_in_port, data_out_port, write_en_port, addr_port, clk_port
+        clk_en_port = getattr(self, f"{port_config.real_prefix}clk_en", None)
+        return data_in_port, data_out_port, write_en_port, addr_port, clk_port, clk_en_port
 
     def _setup(self):
         has_data_in = False
@@ -442,7 +443,7 @@ class _Memory(GenericModule):
             data_conf_bits = port_config.data_type.get_num_bits() if port_config.data_type is not None else None
             addr_conf_bits = port_config.addr_type.get_num_bits() if port_config.addr_type is not None else None
 
-            data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
+            data_in_port, data_out_port, write_en_port, addr_port, clk_port, clk_en_port = self._get_port_ports(port_config)
 
             has_data_in |= data_in_port is not None
 
@@ -512,12 +513,12 @@ class _Memory(GenericModule):
                 self.secondary_port_configs.append(port_config)
 
         # Checking port interactions
-        primary_data_in_port, primary_data_out_port, _, _, _ = self._get_port_ports(self.primary_port_config)
+        primary_data_in_port, primary_data_out_port, _, _, _, _ = self._get_port_ports(self.primary_port_config)
 
         has_data_in = primary_data_in_port is not None
         has_data_out = primary_data_out_port is not None
         for secondary_port_config in self.secondary_port_configs:
-            secondary_data_in_port, secondary_data_out_port, _, _, _ = self._get_port_ports(secondary_port_config)
+            secondary_data_in_port, secondary_data_out_port, _, _, _, _ = self._get_port_ports(secondary_port_config)
             has_data_in |= secondary_data_in_port is not None
             has_data_out |= secondary_data_out_port is not None
 
@@ -533,15 +534,15 @@ class _Memory(GenericModule):
         #inner_mem.do_log = True
         for idx, port_config in enumerate(self.config.port_configs):
             inner_mem.set_port_type(idx, Unsigned(port_config.data_type.get_num_bits()))
-            data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
+            data_in_port, data_out_port, write_en_port, addr_port, clk_port, clk_en_port = self._get_port_ports(port_config)
             if write_en_port is None: write_en_port = 0
             if port_config.registered_input:
-                addr_port = Reg(addr_port, clock_port=clk_port)
-                data_in_port = Reg(data_in_port, clock_port=clk_port)
-                write_en_port = Reg(write_en_port, clock_port=clk_port)
+                addr_port = Reg(addr_port, clock_port=clk_port, clock_en=clk_en_port)
+                data_in_port = Reg(data_in_port, clock_port=clk_port, clock_en=clk_en_port)
+                write_en_port = Reg(write_en_port, clock_port=clk_port, clock_en=clk_en_port)
             async_data_out = getattr(inner_mem, f"data_out_{idx}_port")
             if data_out_port is not None:
-                data_out_port <<= Reg(async_data_out, clock_port=clk_port) if port_config.registered_output else Select(write_en_port, async_data_out, data_in_port)
+                data_out_port <<= Reg(async_data_out, clock_port=clk_port, clock_en=clk_en_port) if port_config.registered_output else Select(write_en_port, async_data_out, data_in_port)
             inner_data_in = getattr(inner_mem, f"data_in_{idx}_port")
             inner_addr = getattr(inner_mem, f"addr_{idx}_port")
             inner_write_en = getattr(inner_mem, f"write_en_{idx}_port")
@@ -555,18 +556,19 @@ class _Memory(GenericModule):
         rtl_body = ""
         if self.config.init_content is not None:
             rtl_body += f"initial begin\n"
-            if isinstance(self.config.init_content, str):
-                rtl_body += back_end.indent(f'$readmemh("{self.config.init_content}", mem);\n')
-            else:
-                content = init_mem(self.config.init_content, self.mem_data_bits, self.mem_addr_range)
-                factor2d = self.mem_max_data_bits // self.mem_data_bits
-                for addr, data in content.items():
-                    if factor2d != 1:
-                        outer_addr = addr // factor2d
-                        inner_addr = addr % factor2d
-                        rtl_body += back_end.indent(f"{memory_name}[{outer_addr}][{inner_addr}] <= {self.mem_data_bits}'h{data:x};\n")
-                    else:
-                        rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {self.mem_data_bits}'h{data:x};\n")
+            with back_end.indent_block():
+                if isinstance(self.config.init_content, str):
+                    rtl_body += back_end.indent(f'$readmemh("{self.config.init_content}", mem);\n')
+                else:
+                    content = init_mem(self.config.init_content, self.mem_data_bits, self.mem_addr_range)
+                    factor2d = self.mem_max_data_bits // self.mem_data_bits
+                    for addr, data in content.items():
+                        if factor2d != 1:
+                            outer_addr = addr // factor2d
+                            inner_addr = addr % factor2d
+                            rtl_body += back_end.indent(f"{memory_name}[{outer_addr}][{inner_addr}] <= {self.mem_data_bits}'h{data:x};\n")
+                        else:
+                            rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {self.mem_data_bits}'h{data:x};\n")
             rtl_body += f"end\n"
             rtl_body += f"\n"
 
@@ -595,13 +597,14 @@ class _Memory(GenericModule):
 
         rtl_body += self.generate_init_content(back_end, memory_name)
 
-        data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
+        data_in_port, data_out_port, write_en_port, addr_port, clk_port, clk_en_port = self._get_port_ports(port_config)
 
         data_in, _ = data_in_port.get_rhs_expression(back_end, target_namespace) if data_in_port is not None else (None, None)
         data_out = data_out_port.get_lhs_name(back_end, target_namespace) if data_out_port is not None else None
         write_en, _ = write_en_port.get_rhs_expression(back_end, target_namespace) if write_en_port is not None else (None, None)
         addr, _ = addr_port.get_rhs_expression(back_end, target_namespace) if addr_port is not None else (None, None)
         clk, _ = clk_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("()")) if clk_port is not None else (None, None)
+        clk_en, _ = clk_en_port.get_rhs_expression(back_end, target_namespace) if clk_en_port is not None else (None, None)
 
         if data_out_port is not None:
             if port_config.registered_input:
@@ -611,17 +614,24 @@ class _Memory(GenericModule):
                 addr_name = addr
         if data_in_port is not None or (data_out_port is not None and port_config.registered_input):
             rtl_body += f"always @(posedge {clk}) begin\n"
-            if data_in_port is not None:
-                if write_en_port is not None:
-                    rtl_body += back_end.indent(f"if ({write_en}) begin\n")
-                    rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {data_in};\n", 2)
+            with back_end.indent_block():
+                if clk_en_port is not None:
+                    rtl_body += back_end.indent(f"if ({clk_en}) begin\n")
+                with back_end.indent_block(clk_en_port is not None):
+                    if data_in_port is not None:
+                        if write_en_port is not None:
+                            rtl_body += back_end.indent(f"if ({write_en}) begin\n")
+                            with back_end.indent_block():
+                                rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {data_in};\n")
+                            rtl_body += back_end.indent(f"end\n")
+                        else:
+                            rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {data_in};\n")
+                    if data_out_port is not None and port_config.registered_input:
+                        rtl_body += back_end.indent(f"{addr_name} <= {addr};\n")
+                    if data_out_port is not None and port_config.registered_output:
+                        rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name}];\n")
+                if clk_en_port is not None:
                     rtl_body += back_end.indent(f"end\n")
-                else:
-                    rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {data_in};\n")
-            if data_out_port is not None and port_config.registered_input:
-                rtl_body += back_end.indent(f"{addr_name} <= {addr};\n")
-            if data_out_port is not None and port_config.registered_output:
-                rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name}];\n")
             rtl_body += f"end\n"
         if data_out_port is not None and not port_config.registered_output:
             rtl_body += f"assign {data_out} = {memory_name}[{addr_name}];\n"
@@ -631,8 +641,6 @@ class _Memory(GenericModule):
         memory_name = self._get_symbol_name(netlist, self.mem_symbol)
 
         rtl_body = ""
-
-        primary_data_in_port, primary_data_out_port, primary_write_en_port, primary_addr_port, primary_clk_port = self._get_port_ports(self.primary_port_config)
 
         mixed_ratios = False
         for secondary_port_config in self.secondary_port_configs:
@@ -653,13 +661,14 @@ class _Memory(GenericModule):
         rtl_body += self.generate_init_content(back_end, memory_name)
 
         for idx, port_config in enumerate(self.config.port_configs):
-            data_in_port, data_out_port, write_en_port, addr_port, clk_port = self._get_port_ports(port_config)
+            data_in_port, data_out_port, write_en_port, addr_port, clk_port, clk_en_port = self._get_port_ports(port_config)
 
             data_in, _ = data_in_port.get_rhs_expression(back_end, target_namespace) if data_in_port is not None else (None, None)
             data_out = data_out_port.get_lhs_name(back_end, target_namespace) if data_out_port is not None else None
             write_en, _ = write_en_port.get_rhs_expression(back_end, target_namespace) if write_en_port is not None else (None, None)
             addr, _ = addr_port.get_rhs_expression(back_end, target_namespace) if addr_port is not None else (None, None)
             clk, _ = clk_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("()")) if clk_port is not None else (None, None)
+            clk_en, _ = clk_en_port.get_rhs_expression(back_end, target_namespace) if clk_en_port is not None else (None, None)
 
             if data_out_port is not None:
                 if port_config.registered_input:
@@ -681,38 +690,46 @@ class _Memory(GenericModule):
             #    -            Yes        Yes      Yes
 
             if data_in_port is not None or (data_out_port is not None and port_config.registered_input):
-                rtl_body += f"always @(posedge {clk}) begin\n"
-                if data_in_port is not None:
-                    if write_en_port is not None:
-                        rtl_body += back_end.indent(f"if ({write_en}) begin\n")
-                        if port_config.mem_ratio == 1:
-                            rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {data_in};\n", 2)
-                        else:
-                            rtl_body += back_end.indent(f"{memory_name}[{addr} / {port_config.mem_ratio}][{addr} % {port_config.mem_ratio}] <= {data_in};\n", 2)
-                        rtl_body += back_end.indent(f"end\n")
-                    else:
-                        if port_config.mem_ratio == 1:
-                            rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {data_in};\n")
-                        else:
-                            rtl_body += back_end.indent(f"{memory_name}[{addr} / {port_config.mem_ratio}][{addr} % {port_config.mem_ratio}] <= {data_in};\n")
-                if data_out_port is not None and port_config.registered_input:
-                    rtl_body += back_end.indent(f"{addr_name} <= {addr};\n")
-                if data_out_port is not None and port_config.registered_output:
-                    if port_config.mem_ratio == 1:
-                        rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name}];\n")
-                    else:
-                        rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n")
+                rtl_body += back_end.indent(f"always @(posedge {clk}) begin\n")
+                with back_end.indent_block():
+                    if clk_en_port is not None:
+                        rtl_body += back_end.indent(f"if ({clk_en}) begin\n")
+                    with back_end.indent_block(clk_en_port is not None):
+                        with back_end.indent_block(clk_en_port is not None):
+                            if data_in_port is not None:
+                                if write_en_port is not None:
+                                    rtl_body += back_end.indent(f"if ({write_en}) begin\n")
+                                with back_end.indent_block(write_en_port is not None):
+                                    if port_config.mem_ratio == 1:
+                                        rtl_body += back_end.indent(f"{memory_name}[{addr}] <= {data_in};\n")
+                                    else:
+                                        rtl_body += back_end.indent(f"{memory_name}[{addr} / {port_config.mem_ratio}][{addr} % {port_config.mem_ratio}] <= {data_in};\n")
+                                if write_en_port is not None:
+                                    rtl_body += back_end.indent(f"end\n")
+                            if data_out_port is not None and port_config.registered_input:
+                                rtl_body += back_end.indent(f"{addr_name} <= {addr};\n")
+                            if data_out_port is not None and port_config.registered_output:
+                                if port_config.mem_ratio == 1:
+                                    rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name}];\n")
+                                else:
+                                    rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n")
+                        if clk_en_port is not None:
+                            rtl_body += back_end.indent(f"end\n")
                 rtl_body += f"end\n"
 
             if data_in_port is None and data_out_port is not None and not port_config.registered_input:
                 if port_config.registered_output:
                     rtl_body += f"always @(posedge {clk}) begin\n"
-
-                    if port_config.mem_ratio == 1:
-                        rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name}];\n")
-                    else:
-                        rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n")
-
+                    with back_end.indent_block():
+                        if clk_en_port is not None:
+                            rtl_body += back_end.indent(f"if ({clk_en}) begin\n")
+                        with back_end.indent_block(clk_en_port is not None):
+                            if port_config.mem_ratio == 1:
+                                rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name}];\n")
+                            else:
+                                rtl_body += back_end.indent(f"{data_out} <= {memory_name}[{addr_name} / {port_config.mem_ratio}][{addr_name} % {port_config.mem_ratio}];\n")
+                        if clk_en_port is not None:
+                            rtl_body += back_end.indent(f"end\n")
                     rtl_body += f"end\n"
 
             if data_out_port is not None and not port_config.registered_output:
@@ -773,6 +790,7 @@ class Memory(GenericModule):
             self.optional_ports[f"{port_config.real_prefix}data_in"] = (port_config.data_type, Memory.INPUT)
             self.optional_ports[f"{port_config.real_prefix}data_out"] = (port_config.data_type, Memory.OUTPUT)
             self.optional_ports[f"{port_config.real_prefix}write_en"] = (logic, Memory.INPUT)
+            self.optional_ports[f"{port_config.real_prefix}clk_en"] = (logic, Memory.INPUT)
             setattr(
                 self,
                 f"{port_config.real_prefix}clk",
@@ -816,7 +834,7 @@ class Memory(GenericModule):
         # Replace all data types with their equivalent number types
         mem_config = deepcopy(self.config)
         for port_config in mem_config.port_configs:
-            port_config.data_type = Unsigned(port_config.data_type.get_num_bits())
+            port_config.data_type = Unsigned(port_config.data_type.get_num_bits()) if port_config.data_type is not None else None
         real_mem = _Memory(mem_config)
         # Hook up all of our ports to the internal one
         for port_name, port in self.get_inputs().items():

@@ -18,7 +18,8 @@ def test_local_gates():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -30,7 +31,8 @@ def test_local_gates():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -42,7 +44,8 @@ def test_local_gates():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -54,7 +57,8 @@ def test_local_gates():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -66,7 +70,8 @@ def test_local_gates():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -78,7 +83,8 @@ def test_local_gates():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a | in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a | in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -90,7 +96,8 @@ def test_local_gates():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -102,7 +109,8 @@ def test_local_gates():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -114,7 +122,8 @@ def test_local_gates():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -147,8 +156,9 @@ def test_local_gates():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("//a = {}, b = {}\n".format(self.a, self.b))
-            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("//a = {}, b = {}\n".format(self.a, self.b))
+                ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -203,7 +213,8 @@ def test_unconnected_submodule():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -226,7 +237,8 @@ def test_old_number():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a & in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -238,7 +250,8 @@ def test_old_number():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a | in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a | in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
@@ -250,7 +263,8 @@ def test_old_number():
             ret_val = ""
             assert back_end.language == "SystemVerilog"
             ret_val += self.generate_module_header(back_end) + "\n"
-            ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
+            with back_end.indent_block():
+                ret_val += back_end.indent("assign out_a = in_a ^ in_b;\n")
             ret_val += "endmodule\n\n\n"
             return ret_val
 
