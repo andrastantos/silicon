@@ -1197,9 +1197,6 @@ class InputPort(Port):
 class OutputPort(Port):
     def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None, *, keyword_only: bool = False):
         super().__init__(net_type, parent_module, keyword_only=keyword_only)
-
-    def __init__(self, net_type: Optional[NetType] = None, parent_module: 'Module' = None):
-        super().__init__(net_type, parent_module)
         self.rhs_expression: Optional[Tuple[str, int]] = None # Filled-in by the parent_module during the 'generation' phase to contain the expression for the right-hand-side value, if inline expressions are supported for this port.
 
     @classmethod

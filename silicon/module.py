@@ -188,7 +188,7 @@ class Module(object):
                     self.create_named_port(arg_name)
                 if arg_value is not None:
                     getattr(self, arg_name).set_source(arg_value, scope)
-            ret_val = tuple(self._impl.get_outputs().values())
+            ret_val = tuple(self._impl.get_positional_outputs().values())
             if len(ret_val) == 1:
                 return ret_val[0]
             return ret_val
