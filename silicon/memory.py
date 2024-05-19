@@ -385,6 +385,7 @@ class _Memory(GenericModule):
             self.optional_ports[f"{port_config.real_prefix}data_in"] = (port_config.data_type, Memory.INPUT)
             self.optional_ports[f"{port_config.real_prefix}data_out"] = (port_config.data_type, Memory.OUTPUT)
             self.optional_ports[f"{port_config.real_prefix}write_en"] = (logic, Memory.INPUT)
+            self.optional_ports[f"{port_config.real_prefix}clk_en"] = (logic, Memory.INPUT)
             setattr(
                 self,
                 f"{port_config.real_prefix}clk",
