@@ -5,7 +5,7 @@ from .auto_input import ClkPort, ClkEnPort, RstPort, RstValPort
 from .exceptions import FixmeException, SyntaxErrorException, SimulationException, InvalidPortError
 from collections import OrderedDict
 from .utils import ScopedAttr, get_common_net_type
-from .number import NumberMeta
+from .number import NumberMeta, logic
 from .utils import TSimEvent, is_module
 from .sil_enum import is_enum
 
@@ -709,3 +709,39 @@ class NegReg(GenericReg):
         super().__init__(EdgeType.Negative)
 
 Reg = PosReg
+
+class GenericLatchReg(GenericModule):
+    output_port = Output()
+    input_port = Input()
+    clock_port = ClkPort()
+    reset_port = RstPort()
+    reset_value_port = RstValPort()
+    enable = Input(logic)
+
+    def construct(self, clk_edge: EdgeType) -> None:
+        self.clk_edge = clk_edge
+
+    def body(self):
+        r = GenericReg(self.clk_edge)
+        r.input_port <<= self.input_port
+        r.clock_port <<= self.clock_port
+        r.reset_port <<= self.reset_port
+        r.reset_value_port <<= self.reset_value_port
+        r.clock_en <<= self.enable
+
+        self.output_port <<= Select(self.enable, r.output_port, self.input_port)
+
+class PosLatchReg(GenericLatchReg):
+    def __new__(cls, *args, **kwargs):
+        return Module.__new__(cls, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(EdgeType.Positive)
+
+class NegLatchReg(GenericLatchReg):
+    def __new__(cls, *args, **kwargs):
+        return Module.__new__(cls, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(EdgeType.Negative)
+
+LatchReg = PosLatchReg
+

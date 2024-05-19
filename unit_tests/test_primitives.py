@@ -383,6 +383,81 @@ def test_default_select():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+
+def test_latch(mode: str = "sim"):
+    class top(Module):
+        in1 = Input(Unsigned(8))
+        out1 = Output(Unsigned(8))
+        clk = ClkPort()
+        rst = RstPort()
+        enable = Input(logic)
+
+        def body(self):
+            dut = LatchReg()
+            self.out1 <<= dut(self.in1)
+            dut.enable <<= self.enable
+
+    class sim_top(Module):
+        clk = ClkPort()
+        rst = RstPort()
+
+        def body(self):
+            self.data = Wire(Unsigned(8))
+            self.check = Wire(Unsigned(8))
+            self.enable = Wire(logic)
+            dut = top()
+            dut.rst <<= self.rst
+            dut.clk <<= self.clk
+            self.check <<= dut(self.data)
+            dut.enable <<= self.enable
+
+        def simulate(self) -> TSimEvent:
+            def clk():
+                yield 10
+                self.clk <<= ~self.clk & self.clk
+                yield 10
+                self.clk <<= ~self.clk
+                yield 0
+
+            print("Simulation started")
+
+            self.rst <<= 1
+            self.clk <<= 1
+            self.enable <<= 0
+            yield 10
+            for i in range(5):
+                yield from clk()
+            self.rst <<= 0
+
+            yield from clk()
+            self.data <<= 1
+            self.enable <<= 1
+            yield 0
+            assert self.check == 1
+            yield from clk()
+            assert self.check == 1
+            self.enable <<= 0
+            self.data <<= 2
+            yield 0
+            assert self.check == 1
+            yield from clk()
+            assert self.check == 1
+            self.enable <<= 1
+            yield 0
+            assert self.check == 2
+            yield from clk()
+            assert self.check == 2
+            now = yield 10
+            print(f"Done at {now}")
+
+    if mode == "rtl":
+        test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+    else:
+        test.simulation(sim_top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+def test_latch_sim(): test_latch("sim")
+def test_latch_rtl(): test_latch("rtl")
+
 if __name__ == "__main__":
     #test_select()
     #test_select_one_first()
@@ -402,4 +477,5 @@ if __name__ == "__main__":
     #test_default_select()
     #test_large_select_one()
     #test_select_first_sim()
-    test_select_first_sim2()
+    #test_select_first_sim2()
+    test_latch("sim")
