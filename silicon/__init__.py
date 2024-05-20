@@ -10,7 +10,7 @@ from .back_end import *
 from .adaptor import *
 from .primitives import *
 from .utils import get_common_net_type, explicit_adapt, cast, set_verbosity_level, VerbosityLevels, increment, decrement
-from .simulator import Simulator
+from .simulator import Simulator, get_simulator
 from .fsm import FSM
 from .composite import Reverse, Interface, Struct, Array, GenericMember
 from .memory import MemoryConfig, Memory, MemoryPortConfig
@@ -23,3 +23,5 @@ from .sim_asserts import AssertAlways, AssertOnNegClk, AssertOnClk, AssertOnPosC
 from .arbiters import RoundRobinArbiter
 from .apb_bus import ApbIf, ApbBaseIf
 from .reg_bank_utils import RegField, RegMapEntry, create_apb_reg_map
+
+from ._fyeah import f, lazy_f

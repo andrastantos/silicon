@@ -411,7 +411,23 @@ class Simulator(object):
             print(msg)
             raise_for_caller(SimulationException() if msg == "" else SimulationException(msg))
 
+    def sim_check_cond(self, condition, *args, **kwargs):
+        if not condition:
+            prefix = f"{self.now}:{self.delta}"
+            print(f"{prefix:>7} CONDITION CHECK FAILED ", end="")
+            from io import StringIO
+            msg = StringIO()
+            print(*args, **kwargs, file=msg, end="")
+            msg = msg.getvalue()
+            print(msg)
 
+
+# Some utility functions to fish out the simulator object from a net or a module
+def get_simulator(obj) -> Simulator:
+    if is_junction_base(obj):
+        obj = obj.get_parent_module()
+    # Let's try it as a module and hope for the best
+    return obj._impl.netlist.simulator_context.simulator
 
 
     """
