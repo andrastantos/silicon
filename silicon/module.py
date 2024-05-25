@@ -324,7 +324,6 @@ class Module(object):
         );
         """
 
-        assert back_end.language == "SystemVerilog"
         rtl_header = ""
         rtl_inline_assignments = ""
         rtl_instantiations = ""
