@@ -933,11 +933,15 @@ class Junction(JunctionBase):
             name = first(names)
         name = module_name + FQN_DELIMITER + name
         if add_location:
-            name += self.get_parent_module()._impl.get_diagnostic_location(" at ")
+            name += parent_module._impl.get_diagnostic_location(" at ")
         return name
 
-
-
+    def get_names_in_module(self, module: "Module") -> Optional[Sequence[str]]:
+        scope_table = module._impl.netlist.symbol_table[module]
+        names = scope_table.get_names(self)
+        if len(names) == 0:
+            return None
+        return names
 
     def ilshift__sim(self, other: Any) -> 'Junction':
         if self.is_composite():
