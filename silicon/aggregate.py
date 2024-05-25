@@ -27,7 +27,7 @@ class Aggregate(NetType):
         def __init__(self, member: NetType, is_reversed: bool):
             self.member = member
             self.is_reversed = is_reversed
- 
+
     @classmethod
     def _init_members(cls):
         cls.members: Dict[str, 'Aggregate.MemberDesc'] = OrderedDict()
@@ -114,7 +114,7 @@ class Aggregate(NetType):
         # requires that all instances of an Aggregate have the same members. Which in turn
         # requires that members are class variables. So, add_member really adds a member
         # to *all existing instances* of an Aggregate. That is almost certainly *not* what
-        # was intended if add_member was called on an instance. So what we'll do is to 
+        # was intended if add_member was called on an instance. So what we'll do is to
         # hide the class-level method by providing an instance-level one with the same name
         # that just raises an exception
         ret_val = super().__new__(cls, *args, **kwargs)
@@ -254,7 +254,7 @@ class Aggregate(NetType):
     @staticmethod
     def get_lhs_slicer(key_chains: Sequence[Sequence[Tuple[Any, KeyKind]]]) -> 'Module':
         return Number.PhiSlice(key_chains)
-        
+
     @classmethod
     def resolve_key_sequence_for_get(cls, keys: Sequence[Tuple[Any, KeyKind]], for_junction: Junction) -> Tuple[Optional[Sequence[Tuple[Any, KeyKind]]], Junction]:
         # Implements junction[3:2][2:1] or junction[3:2][0] type recursive slicing
@@ -382,18 +382,16 @@ class Struct(Composite, support_reverse=False):
             ABS
         """
         assert len(net_types) > 0
+        from .constant import NoneNetType
+        net_types = list(n for n in net_types if n is not NoneNetType)
+        if len(net_types) == 0:
+            return NoneNetType
         for net_type in net_types:
             if not is_struct(net_type) and net_type is not None:
                 raise SyntaxErrorException("Can only determine union type if all constituents are Structs")
         if operation == "SELECT":
-            start_idx = 0
-            first_type = None
-            while first_type is None:
-                first_type = net_types[start_idx]
-                start_idx += 1
-                if start_idx == len(net_types):
-                    raise SyntaxErrorException(f"Can't determine net type for SELECT: none of the value ports have types")
-            for net_type in net_types[start_idx:]:
+            first_type = net_types[0]
+            for net_type in net_types[1:]:
                 if first_type is not net_type:
                     raise SyntaxErrorException("SELECT is only supported on structs of the same type")
             return first_type

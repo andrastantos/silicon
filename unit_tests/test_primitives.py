@@ -53,6 +53,35 @@ def test_mux():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_enum_mux():
+    class branch_ops(Enum):
+        unknown   = 0
+
+        cb_eq     = 1
+        cb_ne     = 2
+        cb_unk    = 14
+
+    class top(Module):
+        in1 = Input(EnumNet(branch_ops))
+        in2 = Input(EnumNet(branch_ops))
+        sel1 = Input(logic)
+        sel2 = Input(logic)
+        sel3 = Input(logic)
+        sel_none = Input(logic)
+        out1 = Output(EnumNet(branch_ops))
+
+        def body(self):
+            self.out1 <<= SelectOne(
+                self.sel_none, None,
+                self.sel1, self.in1,
+                self.sel2, self.in2,
+                self.sel3, branch_ops.cb_eq,
+                default_port=branch_ops.cb_unk
+            )
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+
 def test_select_one_first():
     class top(Module):
         sout1 = Output(Signed(length=11))
@@ -478,4 +507,5 @@ if __name__ == "__main__":
     #test_large_select_one()
     #test_select_first_sim()
     #test_select_first_sim2()
-    test_latch("sim")
+    #test_latch("sim")
+    test_enum_mux()

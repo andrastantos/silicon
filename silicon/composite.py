@@ -226,18 +226,16 @@ class Struct(Composite, support_reverse=False):
             ABS
         """
         assert len(net_types) > 0
+        from .constant import NoneNetType
+        net_types = list(n for n in net_types if n is not NoneNetType)
+        if len(net_types) == 0:
+            return NoneNetType
         for net_type in net_types:
-            if not is_struct(net_type) and net_type is not None:
+            if not is_struct(net_type):
                 raise SyntaxErrorException("Can only determine union type if all constituents are Structs")
         if operation == "SELECT":
-            start_idx = 0
-            first_type = None
-            while first_type is None:
-                first_type = net_types[start_idx]
-                start_idx += 1
-                if start_idx == len(net_types):
-                    raise SyntaxErrorException(f"Can't determine net type for SELECT: none of the value ports have types")
-            for net_type in net_types[start_idx:]:
+            first_type = net_types[0]
+            for net_type in net_types[1:]:
                 if first_type is not net_type:
                     raise SyntaxErrorException("SELECT is only supported on structs of the same type")
             return first_type

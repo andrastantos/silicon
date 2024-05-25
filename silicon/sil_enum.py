@@ -212,6 +212,9 @@ class EnumNet(Number):
         @classmethod
         def result_type(cls, net_types: Sequence[Optional['NetType']], operation: str) -> 'NetType':
             # If we're SELECT-ing from all EnumNet junctions of the same type, go with that, otherwise revert to Number.
+            net_types = list(n for n in net_types if n is not NoneNetType)
+            if len(net_types) == 0:
+                return NoneNetType
             if operation == "SELECT":
                 first_type = first(net_types)
                 if all(net_type is first_type or net_type is NoneNetType for net_type in net_types[1:]):
