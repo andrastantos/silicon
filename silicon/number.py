@@ -4,7 +4,7 @@ from .exceptions import FixmeException, SyntaxErrorException, SimulationExceptio
 from .net_type import NetType, KeyKind, NetTypeFactory, NetTypeMeta
 from .module import GenericModule, Module, InlineBlock, InlineExpression, inline_statement_from_expression
 from .port import Input, Output, Junction, Port, is_junction_base
-from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, NetValue
+from .utils import first, TSimEvent, get_common_net_type, min_none, max_none, adjust_precision, adjust_precision_sim, first_bit_set, Context, NetValue, is_power_of_two
 from collections import OrderedDict
 import re
 try:
@@ -106,10 +106,18 @@ class Number(NetTypeFactory):
 
         # NOTE: the name of the type could be anything really, doesn't have to be something that's a valid identifier.
         #       This could be important, because we can avoid name-collisions this way.
-        if precision != 0:
-            type_name = f"Number_{min_val}-{max_val}_{precision}"
+        if min_val == 0 and is_power_of_two(max_val+1) and precision == 0:
+            bit_count = max_val.bit_length()
+            if bit_count == 1:
+                type_name = f"logic"
+            else:
+                type_name = f"Unsigned({bit_count})"
+        elif min_val + 1 == max_val and is_power_of_two(max_val+1) and precision == 0:
+            type_name = f"Signed({(max_val+1).bit_length()})"
+        elif precision != 0:
+            type_name = f"Number({min_val}-{max_val}:{precision})"
         else:
-            type_name = f"Number_{min_val}-{max_val}"
+            type_name = f"Number({min_val}-{max_val})"
         key = (precision, min_val, max_val)
         if net_type is not None:
             for name,value in kwargs.items():
