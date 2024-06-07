@@ -68,13 +68,18 @@ class Composite(NetType):
             raise SyntaxErrorException("Can only add members to a Composite-derived type")
         if name in cls.members:
             raise SyntaxErrorException(f"Member {name} already exists on composite type {cls}")
+        if hasattr(cls, name) and getattr(cls, name) is not member:
+            raise SyntaxErrorException(f"Type {cls} already has an attribute named {name}")
         if is_net_type(member):
             cls.members[name] = (member, False)
+            setattr(cls, name, member)
         elif is_generic_member(member):
             cls.members[name] = (None, False)
+            setattr(cls, name, member)
         elif is_reverse(member):
             if cls._support_reverse:
                 cls.members[name] = (member.net_type, True)
+                setattr(cls, name, member)
             else:
                 raise SyntaxErrorException(f"Composite type {cls} doesn't support reverse members")
         else:
