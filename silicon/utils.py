@@ -192,15 +192,19 @@ def str_block(block: Optional[str], header: str, footer: str):
         return ""
 
 
-def implicit_adapt(input: Any, output_type: 'NetType') -> 'Junction':
+def implicit_adapt(input: Any, output_type: 'NetType') -> Union['Junction', Dict['str', 'Junction']]:
     """
     Implicitly adapts input to output_type.
 
     Implicit adaption happens when mismatched port-types are bound together.
 
     If 'force' is set to True, an adaptor is inserted even if input is already of the right type
+
+    The return value is either a single port or a set of ports, for member-wise adaption.
+    This later one is for Composites and it's the responsibility of the 'adapt_from' or
+    'adapt_to' to decide which of the two methods are used.
     """
-    return adapt(input, output_type, implicit=True, force=False)
+    return adapt(input, output_type, implicit=True, force=False, allow_memberwise_adapt=True)
 
 
 def explicit_adapt(input: Any, output_type: 'NetType') -> 'Junction':
@@ -208,8 +212,12 @@ def explicit_adapt(input: Any, output_type: 'NetType') -> 'Junction':
     Explicitly adapts input to output_type. If adaption would require force, it raises an exception.
 
     NOTE: forcing an adaption means for instance to change a Number from a wider to a narrower range.
+
+    The return value is either a single port or a set of ports, for member-wise adaption.
+    This later one is for Composites and it's the responsibility of the 'adapt_from' or
+    'adapt_to' to decide which of the two methods are used.
     """
-    return adapt(input, output_type, implicit=False, force=False)
+    return adapt(input, output_type, implicit=False, force=False, allow_memberwise_adapt=False)
 
 
 def cast(input: Any, output_type: 'NetType') -> 'Junction':
@@ -218,14 +226,18 @@ def cast(input: Any, output_type: 'NetType') -> 'Junction':
 
     NOTE: forcing an adaption means for instance to change a Number from a wider to a narrower range.
     """
-    return adapt(input, output_type, implicit=False, force=True)
+    return adapt(input, output_type, implicit=False, force=True, allow_memberwise_adapt=False)
 
-def adapt(input: Any, output_type: 'NetType', implicit: bool, force: bool) -> 'Junction':
+def adapt(input: Any, output_type: 'NetType', implicit: bool, force: bool, allow_memberwise_adapt: bool) -> Union['Junction', Dict['str', 'Junction']]:
     """
     Creates an adaptor instance if needed to convert input to output_type.
     Returns the generated output port. If such adaptation is not possible, raises an exception
 
     If the type of the input is not know, a delayed adaptor is created.
+
+    The return value is either a single port or a set of ports, for member-wise adaption.
+    This later one is for Composites and it's the responsibility of the 'adapt_from' or
+    'adapt_to' to decide which of the two methods are used.
     """
     try:
         if output_type is input.get_net_type():
@@ -251,7 +263,7 @@ def adapt(input: Any, output_type: 'NetType', implicit: bool, force: bool) -> 'J
                     self.output_port.set_net_type(output_type)
                     self.is_trivial = False
                 def body(self):
-                    adapted = adapt(self.input_port, self.output_port.get_net_type(), self.implicit, self.force)
+                    adapted = adapt(self.input_port, self.output_port.get_net_type(), self.implicit, self.force, allow_memberwise_adapt=False)
                     self.is_trivial = adapted is self.input_port
                     self.adaptor = adapted.get_parent_module()
                     self.output_port <<= adapted
@@ -272,10 +284,10 @@ def adapt(input: Any, output_type: 'NetType', implicit: bool, force: bool) -> 'J
 
     input = convert_to_junction(input, output_type)
     try:
-        return output_type.adapt_from(input, implicit, force)
+        return output_type.adapt_from(input, implicit, force, allow_memberwise_adapt)
     except AdaptTypeError:
         try:
-            return input.get_net_type().adapt_to(output_type, input, implicit, force)
+            return input.get_net_type().adapt_to(output_type, input, implicit, force, allow_memberwise_adapt)
         except AdaptTypeError:
             raise SyntaxErrorException(f"Can't generate adaptor from {input.get_net_type().__name__} to {output_type.__name__} for port {input}")
         except AttributeError:

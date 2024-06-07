@@ -104,6 +104,22 @@ def test_type_propagation():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+@pytest.mark.skip(reason="This is a test for something that only the new Composite infrastructure can handle well")
+def test_type_propagation_through_reg():
+    class top(Module):
+        clk = ClkPort
+        rst = RstPort
+
+        in1 = Input(Pixel)
+        out1 = Output(Unsigned(8))
+
+        def body(self):
+            w = Wire()
+            w <<= Reg(self.in1)
+            self.out1 <<= w.r
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 def test_reg_struct():
     class top(Module):
         sout1 = Output(Pixel)
@@ -551,6 +567,26 @@ def test_generic_interface2():
 
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
+def test_member_type_propagation(mode: str = "rtl"):
+    class Top(Module):
+        inp = Input(ApbIf(Unsigned(32), Unsigned(32)))
+        outp = Output(ApbIf(Unsigned(32)))
+
+        class Inner(Module):
+            i_inp = Input(ApbIf(Unsigned(32)))
+            i_outp = Output(ApbIf(Unsigned(32)))
+
+            def body(self):
+                self.i_outp <<= self.i_inp
+
+        def body(self):
+            self.outp <<= Top.Inner(self.inp)
+
+    if mode == "rtl":
+        test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        test.simulation(Top, "test_multi_assign")
+
 if __name__ == "__main__":
     #test_select_struct()
     #test_select_one_struct()
@@ -572,11 +608,13 @@ if __name__ == "__main__":
     #test_multi_assign("sim")
     #test_select_one_struct_default()
     #test_type_propagation()
+    #test_type_propagation_through_reg()
     #test_bidir_interface()
     #test_illegal_branch()
     #test_generic_interface()
-    test_generic_interface_rev()
+    #test_generic_interface_rev()
     #test_generic_interface2()
+    test_member_type_propagation()
 
 """
 Additional tests needed:

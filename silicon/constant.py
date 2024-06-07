@@ -97,7 +97,7 @@ class NoneNetType(NetType):
             return expr, prec
 
     @classmethod
-    def adapt_from(cls, input: Any, implicit: bool, force: bool) -> Any:
+    def adapt_from(cls, input: Any, implicit: bool, force: bool, allow_memberwise_adapt: bool) -> Any:
         context = Context.current()
 
         if context == Context.simulation:
@@ -135,7 +135,7 @@ class NoneNetType(NetType):
             return True
 
     @classmethod
-    def adapt_to(cls, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool) -> Optional['Junction']:
+    def adapt_to(cls, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool, allow_memberwise_adapt: bool) -> Optional['Junction']:
         assert input.get_net_type() is cls
         if output_type is cls:
             return input

@@ -509,7 +509,7 @@ class Struct(Composite, support_reverse=False):
             return True
 
     @classmethod
-    def adapt_to(cls, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool) -> Optional['Junction']:
+    def adapt_to(cls, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool, allow_memberwise_adapt: bool) -> Optional['Junction']:
         assert input.get_net_type() is cls
         if output_type is cls:
             return input
@@ -523,7 +523,7 @@ class Struct(Composite, support_reverse=False):
         return adapt(raw_number, output_type, implicit, force)
 
     @classmethod
-    def adapt_from(cls, input: Any, implicit: bool, force: bool) -> Any:
+    def adapt_from(cls, input: Any, implicit: bool, force: bool, allow_memberwise_adapt: bool) -> Any:
         context = Context.current()
         if context == Context.simulation:
             raise SimulationException("Don't support simulation yet")
@@ -535,7 +535,7 @@ class Struct(Composite, support_reverse=False):
             if implicit:
                 raise AdaptTypeError
             # We support anything that can convert to a number
-            input_as_num = adapt(input, Unsigned(length=input_type.get_num_bits()), implicit, force)
+            input_as_num = adapt(input, Unsigned(length=input_type.get_num_bits()), implicit, force, allow_memberwise_adapt)
             if input_as_num is None:
                 raise AdaptTypeError
             return Struct.FromNumber(cls)(input_as_num)

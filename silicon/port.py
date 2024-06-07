@@ -984,7 +984,7 @@ class Junction(JunctionBase):
             new_sim_value = value.sim_value
         else:
             from .utils import adapt
-            new_sim_value = adapt(value, self.get_net_type(), implicit=False, force=False)
+            new_sim_value = adapt(value, self.get_net_type(), implicit=False, force=False, allow_memberwise_adapt=False)
 
         xnet_source = self._xnet.get_source()
         if xnet_source is self:

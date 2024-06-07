@@ -97,7 +97,7 @@ class NetType(object, metaclass=NetTypeMeta):
 
     def __new__(cls, *args) -> Union['NetType', 'Junction']:
         """
-        If called with a single, positional parameters, this is the explicit type-conversion case.
+        If called with a single, positional parameter, this is the explicit type-conversion case.
 
         If called without parameters, it's (eventually) the port or wire instance creation case.
         In this case we should simply return a NetType instance.
@@ -236,7 +236,7 @@ class NetType(object, metaclass=NetTypeMeta):
     def get_num_bits(cls) -> int:
         raise NotImplementedError
     @classmethod
-    def adapt_from(cls, input: Any, implicit: bool, force: bool) -> Any:
+    def adapt_from(cls, input: Any, implicit: bool, force: bool, allow_memberwise_adapt: bool) -> Any:
         """
         Return the (output of) a converter object that adapts the input to the current type.
         Should raise AdaptTypeError if conversion is not supported.
@@ -249,7 +249,7 @@ class NetType(object, metaclass=NetTypeMeta):
         """
         raise AdaptTypeError
     @classmethod
-    def adapt_to(cls, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool) -> Optional['Junction']:
+    def adapt_to(cls, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool, allow_memberwise_adapt: bool) -> Optional['Junction']:
         """
         Return the (output of) a converter object that adapts the current type to the desired output type.
         Should raise AdaptTypeError if conversion is not supported.

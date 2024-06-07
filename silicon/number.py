@@ -1157,7 +1157,7 @@ class Number(NetTypeFactory):
             return value
 
         @classmethod
-        def adapt_from(cls, input: Any, implicit: bool, force: bool) -> Any:
+        def adapt_from(cls, input: Any, implicit: bool, force: bool, allow_memberwise_adapt: bool) -> Any:
             context = Context.current()
 
             if context == Context.simulation:

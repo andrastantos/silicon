@@ -138,6 +138,37 @@ class Composite(NetType):
     def get_default_sim_value(cls) -> Any:
         assert False, "Simulation should never enquire about default values of Composites"
 
+    @classmethod
+    def adapt_from(cls, input: Any, implicit: bool, force: bool, allow_memberwise_adapt: bool) -> Any:
+        context = Context.current()
+        if context == Context.simulation:
+            raise SimulationException("Don't support simulation yet")
+        elif context == Context.elaboration:
+            input_type = input.get_net_type()
+            if input_type is cls:
+                return input
+            # If we *only* have generics on one side that are specialized on the other, we can do member-wise adaptation
+            if allow_memberwise_adapt and input.is_composite():
+                for name, (sub_input, sub_input_is_reversed) in input.get_member_junctions().items():
+                    try:
+                        sub_output, sub_output_is_reversed = cls.get_members()[name]
+                    except KeyError:
+                        raise AdaptTypeError
+                    if sub_input_is_reversed != sub_output_is_reversed:
+                        raise AdaptTypeError
+                    if sub_input_is_reversed:
+                        if sub_input.get_net_type() is not None and sub_output is not sub_input.get_net_type():
+                            raise AdaptTypeError
+                    else:
+                        if sub_output is not None and sub_output is not sub_input.get_net_type():
+                            raise AdaptTypeError
+                outputs = OrderedDict()
+                for name, (sub_port, is_reveresed) in input.get_member_junctions().items():
+                    outputs[name] = sub_port
+                return outputs
+            raise AdaptTypeError
+        else:
+            assert False, f"Unknown context: {context}"
 
 def is_struct(thing: Any) -> bool:
     try:
@@ -358,7 +389,7 @@ class Struct(Composite, support_reverse=False):
             return True
 
     @classmethod
-    def adapt_to(cls, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool) -> Optional['Junction']:
+    def adapt_to(cls, output_type: 'NetType', input: 'Junction', implicit: bool, force: bool, allow_memberwise_adapt: bool) -> Optional['Junction']:
         assert input.get_net_type() is cls
         if output_type is cls:
             return input
@@ -372,24 +403,15 @@ class Struct(Composite, support_reverse=False):
         return adapt(raw_number, output_type, implicit, force)
 
     @classmethod
-    def adapt_from(cls, input: Any, implicit: bool, force: bool) -> Any:
-        context = Context.current()
-        if context == Context.simulation:
-            raise SimulationException("Don't support simulation yet")
-        elif context == Context.elaboration:
-            input_type = input.get_net_type()
-            if input_type is cls:
-                return input
-            # We don't support implicit conversion
-            if implicit:
-                raise AdaptTypeError
+    def adapt_from(cls, input: Any, implicit: bool, force: bool, allow_memberwise_adapt: bool) -> Any:
+        try:
+            return Composite.adapt_from(input, implicit, force, allow_memberwise_adapt)
+        except AdaptTypeError:
             # We support anything that can convert to a number
-            input_as_num = adapt(input, Unsigned(length=input_type.get_num_bits()), implicit, force)
-            if input_as_num is None:
-                raise AdaptTypeError
-            return Struct.FromNumber(cls)(input_as_num)
-        else:
-            assert False, f"Unknown context: {context}"
+            input_type = input.get_net_type()
+            input_as_num = adapt(input, Unsigned(length=input_type.get_num_bits()), implicit, force, allow_memberwise_adapt)
+            if input_as_num is not None:
+                return Struct.FromNumber(cls)(input_as_num)
 class Interface(Composite, support_reverse=True):
     def __init_subclass__(cls):
         cls._init_members()

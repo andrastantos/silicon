@@ -1088,7 +1088,9 @@ class Module(object):
                     return True
 
             def propagate_net_types():
-                def insert_adaptor(source: 'Junction', sink: 'Junction', sink_type: 'NetType', scope: 'Module', force: bool) -> None:
+                # Returns True, if a member-wise adaptor is created, in which case, we need to re-run propagate_net_types again.
+                def insert_adaptor(source: 'Junction', sink: 'Junction', sink_type: 'NetType', scope: 'Module', force: bool) -> bool:
+                    ret_val = False
                     with self.netlist.set_current_scope(scope):
                         if force and source.get_net_type() is sink_type:
                             #if source.is_composite():
@@ -1103,18 +1105,43 @@ class Module(object):
                             new_source = TrivialAdaptor(source.get_net_type())(source)
                         else:
                             new_source = implicit_adapt(source, sink_type)
-                        # If an adaptor was created, fix up connectivity, including inserting a naming wire, if needed
                         if new_source is not source:
-                            parent_module = source.get_parent_module()
-                            names = self.netlist.symbol_table[parent_module._impl.parent].get_names(source)
-                            if len(names) > 0:
-                                name = first(names)
-                                naming_wire = Wire(new_source.get_net_type(), scope)
-                                self.netlist.symbol_table[scope].add_soft_symbol(naming_wire, name) # This creates duplicates of course, but that will be resolved later on
-                                naming_wire.set_source(new_source, scope=scope)
-                                sink.set_source(naming_wire, scope)
+                            # If an adaptor was created, fix up connectivity, including inserting a naming wire, if needed
+                            if is_junction(new_source):
+                                parent_module = source.get_parent_module()
+                                names = self.netlist.symbol_table[parent_module._impl.parent].get_names(source)
+                                if len(names) > 0:
+                                    name = first(names)
+                                    naming_wire = Wire(new_source.get_net_type(), scope)
+                                    self.netlist.symbol_table[scope].add_soft_symbol(naming_wire, name) # This creates duplicates of course, but that will be resolved later on
+                                    naming_wire.set_source(new_source, scope=scope)
+                                    sink.set_source(naming_wire, scope)
+                                else:
+                                    sink.set_source(new_source, scope)
                             else:
-                                sink.set_source(new_source, scope)
+                                parent_module = source.get_parent_module()
+                                names = self.netlist.symbol_table[parent_module._impl.parent].get_names(source)
+                                base_name = first(names) if len(names) > 0 else None
+                                sink._del_source()
+                                for member_name, member_source in new_source.items():
+                                    member_sink, member_reversed = sink.get_member_junctions()[member_name]
+                                    if base_name is not None:
+                                        name = f"{base_name}_{member_name}"
+                                        naming_wire = Wire(member_source.get_net_type(), scope)
+                                        self.netlist.symbol_table[scope].add_soft_symbol(naming_wire, name) # This creates duplicates of course, but that will be resolved later on
+                                        if member_reversed:
+                                            naming_wire.set_source(member_sink, scope=scope)
+                                            member_source.set_source(naming_wire, scope)
+                                        else:
+                                            naming_wire.set_source(member_source, scope=scope)
+                                            member_sink.set_source(naming_wire, scope)
+                                    else:
+                                        if member_reversed:
+                                            member_source.set_source(member_sink, scope)
+                                        else:
+                                            member_sink.set_source(member_source, scope)
+                                ret_val = True
+                    return ret_val
 
                 def get_all_junctions() -> Sequence[Junction]:
                     """
@@ -1129,25 +1156,28 @@ class Module(object):
 
 
                 # First set net types on junctions where the source has a type, but the sink doesn't
-                incomplete_junctions = set(junction for junction in get_all_junctions() if not junction.is_specialized() and junction.has_source(allow_partials=False))
-                changes = True
-                while len(incomplete_junctions) > 0 and changes:
-                    changes = False
-                    for junction in tuple(incomplete_junctions):
-                        source = junction.get_source()
-                        if source.is_specialized():
-                            junction.set_net_type(source.get_net_type())
-                            changes = True
-                            incomplete_junctions.remove(junction)
-                # Look through all junctions for incompatible source-sink types and insert adaptors as needed
-                for composite_junction in tuple(get_all_junctions()):
-                    for junction in composite_junction.get_all_member_junctions(add_self=True):
-                        old_source = junction.get_source()
-                        if junction.is_specialized() and old_source is not None and old_source.is_specialized():
-                            if junction.get_net_type() is not old_source.get_net_type():
-                                insert_adaptor(old_source, junction, junction.get_net_type(), junction.source_scope, force=False)
-                        elif old_source is not None and old_source.is_specialized():
-                            junction.set_net_type(old_source.get_net_type())
+                rerun = True
+                while rerun:
+                    rerun = False
+                    incomplete_junctions = set(junction for junction in get_all_junctions() if not junction.is_specialized() and junction.has_source(allow_partials=False))
+                    changes = True
+                    while len(incomplete_junctions) > 0 and changes:
+                        changes = False
+                        for junction in tuple(incomplete_junctions):
+                            source = junction.get_source()
+                            if source.is_specialized():
+                                junction.set_net_type(source.get_net_type())
+                                changes = True
+                                incomplete_junctions.remove(junction)
+                    # Look through all junctions for incompatible source-sink types and insert adaptors as needed
+                    for composite_junction in tuple(get_all_junctions()):
+                        for junction in composite_junction.get_all_member_junctions(add_self=True):
+                            old_source = junction.get_source()
+                            if junction.is_specialized() and old_source is not None and old_source.is_specialized():
+                                if junction.get_net_type() is not old_source.get_net_type():
+                                    rerun = insert_adaptor(old_source, junction, junction.get_net_type(), junction.source_scope, force=False)
+                            elif old_source is not None and old_source.is_specialized():
+                                junction.set_net_type(old_source.get_net_type())
                 # We also need to insert adaptors for loopbacks: This forces XNets with loopbacks to be broken up into
                 # multiple pieces thus generating proper RTL and simulation.
                 # Consider the following cenario:
@@ -1162,7 +1192,7 @@ class Module(object):
                 # handled in RTL generation though by excluding the output port from the port-binding.
                 #
                 # The reason we can't handle the first situation in a similar way is that would mean that the use
-                # (exnteral loopback or not) influeces the way we would generate RTL for the sub-module.
+                # (exteral loopback or not) influeces the way we would generate RTL for the sub-module.
                 #
                 # Consider something more complex though:
                 #
