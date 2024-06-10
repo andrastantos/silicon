@@ -36,6 +36,9 @@ class File(object):
         self.mode = mode
         self.stream = None
     def __enter__(self) -> IO:
+        if "w" in self.mode or "a" in self.mode:
+            # Create path to the filename
+            Path(self.filename).parent.mkdir(parents=True, exist_ok=True)
         self.stream = open(self.filename, self.mode)
         return self.stream
     def __exit__(self, exception_type, exception_value, traceback):
