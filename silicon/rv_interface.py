@@ -86,7 +86,7 @@ class RvSimSource(GenericModule):
         self.data_members = Wire(self.output_port.get_data_member_type())
         self.output_port.set_data_members(self.data_members)
 
-    def simulate(self) -> TSimEvent:
+    def simulate(self, simulator) -> TSimEvent:
         def set_data(next_val):
             if next_val is not None and not is_iterable(next_val):
                 try:
@@ -108,7 +108,7 @@ class RvSimSource(GenericModule):
         def reset():
             self.output_port.valid <<= 0
             self.wait_state = randint(1,self.max_wait_state+1)
-            set_data(self.generator(True))
+            set_data(self.generator(True, simulator))
 
         reset()
         while True:
@@ -123,7 +123,7 @@ class RvSimSource(GenericModule):
                     if self.wait_state != 0:
                         self.wait_state -= 1
                         if self.wait_state == 0:
-                            set_data(self.generator(False))
+                            set_data(self.generator(False, simulator))
 
                     self.output_port.valid <<= 1 if self.wait_state == 0 else 0
 
@@ -142,7 +142,7 @@ class RvSimSink(GenericModule):
         self.data_members = Wire(self.input_port.get_data_member_type())
         self.data_members <<= self.input_port.get_data_members()
 
-    def simulate(self) -> TSimEvent:
+    def simulate(self, simulator) -> TSimEvent:
         def reset():
             self.input_port.ready <<= 0
             self.wait_state = randint(1,self.max_wait_state+1)
@@ -160,7 +160,7 @@ class RvSimSink(GenericModule):
                         sim_val = self.data_members.sim_value
                         #if is_iterable(sim_val) and len(sim_val) == 1:
                         #    sim_val = sim_val[0]
-                        self.checker(sim_val)
+                        self.checker(sim_val, simulator)
                     if self.wait_state != 0:
                         self.wait_state -= 1
                     self.input_port.ready <<= 1 if self.wait_state == 0 else 0

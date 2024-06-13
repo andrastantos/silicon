@@ -745,3 +745,28 @@ class NegLatchReg(GenericLatchReg):
 
 LatchReg = PosLatchReg
 
+def SRReg(set, reset):
+    state = Wire(logic)
+    state <<= Reg(Select(
+        set,
+        Select(
+            reset,
+            state,
+            0
+        ),
+        1
+    ))
+    return state
+
+def RSReg(set, reset):
+    state = Wire(logic)
+    state <<= Reg(Select(
+        reset,
+        Select(
+            set,
+            state,
+            1
+        ),
+        0
+    ))
+    return state
