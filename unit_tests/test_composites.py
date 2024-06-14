@@ -475,6 +475,56 @@ def test_bidir_interface(mode: str = "rtl"):
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 
+class RevOnly(Interface):
+    bwd = Reverse(logic)
+
+
+def test_bidir_interface2(mode: str= "rtl"):
+
+    class mod(Module):
+        mod_out = Output(RevOnly)
+
+        def body(self):
+            pass
+            #self.mod_out.fwd <<= 2
+
+    class top(Module):
+        top_out = Output(RevOnly)
+
+        def body(self):
+            top_w = Wire(RevOnly)
+
+            m = mod()
+            top_w <<= m.mod_out
+            self.top_out <<= top_w
+
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
+# This test doesn't add anything that we haven't tested already
+#class Request(ReadyValid):
+#    data = Unsigned(16)
+#
+#def test_bidir_interface3(mode: str= "rtl"):
+#
+#    class mod(Module):
+#        mod_out = Output(Request)
+#
+#        def body(self):
+#            pass
+#            #self.mod_out.fwd <<= 2
+#
+#    class top(Module):
+#        top_out = Output(Request)
+#
+#        def body(self):
+#            top_w = Wire(Request)
+#
+#            m = mod()
+#            top_w <<= m.mod_out
+#            self.top_out <<= top_w
+#
+#    test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+
 
 class GenIf(Interface):
     fwd = GenericMember
@@ -614,7 +664,9 @@ if __name__ == "__main__":
     #test_generic_interface()
     #test_generic_interface_rev()
     #test_generic_interface2()
-    test_member_type_propagation()
+    #test_member_type_propagation()
+    test_bidir_interface2()
+    #test_bidir_interface3()
 
 """
 Additional tests needed:

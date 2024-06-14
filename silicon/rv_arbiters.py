@@ -36,7 +36,7 @@ class RVArbiter(GenericModule):
     # altogether.
     ports: Dict[str, PortDesc] = OrderedDict()
 
-    output_reqest = Output()
+    output_request = Output()
     output_response = Input()
 
     def construct(self, request_if, response_if):
@@ -44,6 +44,9 @@ class RVArbiter(GenericModule):
         self.response_if = response_if
         # See if response port supports back-pressure
         self.response_has_back_pressure = "ready" in self.response_if.get_members()
+
+        self.output_request.set_net_type(self.request_if)
+        self.output_response.set_net_type(self.response_if)
 
 
     def create_named_port_callback(self, name: str, net_type: Optional[NetType] = None) -> Optional[Port]:
@@ -57,7 +60,7 @@ class RVArbiter(GenericModule):
             if net_type is not None and net_type is not self.request_if:
                 raise SyntaxErrorException("Net type '{net_type}' is not valid for port '{name}'")
             basename = name[:name.rfind("_request")]
-            if basename not in self.ports[basename]:
+            if basename not in self.ports:
                 self.ports[basename] = RVArbiter.PortDesc(None, None)
             port = Input(self.request_if)
             self.ports[basename].req = port
@@ -66,15 +69,16 @@ class RVArbiter(GenericModule):
             if net_type is not None and net_type is not self.response_if:
                 raise SyntaxErrorException("Net type '{net_type}' is not valid for port '{name}'")
             basename = name[:name.rfind("_response")]
-            if basename not in self.ports[basename]:
+            if basename not in self.ports:
                 self.ports[basename] = RVArbiter.PortDesc(None, None)
-            port = Input(self.response_if)
+            port = Output(self.response_if)
             self.ports[basename].rsp = port
             return port
 
         raise InvalidPortError()
 
     def body(self):
+
         for name, port_desc in self.ports.items():
             if port_desc.req is None:
                 raise SyntaxErrorException(f"RVArbiter port '{name}_requests' is not connected")
@@ -91,15 +95,15 @@ class RVArbiter(GenericModule):
                 raise SyntaxErrorException(f"RVArbiter port prefix '{name}' doesn't exist in 'arbitration_order'. Don't know how to build arbiter.")
 
 
-        selected_port = Wire(Number(min_val=0, max_val=len(self.port)))
+        selected_port = Wire(Number(min_val=0, max_val=len(self.ports)))
 
         selectors = []
         for idx, name in enumerate(self.arbitration_order[:-1]):
             port_desc = self.ports[name]
             selectors += [port_desc.req.valid, idx]
-        selected_port_comb = SelectFirst(*selectors, default_port = self.arbitration_order[-1].req.valid)
+        selected_port_comb = SelectFirst(*selectors, default_port = self.ports[self.arbitration_order[-1]].req.valid)
 
-        request_progress = self.output_reqest.ready & self.output_reqest.valid
+        request_progress = self.output_request.ready & self.output_request.valid
         response_progress = self.output_response.ready & self.output_response.valid if self.response_has_back_pressure else self.output_response.valid
 
         active = SRReg(request_progress, response_progress)
@@ -121,10 +125,10 @@ class RVArbiter(GenericModule):
                 req_distributor.append(member)
             req_distributors.append(req_distributor)
 
-        for req_selector, member in zip(req_selectors, self.output_reqest.get_all_member_junctions(add_self=False, reversed=False)):
+        for req_selector, member in zip(req_selectors, self.output_request.get_all_member_junctions(add_self=False, reversed=False)):
             member <<= Select(selected_port_comb, *req_selector)
 
-        for req_distributor, member in zip(req_distributors, self.output_reqest.get_all_member_junctions(add_self=False, reversed=True)):
+        for req_distributor, member in zip(req_distributors, self.output_request.get_all_member_junctions(add_self=False, reversed=True)):
             for idx, req_wire in enumerate(req_distributor):
                 req_wire <<= Select(selected_port_comb == idx, 0, member)
 
@@ -147,14 +151,14 @@ class RVArbiter(GenericModule):
                 rsp_selector.append(member)
             rsp_selectors.append(rsp_selector)
 
-        for rsp_distributor, member in zip(rsp_distributors, self.output_reqest.get_all_member_junctions(add_self=False, reversed=False)):
+        for rsp_distributor, member in zip(rsp_distributors, self.output_request.get_all_member_junctions(add_self=False, reversed=False)):
             for idx, rsp_wire in enumerate(rsp_distributor):
                 if member is rsp_valid_port:
                     rsp_wire <<= Select((selected_port == idx) & active, 0, member)
                 else:
-                    rps_wire <<= member
+                    rsp_wire <<= member
 
-        for rsp_selector, member in zip(rsp_selectors, self.output_reqest.get_all_member_junctions(add_self=False, reversed=True)):
+        for rsp_selector, member in zip(rsp_selectors, self.output_request.get_all_member_junctions(add_self=False, reversed=True)):
             member <<= Select(selected_port, *rsp_selector)
 
 

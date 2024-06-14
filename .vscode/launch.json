@@ -198,6 +198,15 @@
             "justMyCode": false
         },
         {
+            "name": "Python: UNIT_TEST/test_rv_arbiters",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/unit_tests/test_rv_arbiters.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/unit_tests",
+            "justMyCode": false
+        },
+        {
             "name": "Python: CPC6128/i8255",
             "type": "python",
             "request": "launch",
