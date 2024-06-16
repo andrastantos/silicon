@@ -1647,7 +1647,13 @@ class Module(object):
                             if source_module is self._true_module:
                                 name = first(source_port.get_interface_names())
                             else:
-                                name = f"{source_module._impl.get_name()}{MEMBER_DELIMITER}{first(source_port.get_interface_names())}"
+                                try:
+                                    name = f"{source_module._impl.get_name()}{MEMBER_DELIMITER}{first(source_port.get_interface_names())}"
+                                except AttributeError:
+                                    # It's possible that wires and up being sources in cases when a module has a custom 'simulate' and/or
+                                    # 'generate' method.
+                                    assert is_wire(source_port)
+                                    name = f"{source_module._impl.get_name()}{MEMBER_DELIMITER}{first(source_port.get_names_in_module(source_module))}"
                             xnet.add_name(self._true_module, name, is_explicit=False, is_input=False) # These ports are not inputs, at least not as far is this context is concerned.
 
 
