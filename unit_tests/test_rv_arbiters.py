@@ -44,7 +44,7 @@ class ReqChecker(RvSimSink):
         super().construct(None, max_wait_state)
     def checker(self, value, simulator: Simulator):
         data = int(value.data)
-        simulator.SimAssert(data in requests)
+        simulator.sim_assert(data in requests)
         requests.remove(data)
         responses.append(data)
 

@@ -111,54 +111,52 @@ class RVArbiter(GenericModule):
         selected_port <<= Reg(selected_port_comb, clock_en=request_progress)
 
         # Create request mux
-        req_selectors = [] # A list of lists for each member
-        req_distributors = [] # Same for reversed members
-        for idx, name in enumerate(self.arbitration_order):
+        req_selectors = OrderedDict() # Contains a lists for each member
+        req_distributors = OrderedDict() # Same for reversed members
+        for output_member in self.output_request.get_all_member_junctions(add_self=False, reversed=False): req_selectors[output_member] = []
+        for output_member in self.output_request.get_all_member_junctions(add_self=False, reversed=True): req_distributors[output_member] = []
+
+        for name in self.arbitration_order:
             req_port = self.ports[name].req
-            req_selector = []
-            for member in req_port.get_all_member_junctions(add_self=False, reversed=False):
+            for req_selector, member in zip(req_selectors.values(), req_port.get_all_member_junctions(add_self=False, reversed=False)):
                 req_selector.append(member)
-            req_selectors.append(req_selector)
 
-            req_distributor = []
-            for member in req_port.get_all_member_junctions(add_self=False, reversed=True):
+            for req_distributor, member in zip(req_distributors.values(), req_port.get_all_member_junctions(add_self=False, reversed=True)):
                 req_distributor.append(member)
-            req_distributors.append(req_distributor)
 
-        for req_selector, member in zip(req_selectors, self.output_request.get_all_member_junctions(add_self=False, reversed=False)):
-            member <<= Select(selected_port_comb, *req_selector)
+        for output_member, req_selector in req_selectors.items():
+            output_member <<= Select(selected_port_comb, *req_selector)
 
-        for req_distributor, member in zip(req_distributors, self.output_request.get_all_member_junctions(add_self=False, reversed=True)):
+        for output_member, req_distributor in req_distributors.items():
             for idx, req_wire in enumerate(req_distributor):
-                req_wire <<= Select(selected_port_comb == idx, 0, member)
+                req_wire <<= Select(selected_port_comb == idx, 0, output_member)
 
         # Create response mux
         # NOTE: This *IS* a reference to the wire object. We will use it later
         #       to find the one reveresed port that needs a 'Select' statement.
         #       All others are just pass-through
         rsp_valid_port = self.output_response.valid
-        rsp_distributors = [] # A list of lists for each member
-        rsp_selectors = [] # Same for reversed members
-        for idx, name in enumerate(self.arbitration_order):
+        rsp_distributors = OrderedDict() # Contains a list of lists for each member
+        rsp_selectors = OrderedDict() # Same for reversed members
+        for output_member in self.output_response.get_all_member_junctions(add_self=False, reversed=False): rsp_distributors[output_member] = []
+        for output_member in self.output_response.get_all_member_junctions(add_self=False, reversed=True): rsp_selectors[output_member] = []
+
+        for name in self.arbitration_order:
             rsp_port = self.ports[name].rsp
-            rsp_distributor = []
-            for member in rsp_port.get_all_member_junctions(add_self=False, reversed=False):
+            for rsp_distributor, member in zip(rsp_distributors.values(), rsp_port.get_all_member_junctions(add_self=False, reversed=False)):
                 rsp_distributor.append(member)
-            rsp_distributors.append(rsp_distributor)
 
-            rsp_selector = []
-            for member in rsp_port.get_all_member_junctions(add_self=False, reversed=True):
+            for rsp_selector, member in zip(rsp_selectors.values(), rsp_port.get_all_member_junctions(add_self=False, reversed=True)):
                 rsp_selector.append(member)
-            rsp_selectors.append(rsp_selector)
 
-        for rsp_distributor, member in zip(rsp_distributors, self.output_request.get_all_member_junctions(add_self=False, reversed=False)):
+        for output_member, rsp_distributor in rsp_distributors.items():
             for idx, rsp_wire in enumerate(rsp_distributor):
-                if member is rsp_valid_port:
-                    rsp_wire <<= Select((selected_port == idx) & active, 0, member)
+                if output_member is rsp_valid_port:
+                    rsp_wire <<= Select((selected_port == idx) & active, 0, output_member)
                 else:
-                    rsp_wire <<= member
+                    rsp_wire <<= output_member
 
-        for rsp_selector, member in zip(rsp_selectors, self.output_request.get_all_member_junctions(add_self=False, reversed=True)):
-            member <<= Select(selected_port, *rsp_selector)
+        for output_member, rsp_selector in rsp_selectors.items():
+            output_member <<= Select(selected_port, *rsp_selector)
 
 
