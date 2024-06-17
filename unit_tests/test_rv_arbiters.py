@@ -55,6 +55,8 @@ class RspGenerator(RvSimSource):
     def generator(self, is_reset, simulator):
         if is_reset:
             return None
+        if len(responses) == 0:
+            raise RvSimSource.RetryLater
         rsp = responses[0]
         responses.pop(0)
         return rsp
@@ -72,7 +74,7 @@ class RspChecker(RvSimSink):
 
 
 @pytest.mark.skip(reason="Test is under development")
-def test_arbiter_buf(mode: str = "sim"):
+def test_arbiter(mode: str = "sim"):
     class sim_top(Module):
         clk = ClkPort()
         rst = RstPort()
@@ -82,12 +84,13 @@ def test_arbiter_buf(mode: str = "sim"):
             self.req2 = Wire(Request)
             self.rsp2 = Wire(Response)
 
-            self.expectation_queue = []
-            self.req1_gen = ReqGenerator(top_byte=0x11, expectation_queue=self.expectation_queue)
-            self.req1_chk = RspChecker(top_byte=0x11, expectation_queue=self.expectation_queue)
+            self.expectation_queue1 = []
+            self.req1_gen = ReqGenerator(top_byte=0x11, expectation_queue=self.expectation_queue1)
+            self.req1_chk = RspChecker(top_byte=0x11, expectation_queue=self.expectation_queue1)
 
-            self.req2_gen = ReqGenerator(top_byte=0x22, expectation_queue=self.expectation_queue)
-            self.req2_chk = RspChecker(top_byte=0x22, expectation_queue=self.expectation_queue)
+            self.expectation_queue2 = []
+            self.req2_gen = ReqGenerator(top_byte=0x22, expectation_queue=self.expectation_queue2)
+            self.req2_chk = RspChecker(top_byte=0x22, expectation_queue=self.expectation_queue2)
 
             self.out_chk = ReqChecker()
             self.out_gen = RspGenerator()
@@ -97,7 +100,7 @@ def test_arbiter_buf(mode: str = "sim"):
             self.req2 <<= self.req2_gen.output_port
             self.req2_chk.input_port <<= self.rsp2
 
-            dut = RVArbiter(request_if=Request, response_if=Response)
+            dut = RVArbiter(request_if=Request, response_if=Response, max_oustanding_responses=1)
             dut.req1_request <<= self.req1
             self.rsp1 <<= dut.req1_response
             dut.req2_request <<= self.req2
@@ -136,4 +139,4 @@ def test_arbiter_buf(mode: str = "sim"):
         test.simulation(sim_top, inspect.currentframe().f_code.co_name)
 
 if __name__ == "__main__":
-    test_arbiter_buf("sim")
+    test_arbiter("sim")
