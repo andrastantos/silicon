@@ -69,11 +69,12 @@ class ReadyValid(Interface):
             raise SyntaxErrorException(f"ReadyValid interface {cls.__name__} doesn't support reverse members")
         super().add_member(name, member)
 
-
 class RvSimSource(GenericModule):
     output_port = Output()
     clock_port = ClkPort()
     reset_port = RstPort()
+
+    class RetryLater(Exception): pass
 
     def construct(self, data_type: NetType = None, generator: Optional[Callable] = None, max_wait_state: int = 5) -> None:
         if data_type is not None:
@@ -123,8 +124,10 @@ class RvSimSource(GenericModule):
                     if self.wait_state != 0:
                         self.wait_state -= 1
                         if self.wait_state == 0:
-                            set_data(self.generator(False, simulator))
-
+                            try:
+                                set_data(self.generator(False, simulator))
+                            except RvSimSource.RetryLater:
+                                self.wait_state = randint(1,self.max_wait_state+1)
                     self.output_port.valid <<= 1 if self.wait_state == 0 else 0
 
 
