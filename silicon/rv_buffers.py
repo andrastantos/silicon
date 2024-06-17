@@ -225,8 +225,8 @@ class Fifo(GenericModule):
 
             # Buffer memory
             mem_config = MemoryConfig((
-                MemoryPortConfig(addr_type, data_type, registered_input=False, registered_output=True),
-                MemoryPortConfig(addr_type, data_type, registered_input=False, registered_output=True)
+                MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False),
+                MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False)
             ))
             buffer_mem = Memory(mem_config)
 
@@ -237,11 +237,12 @@ class Fifo(GenericModule):
             # we need a bypass pass to get rid of the extra cycle of latency.
             # TODO: Can we do better? We could probably change the logic to take the extra cycle into account.
             #       This way output_data is not registered.
+            reg_in_data = Reg(input_data)
             out_data_selector = (push_addr == next_pop_addr) & Reg(push)
             output_data <<= Select(
                 out_data_selector,
                 buffer_mem.port2_data_out,
-                Reg(input_data)
+                reg_in_data
             )
             buffer_mem.port2_addr <<= next_pop_addr
             self.output_port.set_data_members(output_data)

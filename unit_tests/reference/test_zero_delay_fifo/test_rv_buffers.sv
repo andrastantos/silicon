@@ -123,9 +123,9 @@ module Fifo (
 	logic empty;
 	logic full;
 	logic looped;
-	logic u93_output_port;
+	logic [7:0] reg_in_data_data;
+	logic u94_output_port;
 	logic out_data_selector;
-	logic [7:0] u95_output_port_data;
 	logic [7:0] output_data_data;
 	logic [7:0] buffer_mem_port2_data_out_data;
 
@@ -155,10 +155,10 @@ module Fifo (
 	initial empty <= 1'h1;
 	always_ff @(posedge clock_port) full <= reset_port ? 1'h0 : clear ? 1'h0 : next_full;
 	always_ff @(posedge clock_port) looped <= reset_port ? 1'h0 : clear ? 1'h0 : next_looped;
-	always_ff @(posedge clock_port) u93_output_port <= reset_port ? 1'h0 : push;
-	assign out_data_selector = push_addr == next_pop_addr & u93_output_port;
-	always_ff @(posedge clock_port) u95_output_port_data <= reset_port ? 8'h0 : input_port_data;
-	assign output_data_data = out_data_selector ? u95_output_port_data : buffer_mem_port2_data_out_data;
+	always_ff @(posedge clock_port) u94_output_port <= reset_port ? 1'h0 : push;
+	assign out_data_selector = push_addr == next_pop_addr & u94_output_port;
+	always_ff @(posedge clock_port) reg_in_data_data <= reset_port ? 8'h0 : input_port_data;
+	assign output_data_data = out_data_selector ? reg_in_data_data : buffer_mem_port2_data_out_data;
 
 	Memory buffer_mem (
 		.port1_addr(push_addr),
@@ -199,9 +199,11 @@ module Memory (
 		end
 	end
 
+	logic [3:0] port2_addr_reg;
 	always @(posedge port1_clk) begin
-		real_mem_port2_data_out <= mem[port2_addr];
+		port2_addr_reg <= port2_addr;
 	end
+	assign real_mem_port2_data_out = mem[port2_addr_reg];
 
 	assign {port2_data_out_data} = real_mem_port2_data_out;
 
