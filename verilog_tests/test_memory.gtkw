@@ -1,0 +1,40 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Mon Jun 17 23:45:24 2024
+[*]
+[dumpfile] "/home/tantos/silicon/verilog_tests/test_memory.vcd"
+[dumpfile_mtime] "Mon Jun 17 23:42:39 2024"
+[dumpfile_size] 8335
+[savefile] "/home/tantos/silicon/verilog_tests/test_memory.gtkw"
+[timestart] 0
+[size] 1920 1097
+[pos] -1 -1
+*-6.617992 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] Top.
+[sst_width] 278
+[signals_width] 190
+[sst_expanded] 1
+[sst_vpaned_height] 347
+@28
+Top.mem.port1_clk
+@22
+Top.mem.port1_addr[5:0]
+@28
+Top.mem.port1_write_en
+@22
+Top.mem.port1_data_in[13:0]
+Top.mem.port1_data_out[13:0]
+Top.mem.port1_addr_reg[5:0]
+@200
+-
+@28
+Top.mem.port2_clk
+@29
+Top.mem.port2_write_en
+@22
+Top.mem.port2_addr[5:0]
+Top.mem.port2_data_in[13:0]
+Top.mem.port2_data_out[13:0]
+Top.mem.port2_addr_reg[5:0]
+[pattern_trace] 1
+[pattern_trace] 0

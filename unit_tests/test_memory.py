@@ -692,7 +692,8 @@ def test_basic_dual_port():
                 assert self.data_out_2 == i+100
                 assert self.reg_data_2 == i
 
-    Build.simulation(Top, "test_dual_port.vcd", add_unnamed_scopes=True)
+    #Build.simulation(Top, "test_dual_port.vcd", add_unnamed_scopes=True)
+    test.simulation(Top, inspect.currentframe().f_code.co_name)
 
 
 def test_basic_dual_size():
@@ -778,7 +779,7 @@ if __name__ == "__main__":
     #test_single_port_ram_tf("rtl")
     #test_single_port_ram_tt("rtl")
     #test_single_port_rom("rtl")
-    test_single_port_rom2("rtl")
+    #test_single_port_rom2("rtl")
     #test_single_port_rom3("rtl")
     #test_single_port_rom4("rtl")
     #test_simple_dual_port_ram_ftft("rtl")
@@ -795,3 +796,5 @@ if __name__ == "__main__":
     #test_simple_dual_port_ram_tftf()
     #test_simple_dual_port_ram_sim("sim", read_new_data_a=True, read_new_data_b=False)
     #test_simple_dual_port_ram_sim("rtl", read_new_data_b=True)
+    #test_basic_dual_port()
+    test_simple_dual_port_ram_sim_TT("sim")
