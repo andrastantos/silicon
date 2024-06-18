@@ -74,6 +74,30 @@
 #    - There's another 'fake' memory generator, called CACTI (https://www.hpl.hp.com/research/cacti/)
 #      that only generates size/power models but can still be useful potentially.
 
+"""
+For memories, you almost always want 'registered output' behavior. That
+generates code similar to the inference patterns recommended by Xilinx:
+
+always @ (posedge clk) begin
+    if(we)
+        mem[addr] <= din;
+    memreg <= mem[addr];
+end
+
+NOTE: For write-first (or read-new-data) behavior Xilinx recommends this code:
+
+always @ (posedge clk) begin
+    if(we) begin
+   	    mem[addr] <= din;
+	    memreg <= din;
+	end else begin
+	    memreg <= mem[addr];
+    end
+end
+
+which we never generate.
+"""
+
 from .module import GenericModule, has_port, Module, InlineBlock, InlineStatement
 from .port import Input, Output, Wire, Port, EdgeType, Junction
 from .auto_input import ClkPort
@@ -161,6 +185,43 @@ def init_mem(init_content, content_width, content_depth):
                 except EOFError:
                     pass
     return content
+
+"""
+_BasicMemory only supports 'read-old-data' behavior for multiple ports.
+What does it mean? Let's assume a dual-port configuration, where port A
+writes to the same address as port B is reading from in the same clock
+cycle (i.e. assuming clocks are shared). Will port B return the newly
+written data or the old data in the array? _BasicMemory will return the
+old data.
+
+Why? It seems that that's the safe choice when looking at available options
+from FPGA vencors.
+
+NOTE: while most (all?) vendors allow for configuring read-new-data /
+read-old-data behavior within a single port, this is not the question at hand:
+it's about reading/writing on different ports.
+
+NOTE: _BasicMemory only supports 'read-old-data' behavior on the same port
+as well, something that is overly conservative and should probably be
+configurable.
+
+Altera seems to *NOT* support read-new-data behavior on mixed-port setups, at
+least in the MAX10 series:
+
+https://cdrdv2-public.intel.com/667017/ug_m10_memory-683431-667017.pdf chapter 3.2.2.
+
+Their Newer devices (Agilex 7) however seems to support read-new-data behavior
+on mixed ports as well.
+
+Xilins for their part (in 7 series) claims something similar:
+
+https://docs.amd.com/v/u/en-US/ug473_7Series_Memory_Resources, Table 1-4.
+
+This shows that the only reliable way of getting data out at all in this
+scenario is to set *both* ports into read-first mode, in which case the
+old data is returned on both ports.
+
+"""
 class _BasicMemory(GenericModule):
     class MemoryPort(object):
         def __init__(self):
@@ -277,7 +338,10 @@ class _BasicMemory(GenericModule):
         while True:
             yield trigger_ports
 
-            if self.do_log: simulator.log("Memory got triggered")
+            if self.do_log:
+                simulator.log("Memory got triggered")
+                if self.content_trigger.get_sim_edge() != EdgeType.NoEdge: simulator.log("CONTENT CHANGED TRIGGER")
+
             # This is an asynchronous memory with 'read-old-value' behavior.
             # However, if any writes are performed, that will trigger a 'content_trigger' change
             # So we will come back in the next delta step and do another read. This behavior
@@ -298,13 +362,14 @@ class _BasicMemory(GenericModule):
                 if self.do_log: simulator.log(f"reading port {idx} addr {addr} returning value {raw_value}")
                 port.data_out <<= raw_value
 
+            content_changed = False
             for idx, port in enumerate(self.mem_ports):
                 we_edge_type = port.write_clk.get_sim_edge()
                 if we_edge_type == EdgeType.Undefined:
                     # We don't know if there was an edge: clear the whole memory
                     if port.write_en != 0 and simulator.now > 0:
                         content.clear()
-                    self.content_trigger <<= 1 if self.content_trigger == 0 else 0
+                    content_changed = True
                     continue
                 if we_edge_type == EdgeType.Positive:
                     if port.write_en == 1:
@@ -313,7 +378,7 @@ class _BasicMemory(GenericModule):
                         except (TypeError, ValueError):
                             # There was an edge, but we don't know which address was written: clear the whole memory
                             content.clear()
-                            self.content_trigger <<= 1 if self.content_trigger == 0 else 0
+                            content_changed = True
                             continue
                         try:
                             raw_value = int(port.data_in.sim_value)
@@ -323,13 +388,15 @@ class _BasicMemory(GenericModule):
                         if self.do_log: simulator.log(f"writing port {idx} addr {addr} with value {raw_value}")
                         write_mem(addr, raw_value, port.width)
 
-                        self.content_trigger <<= 1 if self.content_trigger == 0 else 0
+                        content_changed = True
                     elif port.write_en == None:
                         content.clear()
-                        self.content_trigger <<= 1 if self.content_trigger == 0 else 0
+                        content_changed = True
 
                     if self.do_log: simulator.log(f"     content: {content}")
 
+            if content_changed:
+                self.content_trigger <<= 1 if self.content_trigger == 0 else 0
 
 
 @dataclass
