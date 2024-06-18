@@ -100,7 +100,7 @@ def test_arbiter(mode: str = "sim"):
             self.req2 <<= self.req2_gen.output_port
             self.req2_chk.input_port <<= self.rsp2
 
-            dut = RVArbiter(request_if=Request, response_if=Response, max_oustanding_responses=1)
+            dut = RVArbiter(request_if=Request, response_if=Response, max_oustanding_responses=10)
             dut.req1_request <<= self.req1
             self.rsp1 <<= dut.req1_response
             dut.req2_request <<= self.req2
@@ -134,7 +134,7 @@ def test_arbiter(mode: str = "sim"):
             print(f"Done at {now}")
 
     if mode == "rtl":
-        test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+        test.rtl_generation(RVArbiter(request_if=Request, response_if=Response, max_oustanding_responses=10), inspect.currentframe().f_code.co_name)
     else:
         test.simulation(sim_top, inspect.currentframe().f_code.co_name)
 

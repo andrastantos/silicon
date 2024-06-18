@@ -117,8 +117,6 @@ class RVArbiter(GenericModule):
         request_progress = self.output_request.ready & self.output_request.valid & selector_fifo_input.ready
         response_progress = self.output_response.ready & self.output_response.valid if self.response_has_back_pressure else self.output_response.valid
 
-        active = SRReg(request_progress, response_progress)
-
         selector_fifo_input.data <<= selected_port_comb
         selected_port <<= selector_fifo_output.data
         selector_fifo_output.ready <<= response_progress
@@ -175,7 +173,7 @@ class RVArbiter(GenericModule):
         for output_member, rsp_distributor in rsp_distributors.items():
             for idx, rsp_wire in enumerate(rsp_distributor):
                 if output_member is rsp_valid_port:
-                    rsp_wire <<= Select((selected_port == idx) & active, 0, output_member)
+                    rsp_wire <<= Select((selected_port == idx) & selector_fifo_output.valid, 0, output_member)
                 else:
                     rsp_wire <<= output_member
 
