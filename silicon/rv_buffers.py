@@ -225,8 +225,8 @@ class Fifo(GenericModule):
 
             # Buffer memory
             mem_config = MemoryConfig((
-                MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False),
-                MemoryPortConfig(addr_type, data_type, registered_input=True, registered_output=False)
+                MemoryPortConfig(addr_type, data_type, registered_input=False, registered_output=True),
+                MemoryPortConfig(addr_type, data_type, registered_input=False, registered_output=True)
             ))
             buffer_mem = Memory(mem_config)
 
