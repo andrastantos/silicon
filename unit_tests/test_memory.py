@@ -292,8 +292,99 @@ def _test_simple_dual_port_ram(mode: str, registered_input_a: bool, registered_o
                 mem.port2_write_en <<= self.write_en_b
             mem.port2_addr <<= self.addr_b
 
+
+        def simulate(self, simulator) -> TSimEvent:
+            def clk() -> int:
+                yield 10
+                self.clk <<= ~self.clk
+                yield 10
+                self.clk <<= ~self.clk
+                yield 0
+
+            self.clk <<= 1
+            self.write_en_a <<= 0
+            self.write_en_b <<= 0
+            for i in range(10):
+                yield from clk()
+            # Write from port a
+            self.write_en_a <<= 1
+            self.write_en_b <<= 0
+            for i in range(10):
+                self.data_in_a <<= i
+                self.addr_a <<= i
+                yield from clk()
+
+            # Write from port b
+            self.write_en_a <<= 0
+            self.write_en_b <<= 1
+            for i in range(10,20):
+                self.data_in_b <<= i
+                self.addr_b <<= i
+                yield from clk()
+
+            # Write from port a, read from port b
+            self.write_en_a <<= 1
+            self.write_en_b <<= 0
+            for i in range(10):
+                self.data_in_b <<= None
+                data = i+0x100
+                old_data = i
+                self.data_in_a <<= data
+                self.addr_a <<= i
+                self.addr_b <<= i
+                simulator.log(f"set addr to {i}")
+                yield from clk()
+                simulator.log(f"testing")
+                # There's a one-cycle latency in getting the data back, so can't test the first loop in this simple manner
+                #if i > 0:
+                #    if read_new_data_a and read_new_data_b:
+                #        assert self.data_out_a == new_data, f"{self.data_out_a} == {new_data} failed"
+                #        assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
+                #    elif not read_new_data_a and read_new_data_b:
+                #        assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
+                #        assert self.data_out_b == new_data, f"{self.data_out_b} == {new_old_data} failed"
+                #    elif read_new_data_a and not read_new_data_b:
+                #        assert self.data_out_a == new_data, f"{self.data_out_a} == {new_data} failed"
+                #        assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
+                #    else:
+                #        assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
+                #        assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
+                new_data = data
+                new_old_data = old_data
+
+            self.write_en_a <<= 0
+            self.write_en_b <<= 1
+            for i in range(10):
+                self.data_in_a <<= None
+                data = i+0x200
+                old_data = i+0x100
+                self.data_in_b <<= data
+                self.addr_a <<= i
+                self.addr_b <<= i
+                simulator.log(f"set addr to {i}")
+                yield from clk()
+                simulator.log(f"testing")
+                #if i > 0:
+                #    if read_new_data_a and read_new_data_b:
+                #        assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
+                #        assert self.data_out_b == new_data, f"{self.data_out_b} == {new_data} failed"
+                #    elif not read_new_data_a and read_new_data_b:
+                #        assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
+                #        assert self.data_out_b == new_data, f"{self.data_out_b} == {new_data} failed"
+                #    elif read_new_data_a and not read_new_data_b:
+                #        assert self.data_out_a == new_data, f"{self.data_out_a} == {new_data} failed"
+                #        assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
+                #    else:
+                #        assert self.data_out_a == new_old_data, f"{self.data_out_a} == {new_data} failed"
+                #        assert self.data_out_b == new_old_data, f"{self.data_out_b} == {new_old_data} failed"
+                new_data = data
+                new_old_data = old_data
+
     if mode == "rtl":
         test.rtl_generation(Top, inspect.currentframe().f_back.f_code.co_name)
+    else:
+        test.simulation(Top, inspect.currentframe().f_back.f_code.co_name)
+
 
 def test_simple_dual_port_ram_ffff(mode: str = "rtl"):
     _test_simple_dual_port_ram(mode, False, False, False, False)
@@ -782,7 +873,8 @@ if __name__ == "__main__":
     #test_single_port_rom2("rtl")
     #test_single_port_rom3("rtl")
     #test_single_port_rom4("rtl")
-    #test_simple_dual_port_ram_ftft("rtl")
+    #test_simple_dual_port_ram_tftf("sim")
+    test_simple_dual_port_ram_ftft("sim")
     #_test_simple_dual_port_ram("rtl", False, True, True, False, READ, WRITE)
     #test_simple_dual_port_ram_ffff("rtl")
     #test_simple_dual_port_ram_tftt("rtl")
@@ -797,4 +889,4 @@ if __name__ == "__main__":
     #test_simple_dual_port_ram_sim("sim", read_new_data_a=True, read_new_data_b=False)
     #test_simple_dual_port_ram_sim("rtl", read_new_data_b=True)
     #test_basic_dual_port()
-    test_simple_dual_port_ram_sim_TT("sim")
+    #test_simple_dual_port_ram_sim_TT("sim")
