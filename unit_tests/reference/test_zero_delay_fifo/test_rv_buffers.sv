@@ -199,11 +199,9 @@ module Memory (
 		end
 	end
 
-	logic [3:0] port2_addr_reg;
 	always @(posedge port1_clk) begin
-		port2_addr_reg <= port2_addr;
+		real_mem_port2_data_out <= mem[port2_addr];
 	end
-	assign real_mem_port2_data_out = mem[port2_addr_reg];
 
 	assign {port2_data_out_data} = real_mem_port2_data_out;
 
