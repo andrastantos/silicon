@@ -72,6 +72,7 @@ module Fifo (
 	logic out_data_selector;
 	logic [7:0] output_data_data;
 	logic [7:0] buffer_mem_port2_data_out_data;
+	logic [3:0] incremented_pop_addr;
 
 	assign input_port_ready =  ~ full;
 	assign output_port_valid =  ~ empty;
@@ -80,7 +81,8 @@ module Fifo (
 	assign next_push_addr = push ? push_will_wrap ? 1'h0 : push_addr + 1'h1 : push_addr;
 	assign pop_will_wrap = pop_addr == 4'h9;
 	assign pop =  ~ empty & output_port_ready;
-	assign next_pop_addr = pop ? pop_will_wrap ? 1'h0 : pop_addr + 1'h1 : pop_addr;
+	assign incremented_pop_addr = pop_will_wrap ? 1'h0 : pop_addr + 1'h1;
+	assign next_pop_addr = pop ? incremented_pop_addr : pop_addr;
 	assign next_looped = 
 		(push != 1'h1 & pop != 1'h1 ? looped : 1'b0) | 
 		(push == 1'h1 & pop != 1'h1 ? push_will_wrap ? 1'h1 : looped : 1'b0) | 
@@ -100,7 +102,7 @@ module Fifo (
 	always_ff @(posedge clock_port) full <= reset_port ? 1'h0 : clear ? 1'h0 : next_full;
 	always_ff @(posedge clock_port) looped <= reset_port ? 1'h0 : clear ? 1'h0 : next_looped;
 	always_ff @(posedge clock_port) u94_output_port <= reset_port ? 1'h0 : push;
-	assign out_data_selector = push_addr == next_pop_addr & u94_output_port;
+	assign out_data_selector = push_addr == incremented_pop_addr & u94_output_port;
 	always_ff @(posedge clock_port) reg_in_data_data <= reset_port ? 8'h0 : input_port_data;
 	assign output_data_data = out_data_selector ? reg_in_data_data : buffer_mem_port2_data_out_data;
 

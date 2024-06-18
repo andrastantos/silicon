@@ -5,10 +5,8 @@ from .port import Input, Output, Wire, Junction
 from .auto_input import ClkPort, RstPort, RstValPort
 from .primitives import Select, Reg, SelectOne
 from .exceptions import SyntaxErrorException
-from .utils import is_input_port, is_output_port
 from .number import Number, logic
-from .utils import get_composite_member_name
-from collections import OrderedDict
+from .utils import increment
 from .memory import MemoryPortConfig, MemoryConfig, Memory
 from .fsm import FSM
 from .net_type import NetType
@@ -199,7 +197,8 @@ class Fifo(GenericModule):
             push_will_wrap = push_addr == self.depth-1
             pop_will_wrap = pop_addr == self.depth-1
             next_push_addr <<= Select(push, push_addr, addr_type(Select(push_will_wrap, push_addr+1, 0)))
-            next_pop_addr <<= Select(pop, pop_addr, addr_type(Select(pop_will_wrap, pop_addr+1, 0)))
+            incremented_pop_addr = addr_type(Select(pop_will_wrap, pop_addr+1, 0))
+            next_pop_addr <<= Select(pop, pop_addr, incremented_pop_addr)
 
             next_looped <<= SelectOne(
                 (push != 1) & (pop != 1), looped,
@@ -238,7 +237,7 @@ class Fifo(GenericModule):
             # TODO: Can we do better? We could probably change the logic to take the extra cycle into account.
             #       This way output_data is not registered.
             reg_in_data = Reg(input_data)
-            out_data_selector = (push_addr == next_pop_addr) & Reg(push)
+            out_data_selector = (push_addr == incremented_pop_addr) & Reg(push)
             output_data <<= Select(
                 out_data_selector,
                 buffer_mem.port2_data_out,
