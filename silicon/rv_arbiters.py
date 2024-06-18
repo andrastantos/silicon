@@ -1,13 +1,13 @@
 from typing import List, Dict, Optional
-from .module import GenericModule
+from .module import GenericModule, Module
 from .port import JunctionBase, Input, Output, Wire, Port
 from .net_type import NetType
 from .auto_input import ClkPort, RstPort
-from .primitives import Select, Reg, SelectFirst, SRReg
+from .primitives import Select, Reg, SelectFirst
 from .exceptions import SyntaxErrorException, InvalidPortError
 from .rv_interface import ReadyValid
 from .rv_buffers import Fifo
-from .number import Number, logic
+from .number import Number, logic, Unsigned
 from .composite import GenericMember
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -20,6 +20,30 @@ in the 'arbitration_order' member variable. This is a list of strings, which
 are the port prefixes in decreasing priority (i.e. first element is the highest
 priority).
 """
+
+class FixedPriorityArbiter(Module):
+    requestors = Input()
+    selected_requestor = Output()
+
+    # self.arbitration_order contains requestor-indices in descending
+    # priority order. So, for instnace, if we had 5 requestors, and
+    # self.arbitration_order = (0,4,1,3,2)
+    # would mean that self.requestors[0] would be the highest priority,
+    # self.requestors[4] would be the next, etc. while self.requestors[2]
+    # would have the lowest priority.
+    def construct(self):
+        self.arbitration_order = None
+
+    def body(self):
+        #SelectorType = Number(min_val=0, max_val=self.requestors.get_num_bits())
+        #self.selected_requestor.set_net_type(SelectorType)
+
+        selectors = []
+        for requestor_idx in self.arbitration_order[:-1]:
+            selectors += [self.requestors[requestor_idx], requestor_idx]
+        self.selected_requestor <<= SelectFirst(*selectors, default_port = self.arbitration_order[-1])
+
+
 class RVArbiter(GenericModule):
     clk = ClkPort()
     rst = RstPort()
@@ -106,19 +130,26 @@ class RVArbiter(GenericModule):
         selector_fifo_input = Wire(SelectorFifoIf)
         selector_fifo_output <<= Fifo(depth=self.max_oustanding_responses)(selector_fifo_input)
 
-        selected_port = Wire(SelectorType)
+        response_port = Wire(SelectorType)
 
-        selectors = []
-        for idx, name in enumerate(self.arbitration_order[:-1]):
-            port_desc = self.ports[name]
-            selectors += [port_desc.req.valid, idx]
-        selected_port_comb = SelectFirst(*selectors, default_port = self.ports[self.arbitration_order[-1]].req.valid)
+        binary_requestors = Wire(Unsigned(len(self.ports)))
+        binary_requestor_indices = {}
+        for idx, (name, port_desc) in enumerate(self.ports.items()):
+            binary_requestors[idx] <<= port_desc.req.valid
+            binary_requestor_indices[name] = idx
+        binary_arbitration_order = []
+        for name in self.arbitration_order:
+            binary_arbitration_order.append(binary_requestor_indices[name])
 
-        request_progress = self.output_request.ready & self.output_request.valid & selector_fifo_input.ready
+        arbiter_logic = FixedPriorityArbiter()
+        arbiter_logic.arbitration_order = binary_arbitration_order
+        selected_port = arbiter_logic(binary_requestors)
+
+        #request_progress = self.output_request.ready & self.output_request.valid & selector_fifo_input.ready
         response_progress = self.output_response.ready & self.output_response.valid if self.response_has_back_pressure else self.output_response.valid
 
-        selector_fifo_input.data <<= selected_port_comb
-        selected_port <<= selector_fifo_output.data
+        selector_fifo_input.data <<= selected_port
+        response_port <<= selector_fifo_output.data
         selector_fifo_output.ready <<= response_progress
 
         # Create request mux
@@ -129,8 +160,8 @@ class RVArbiter(GenericModule):
 
         req_ready_port = self.output_request.ready
         req_valid_port = self.output_request.valid
-        for name in self.arbitration_order:
-            req_port = self.ports[name].req
+        for port in self.ports.values():
+            req_port = port.req
             for req_selector, member in zip(req_selectors.values(), req_port.get_all_member_junctions(add_self=False, reversed=False)):
                 req_selector.append(member)
 
@@ -139,18 +170,18 @@ class RVArbiter(GenericModule):
 
         for output_member, req_selector in req_selectors.items():
             if output_member is req_valid_port:
-                output_member <<= Select(selected_port_comb, *req_selector) & selector_fifo_input.ready
-                selector_fifo_input.valid <<= Select(selected_port_comb, *req_selector) & self.output_request.ready
+                output_member <<= Select(selected_port, *req_selector) & selector_fifo_input.ready
+                selector_fifo_input.valid <<= Select(selected_port, *req_selector) & self.output_request.ready
             else:
-                output_member <<= Select(selected_port_comb, *req_selector)
+                output_member <<= Select(selected_port, *req_selector)
 
         for output_member, req_distributor in req_distributors.items():
             if output_member is req_ready_port:
                 for idx, req_wire in enumerate(req_distributor):
-                    req_wire <<= Select(selected_port_comb == idx, 0, output_member & selector_fifo_input.ready)
+                    req_wire <<= Select(selected_port == idx, 0, output_member & selector_fifo_input.ready)
             else:
                 for idx, req_wire in enumerate(req_distributor):
-                    req_wire <<= Select(selected_port_comb == idx, 0, output_member)
+                    req_wire <<= Select(selected_port == idx, 0, output_member)
 
         # Create response mux
         # NOTE: This *IS* a reference to the wire object. We will use it later
@@ -162,8 +193,8 @@ class RVArbiter(GenericModule):
         for output_member in self.output_response.get_all_member_junctions(add_self=False, reversed=False): rsp_distributors[output_member] = []
         for output_member in self.output_response.get_all_member_junctions(add_self=False, reversed=True): rsp_selectors[output_member] = []
 
-        for name in self.arbitration_order:
-            rsp_port = self.ports[name].rsp
+        for port in self.ports.values():
+            rsp_port = port.rsp
             for rsp_distributor, member in zip(rsp_distributors.values(), rsp_port.get_all_member_junctions(add_self=False, reversed=False)):
                 rsp_distributor.append(member)
 
@@ -173,11 +204,11 @@ class RVArbiter(GenericModule):
         for output_member, rsp_distributor in rsp_distributors.items():
             for idx, rsp_wire in enumerate(rsp_distributor):
                 if output_member is rsp_valid_port:
-                    rsp_wire <<= Select((selected_port == idx) & selector_fifo_output.valid, 0, output_member)
+                    rsp_wire <<= Select((response_port == idx) & selector_fifo_output.valid, 0, output_member)
                 else:
                     rsp_wire <<= output_member
 
         for output_member, rsp_selector in rsp_selectors.items():
-            output_member <<= Select(selected_port, *rsp_selector)
+            output_member <<= Select(response_port, *rsp_selector)
 
 

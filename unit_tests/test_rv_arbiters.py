@@ -109,8 +109,8 @@ def test_arbiter(mode: str = "sim"):
             self.out_chk.input_port <<= dut.output_request
             dut.output_response <<= self.out_gen.output_port
 
-            dut.arbitration_order.append("req1")
             dut.arbitration_order.append("req2")
+            dut.arbitration_order.append("req1")
 
         def simulate(self) -> TSimEvent:
             def clk() -> int:
