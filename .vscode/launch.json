@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Python: UNIT_TEST/test_rv_buffers",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_rv_buffers.py",
             "console": "integratedTerminal",
@@ -14,7 +14,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_behavior",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_behavior.py",
             "console": "integratedTerminal",
@@ -22,7 +22,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_memory",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_memory.py",
             "console": "integratedTerminal",
@@ -30,7 +30,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_number",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_number.py",
             "console": "integratedTerminal",
@@ -38,7 +38,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_interface",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_interface.py",
             "console": "integratedTerminal",
@@ -46,7 +46,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_enum",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_enum.py",
             "console": "integratedTerminal",
@@ -54,7 +54,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_wire_array",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_wire_array.py",
             "console": "integratedTerminal",
@@ -62,7 +62,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_old_test",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_old_test.py",
             "console": "integratedTerminal",
@@ -70,7 +70,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_symbols",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_symbols.py",
             "console": "integratedTerminal",
@@ -78,7 +78,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_primitives",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_primitives.py",
             "console": "integratedTerminal",
@@ -86,7 +86,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_composites",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_composites.py",
             "console": "integratedTerminal",
@@ -94,7 +94,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_arrays",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_arrays.py",
             "console": "integratedTerminal",
@@ -102,7 +102,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_common_superclass",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_common_superclass.py",
             "console": "integratedTerminal",
@@ -110,16 +110,16 @@
         },
         {
             "name": "Python: UNIT_TEST/test_basics",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_basics.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/unit_tests",
-            "justMyCode": False
+            "justMyCode": false
         },
         {
             "name": "Python: UNIT_TEST/test_self_wire",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_self_wire.py",
             "console": "integratedTerminal",
@@ -127,7 +127,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_sim",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_sim.py",
             "console": "integratedTerminal",
@@ -136,7 +136,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_sim_update",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_sim_update.py",
             "console": "integratedTerminal",
@@ -145,7 +145,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_instantiation",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_instantiation.py",
             "console": "integratedTerminal",
@@ -154,7 +154,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_sequential",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_sequential.py",
             "console": "integratedTerminal",
@@ -163,7 +163,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_accessor",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_accessor.py",
             "console": "integratedTerminal",
@@ -172,7 +172,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_double_assign",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_double_assign.py",
             "console": "integratedTerminal",
@@ -181,7 +181,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_fsm",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_fsm.py",
             "console": "integratedTerminal",
@@ -190,7 +190,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_string_typo",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_string_typo.py",
             "console": "integratedTerminal",
@@ -199,7 +199,7 @@
         },
         {
             "name": "Python: UNIT_TEST/test_rv_arbiters",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/unit_tests/test_rv_arbiters.py",
             "console": "integratedTerminal",
@@ -207,8 +207,17 @@
             "justMyCode": false
         },
         {
+            "name": "Python: UNIT_TEST/test_arbiters",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/unit_tests/test_arbiters.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/unit_tests",
+            "justMyCode": false
+        },
+        {
             "name": "Python: CPC6128/i8255",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/examples/cpc6128/i8255.py",
             "console": "integratedTerminal",
@@ -217,7 +226,7 @@
         },
         {
             "name": "Python: CPC6128/mc6845",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/examples/cpc6128/mc6845.py",
             "console": "integratedTerminal",
@@ -226,7 +235,7 @@
         },
         {
             "name": "Python: CPC6128/gate_array",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/examples/cpc6128/gate_array.py",
             "console": "integratedTerminal",
@@ -235,7 +244,7 @@
         },
         {
             "name": "Python: CPC6128/timing_gen",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/examples/cpc6128/timing_gen.py",
             "console": "integratedTerminal",
@@ -244,7 +253,7 @@
         },
         {
             "name": "Python: CPC6128/z80_alu",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/examples/cpc6128/z80_alu.py",
             "console": "integratedTerminal",
@@ -253,7 +262,7 @@
         },
         {
             "name": "Python: CPC6128/z80_reg_file",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/examples/cpc6128/z80_reg_file.py",
             "console": "integratedTerminal",
@@ -262,7 +271,7 @@
         },
         {
             "name": "Python: CPC6128/z80_mem_if",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/examples/cpc6128/z80_mem_if.py",
             "console": "integratedTerminal",
@@ -271,7 +280,7 @@
         },
         {
             "name": "Python: FFT/fft_tb",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/examples/fft/fft_tb.py",
             "console": "integratedTerminal",
@@ -280,7 +289,7 @@
         },
         {
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
@@ -289,7 +298,7 @@
         },
         {
             "name": "Python: BREW/gen_anacron_fpga",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/../brew/rtl/v1/gen_anacron_fpga.py",
             "console": "integratedTerminal",
