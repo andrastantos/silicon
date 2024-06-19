@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Sequence
 from .module import GenericModule, Module
 from .port import JunctionBase, Input, Output, Wire, Port
 from .net_type import NetType
@@ -12,6 +12,7 @@ from .composite import GenericMember
 from collections import OrderedDict
 from dataclasses import dataclass
 from .sim_asserts import AssertOnPosClk
+from .utils import ScopedAttr
 
 """
 A rather generic arbiter.
@@ -80,20 +81,22 @@ class GenericRVArbiter(GenericModule):
     clk = ClkPort()
     rst = RstPort()
 
-    arbitration_order: List[str] = []
-
     @dataclass
     class PortDesc(object):
         req: JunctionBase
         rsp: JunctionBase
         priority: int = None
 
-    # Request/response ports are dynamically created
-    # Anything with a '_request' or '_response' ending will be recognized.
-    # These ports must be paired up with the same prefix.
-    # Of course 'output' is not a valid prefix, or rather it's a different thing
-    # altogether.
-    ports: Dict[str, PortDesc] = OrderedDict()
+    class ClientDesc(object):
+        def __init__(self, parent: 'GenericRVArbiter', base_name, priority):
+            self.base_name = base_name
+            self.priority = priority
+            self.parent = parent
+            # Create the ports (through calling create_named_port_callback eventually)
+            self.request = getattr(parent, f"{base_name}_request")
+            self.response = getattr(parent, f"{base_name}_response")
+
+
 
     output_request = Output()
     output_response = Input()
@@ -108,6 +111,27 @@ class GenericRVArbiter(GenericModule):
         self.output_request.set_net_type(self.request_if)
         self.output_response.set_net_type(self.response_if)
         self.max_oustanding_responses = max_oustanding_responses
+        self.in_get_client = False
+
+        # Request/response ports are dynamically created using the 'get_client'
+        # method below. That in turn will create a 'client' class that will
+        # contain a reference to the appropriate '_request' and '_response' ports.
+        self.clients: Dict[str, 'GenericRVArbiter.ClientDesc'] = OrderedDict()
+
+    def get_client(self, base_name, priority):
+        if base_name == "output":
+            raise SyntaxErrorException(f"Can't create client port named 'output'. That is a reserved name.")
+        with ScopedAttr(self, "in_get_client", True):
+            if base_name in self.clients:
+                client = self.clients[base_name]
+                if priority != client.priority and priority is not None:
+                    raise SyntaxErrorException(f"Client {base_name} already has a different priority assigned to it")
+                if client.priority is None:
+                    client.priority = priority
+                return client
+            client = GenericRVArbiter.ClientDesc(self, base_name, priority)
+            self.clients[base_name] = client
+            return client
 
     def create_named_port_callback(self, name: str, net_type: Optional[NetType] = None) -> Optional[Port]:
         """
@@ -116,45 +140,31 @@ class GenericRVArbiter(GenericModule):
         This allows for regular attribute creation for non-port attributes.
         NOTE: create_named_port_callback should return the created port object instead of directly adding it to self
         """
+        if not self.in_get_client:
+            raise InvalidPortError()
+
         if name.endswith("_request"):
             if net_type is not None and net_type is not self.request_if:
                 raise SyntaxErrorException("Net type '{net_type}' is not valid for port '{name}'")
-            basename = name[:name.rfind("_request")]
-            if basename not in self.ports:
-                self.ports[basename] = GenericRVArbiter.PortDesc(None, None)
             port = Input(self.request_if)
-            self.ports[basename].req = port
             return port
         if name.endswith("_response"):
             if net_type is not None and net_type is not self.response_if:
                 raise SyntaxErrorException("Net type '{net_type}' is not valid for port '{name}'")
-            basename = name[:name.rfind("_response")]
-            if basename not in self.ports:
-                self.ports[basename] = GenericRVArbiter.PortDesc(None, None)
             port = Output(self.response_if)
-            self.ports[basename].rsp = port
             return port
 
         raise InvalidPortError()
 
     def body(self):
+        for client in self.clients.values():
+            if client.priority is None:
+                raise SyntaxErrorException(f"Client {client.base_name} has no priority assigned to it")
 
-        for name, port_desc in self.ports.items():
-            if port_desc.req is None:
-                raise SyntaxErrorException(f"RVArbiter port '{name}_requests' is not connected")
-            if port_desc.rsp is None:
-                raise SyntaxErrorException(f"RVArbiter port '{name}_response' is not connected")
+        ordered_clients = sorted(self.clients.values(), key=lambda x: x.priority, reverse=False)
+        arbitration_order = [client.base_name for client in ordered_clients]
 
-        for idx, name in enumerate(self.arbitration_order):
-            if name not in self.ports:
-                raise SyntaxErrorException(f"RVArbiter port prefix '{name}' doesn't exist, yet it's listed in 'arbitration_order'")
-            self.ports[name].priority = idx
-
-        for name, port_desc in self.ports.items():
-            if port_desc.priority is None:
-                raise SyntaxErrorException(f"RVArbiter port prefix '{name}' doesn't exist in 'arbitration_order'. Don't know how to build arbiter.")
-
-        SelectorType = Number(min_val=0, max_val=len(self.ports)-1)
+        SelectorType = Number(min_val=0, max_val=len(self.clients)-1)
         SelectorFifoIf = type(f"SelectorFifoIf_{self.max_oustanding_responses}", (ReadyValid,), {})
         SelectorFifoIf.add_member("data", SelectorType)
 
@@ -165,14 +175,19 @@ class GenericRVArbiter(GenericModule):
 
         response_port = Wire(SelectorType)
 
-        binary_requestors = Wire(Unsigned(len(self.ports)))
+        binary_requestors = Wire(Unsigned(len(self.clients)))
         binary_requestor_indices = {}
-        for idx, (name, port_desc) in enumerate(self.ports.items()):
-            binary_requestors[idx] <<= port_desc.req.valid
+        for idx, (name, client) in enumerate(self.clients.items()):
+            binary_requestors[idx] <<= client.request.valid
             binary_requestor_indices[name] = idx
+        # It seems there should be an easier way to create binary_arbitration_order.
+        # However, there's no guarantee that priorities are actually compacted by
+        # the user; something that the underlying arbiter depends upon. Given that,
+        # and the fact that you probably won't have hundreds of hundreds of clients,
+        # I think this is sufficient, if clunky for now.
         binary_arbitration_order = []
-        for name in self.arbitration_order:
-            binary_arbitration_order.append(binary_requestor_indices[name])
+        for client_name in arbitration_order:
+            binary_arbitration_order.append(binary_requestor_indices[client_name])
 
         arbiter_logic = self.arbitration_algorithm(binary_arbitration_order)
         selected_port = arbiter_logic(binary_requestors)
@@ -192,8 +207,8 @@ class GenericRVArbiter(GenericModule):
 
         req_ready_port = self.output_request.ready
         req_valid_port = self.output_request.valid
-        for port in self.ports.values():
-            req_port = port.req
+        for client in self.clients.values():
+            req_port = client.request
             for req_selector, member in zip(req_selectors.values(), req_port.get_all_member_junctions(add_self=False, reversed=False)):
                 req_selector.append(member)
 
@@ -225,8 +240,8 @@ class GenericRVArbiter(GenericModule):
         for output_member in self.output_response.get_all_member_junctions(add_self=False, reversed=False): rsp_distributors[output_member] = []
         for output_member in self.output_response.get_all_member_junctions(add_self=False, reversed=True): rsp_selectors[output_member] = []
 
-        for port in self.ports.values():
-            rsp_port = port.rsp
+        for client in self.clients.values():
+            rsp_port = client.response
             for rsp_distributor, member in zip(rsp_distributors.values(), rsp_port.get_all_member_junctions(add_self=False, reversed=False)):
                 rsp_distributor.append(member)
 

@@ -120,18 +120,15 @@ def test_arbiter(mode: str, arbitration_algorithm):
             self.req2_chk.input_port <<= self.rsp2
 
             dut = create_arbiter()
-            dut.req1_request <<= self.req1
-            self.rsp1 <<= dut.req1_response
-            dut.req2_request <<= self.req2
-            self.rsp2 <<= dut.req2_response
+            dut.get_client("req1", 0).request <<= self.req1
+            self.rsp1 <<= dut.get_client("req1", 0).response
+            dut.get_client("req2", 1).request <<= self.req2
+            self.rsp2 <<= dut.get_client("req2", 1).response
             self.out_req <<= dut.output_request
             dut.output_response <<= self.out_rsp
 
             self.out_chk.input_port <<= self.out_req
             self.out_rsp <<= self.out_gen.output_port
-
-            dut.arbitration_order.append("req2")
-            dut.arbitration_order.append("req1")
 
         def simulate(self) -> TSimEvent:
             global requests, responses
@@ -173,16 +170,12 @@ def test_arbiter(mode: str, arbitration_algorithm):
 
         def body(self):
             dut = create_arbiter()
-            dut.req1_request <<= self.req1
-            self.rsp1 <<= dut.req1_response
-            dut.req2_request <<= self.req2
-            self.rsp2 <<= dut.req2_response
-
+            dut.get_client("req1", 1).request <<= self.req1
+            self.rsp1 <<= dut.get_client("req1", None).response
+            dut.get_client("req2", 0).request <<= self.req2
+            self.rsp2 <<= dut.get_client("req2", None).response
             self.out_req <<= dut.output_request
             dut.output_response <<= self.out_rsp
-
-            dut.arbitration_order.append("req2")
-            dut.arbitration_order.append("req1")
 
     test_name = f"{inspect.currentframe().f_code.co_name.lower()}_{decammelize_name(arbitration_algorithm.__name__)}"
     if mode == "rtl":
@@ -192,4 +185,5 @@ def test_arbiter(mode: str, arbitration_algorithm):
 
 
 if __name__ == "__main__":
-    test_arbiter("rtl", StickyFixedPriorityArbiter)
+    #test_arbiter("sim", FixedPriorityArbiter)
+    test_arbiter("rtl", FixedPriorityArbiter)

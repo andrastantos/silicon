@@ -174,7 +174,7 @@ module FixedPriorityArbiter (
 	output logic selected_requestor
 );
 
-	assign selected_requestor = requestors[1] ? 1'h1 : requestors[0] ? 1'h0 : requestors[1] ? 1'h1 : 1'h0;
+	assign selected_requestor = requestors[1] ? 1'h1 : 1'h0;
 
 endmodule
 

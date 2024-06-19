@@ -184,7 +184,7 @@ module StickyFixedPriorityArbiter (
 	logic last_requestor;
 
 	assign sticky_request = last_requestor ? requestors[1] : requestors[0];
-	assign current_requestor = requestors[1] ? 1'h1 : requestors[0] ? 1'h0 : requestors[1] ? 1'h1 : requestors[0] ? 1'h0 : requestors[1] ? 1'h1 : requestors[0] ? 1'h0 : requestors[1] ? 1'h1 : 1'h0;
+	assign current_requestor = requestors[1] ? 1'h1 : 1'h0;
 	assign selected_requestor_1 = sticky_request ? last_requestor : current_requestor;
 	always_ff @(posedge clk) last_requestor <= rst ? 1'h1 : selected_requestor_1;
 	initial last_requestor <= 1'h1;
