@@ -2,6 +2,7 @@ from silicon import SystemVerilog, File, Build, Netlist, Optional
 from typing import IO, Callable, Any
 import pytest
 from pathlib import Path
+import re
 
 class test(Build):
     file_list = []
@@ -62,7 +63,7 @@ class test(Build):
             return ret_val
 
     @staticmethod
-    def rtl_generation(top_class: Callable, test_name: str = None, allow_new_attributes: bool = False, back_en_customizer: Callable = None):
+    def rtl_generation(top_class: Callable, test_name: str = None, allow_new_attributes: bool = False, back_end_customizer: Callable = None):
         if test_name is None:
             test_name = top_class.__name__.lower()
         import os
@@ -72,8 +73,8 @@ class test(Build):
         with Netlist().elaborate() as netlist:
             top_class()
         logged_system_verilog = SystemVerilog(stream_class = test.DiffedFile)
-        if back_en_customizer is not None:
-            back_en_customizer(logged_system_verilog)
+        if back_end_customizer is not None:
+            back_end_customizer(logged_system_verilog)
         netlist.generate(logged_system_verilog)
         test_diff = ""
         success = True
@@ -163,3 +164,8 @@ class ExpectError(object):
             # Silence all filtered exceptions, re-raise all others
             return exception_type in self.filter
 
+
+# Return the de-cammelized name. That is upper-case letters are replaced by
+# a lower-case letter preceded by an underscore. So MyClass becomes my_class
+def decammelize_name(name: str) -> str:
+    return re.sub( '(?<!^)(?=[A-Z])', '_', name).lower()

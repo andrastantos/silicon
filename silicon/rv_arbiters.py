@@ -11,6 +11,7 @@ from .number import Number, logic, Unsigned
 from .composite import GenericMember
 from collections import OrderedDict
 from dataclasses import dataclass
+from .sim_asserts import AssertOnPosClk
 
 """
 A rather generic arbiter.
@@ -21,7 +22,7 @@ are the port prefixes in decreasing priority (i.e. first element is the highest
 priority).
 """
 
-class FixedPriorityArbiter(Module):
+class FixedPriorityArbiter(GenericModule):
     requestors = Input()
     selected_requestor = Output()
 
@@ -31,8 +32,8 @@ class FixedPriorityArbiter(Module):
     # would mean that self.requestors[0] would be the highest priority,
     # self.requestors[4] would be the next, etc. while self.requestors[2]
     # would have the lowest priority.
-    def construct(self):
-        self.arbitration_order = None
+    def construct(self, arbitration_order):
+        self.arbitration_order = arbitration_order
 
     def body(self):
         #SelectorType = Number(min_val=0, max_val=self.requestors.get_num_bits())
@@ -43,8 +44,39 @@ class FixedPriorityArbiter(Module):
             selectors += [self.requestors[requestor_idx], requestor_idx]
         self.selected_requestor <<= SelectFirst(*selectors, default_port = self.arbitration_order[-1])
 
+class StickyFixedPriorityArbiter(GenericModule):
+    requestors = Input()
+    selected_requestor = Output()
+    clk = ClkPort()
+    rst = RstPort()
 
-class RVArbiter(GenericModule):
+    # self.arbitration_order contains requestor-indices in descending
+    # priority order. So, for instnace, if we had 5 requestors, and
+    # self.arbitration_order = (0,4,1,3,2)
+    # would mean that self.requestors[0] would be the highest priority,
+    # self.requestors[4] would be the next, etc. while self.requestors[2]
+    # would have the lowest priority.
+    def construct(self, arbitration_order):
+        self.arbitration_order = arbitration_order
+
+    def body(self):
+        SelectorType = Number(min_val=0, max_val=self.requestors.get_num_bits()-1)
+
+        # We will use the highest priority requestor as the 'nothing is selected'
+        # value.
+        last_requestor = Wire(SelectorType)
+
+        selectors = []
+        for requestor_idx in self.arbitration_order[:-1]:
+            selectors += [self.requestors[requestor_idx], requestor_idx]
+        current_requestor = SelectFirst(*selectors, default_port = self.arbitration_order[-1])
+        sticky_request = Select(last_requestor, *self.requestors) # contains the current request state of the previously selected requestor
+        selected_requestor = Select(sticky_request, current_requestor, last_requestor) # select the previously selected requestor if it keeps requesting
+        last_requestor <<= Reg(selected_requestor, reset_value_port=self.arbitration_order[0])
+        self.selected_requestor <<= selected_requestor
+
+
+class GenericRVArbiter(GenericModule):
     clk = ClkPort()
     rst = RstPort()
 
@@ -66,11 +98,12 @@ class RVArbiter(GenericModule):
     output_request = Output()
     output_response = Input()
 
-    def construct(self, request_if, response_if, max_oustanding_responses):
+    def construct(self, request_if, response_if, max_oustanding_responses, arbitration_algorithm):
         self.request_if = request_if
         self.response_if = response_if
         # See if response port supports back-pressure
         self.response_has_back_pressure = "ready" in self.response_if.get_members()
+        self.arbitration_algorithm = arbitration_algorithm
 
         self.output_request.set_net_type(self.request_if)
         self.output_response.set_net_type(self.response_if)
@@ -88,7 +121,7 @@ class RVArbiter(GenericModule):
                 raise SyntaxErrorException("Net type '{net_type}' is not valid for port '{name}'")
             basename = name[:name.rfind("_request")]
             if basename not in self.ports:
-                self.ports[basename] = RVArbiter.PortDesc(None, None)
+                self.ports[basename] = GenericRVArbiter.PortDesc(None, None)
             port = Input(self.request_if)
             self.ports[basename].req = port
             return port
@@ -97,7 +130,7 @@ class RVArbiter(GenericModule):
                 raise SyntaxErrorException("Net type '{net_type}' is not valid for port '{name}'")
             basename = name[:name.rfind("_response")]
             if basename not in self.ports:
-                self.ports[basename] = RVArbiter.PortDesc(None, None)
+                self.ports[basename] = GenericRVArbiter.PortDesc(None, None)
             port = Output(self.response_if)
             self.ports[basename].rsp = port
             return port
@@ -121,7 +154,7 @@ class RVArbiter(GenericModule):
             if port_desc.priority is None:
                 raise SyntaxErrorException(f"RVArbiter port prefix '{name}' doesn't exist in 'arbitration_order'. Don't know how to build arbiter.")
 
-        SelectorType = Number(min_val=0, max_val=len(self.ports))
+        SelectorType = Number(min_val=0, max_val=len(self.ports)-1)
         SelectorFifoIf = type(f"SelectorFifoIf_{self.max_oustanding_responses}", (ReadyValid,), {})
         SelectorFifoIf.add_member("data", SelectorType)
 
@@ -141,8 +174,7 @@ class RVArbiter(GenericModule):
         for name in self.arbitration_order:
             binary_arbitration_order.append(binary_requestor_indices[name])
 
-        arbiter_logic = FixedPriorityArbiter()
-        arbiter_logic.arbitration_order = binary_arbitration_order
+        arbiter_logic = self.arbitration_algorithm(binary_arbitration_order)
         selected_port = arbiter_logic(binary_requestors)
 
         #request_progress = self.output_request.ready & self.output_request.valid & selector_fifo_input.ready
@@ -211,4 +243,13 @@ class RVArbiter(GenericModule):
         for output_member, rsp_selector in rsp_selectors.items():
             output_member <<= Select(response_port, *rsp_selector)
 
+        # Make sure the response fifo is never empty if we do get a response
+        AssertOnPosClk(selector_fifo_output.valid | ~self.output_response.valid, "Response FIFO is empty while response is received")
 
+class FixedPriorityRVArbiter(GenericRVArbiter):
+    def construct(self, request_if, response_if, max_oustanding_responses):
+        return super().construct(request_if, response_if, max_oustanding_responses, FixedPriorityArbiter)
+
+class SitckyFixedPriorityRVArbiter(GenericRVArbiter):
+    def construct(self, request_if, response_if, max_oustanding_responses):
+        return super().construct(request_if, response_if, max_oustanding_responses, StickyFixedPriorityArbiter)
