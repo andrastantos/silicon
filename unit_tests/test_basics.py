@@ -947,7 +947,7 @@ def test_size_cast_95_size(mode="rtl"):
 
     si.set_verbosity_level(VerbosityLevels.instantiation)
     if mode == "rtl":
-        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name, back_en_customizer=customizer)
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name, back_end_customizer=customizer)
     else:
         t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 

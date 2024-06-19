@@ -149,7 +149,7 @@ def test_enum_adapt_95():
     def customizer(back_end):
         back_end.support_cast = False
 
-    test.rtl_generation(top, inspect.currentframe().f_code.co_name, back_en_customizer=customizer)
+    test.rtl_generation(top, inspect.currentframe().f_code.co_name, back_end_customizer=customizer)
 
 
 
