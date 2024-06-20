@@ -159,8 +159,10 @@ module GenericRVArbiter (
 	logic u59_output_port;
 	logic [1:0] selector_fifo_input_data;
 	logic [1:0] selected_port;
+	logic u61_output_port;
 	logic [3:0] binary_requestors;
 
+	assign request_progress = output_request_ready & output_request_valid & selector_fifo_input_ready;
 	assign response_progress = output_response_ready & output_response_valid;
 	always @(*) begin
 		unique case (selected_port)
@@ -208,7 +210,6 @@ module GenericRVArbiter (
 			default: output_response_ready = 1'hx;
 		endcase
 	end
-	assign request_progress = output_request_ready & output_request_valid & selector_fifo_input_ready;
 	assign binary_requestors = {req4_request_valid, req3_request_valid, req2_request_valid, req1_request_valid};
 	assign req1_response_data = output_response_data;
 	assign req2_response_data = output_response_data;
@@ -229,11 +230,13 @@ module GenericRVArbiter (
 		.clear(u59_output_port)
 	);
 
-	StickyFixedPriorityArbiter arbiter_logic (
+	RoundRobinArbiter arbiter_logic (
+		.clk(clk),
+		.rst(rst),
 		.requestors(binary_requestors),
 		.grant(selected_port),
-		.clk(clk),
-		.rst(rst)
+		.advance(request_progress),
+		.restart(u61_output_port)
 	);
 
 	GenericAssertOnClk u52 (
@@ -250,6 +253,7 @@ module GenericRVArbiter (
 	assign u59_output_port = 1'h0;
 	assign grant = selected_port;
 	assign selector_fifo_input_data = selected_port;
+	assign u61_output_port = 1'h0;
 endmodule
 
 
@@ -266,35 +270,32 @@ endmodule
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// StickyFixedPriorityArbiter
+// RoundRobinArbiter
 ////////////////////////////////////////////////////////////////////////////////
-module StickyFixedPriorityArbiter (
+module RoundRobinArbiter (
+	input logic clk,
+	input logic rst,
 	input logic [3:0] requestors,
 	output logic [1:0] grant,
-	input logic clk,
-	input logic rst
+	input logic advance,
+	input logic restart
 );
 
-	logic [1:0] current_requestor;
-	logic sticky_request;
-	logic [1:0] grant_1;
-	logic [1:0] last_requestor;
+	logic [2:0] next_mask;
+	logic [2:0] mask;
+	logic [3:0] masked_requestors;
+	logic [1:0] masked_selector;
+	logic use_masked_selector;
+	logic [1:0] unmasked_selector;
 
-	always @(*) begin
-		unique case (last_requestor)
-			2'd0: sticky_request = requestors[0];
-			2'd1: sticky_request = requestors[1];
-			2'd2: sticky_request = requestors[2];
-			2'd3: sticky_request = requestors[3];
-			default: sticky_request = 1'hx;
-		endcase
-	end
-	assign current_requestor = requestors[1] ? 1'h1 : requestors[0] ? 1'h0 : requestors[3] ? 2'h3 : 2'h2;
-	assign grant_1 = sticky_request ? last_requestor : current_requestor;
-	always_ff @(posedge clk) last_requestor <= rst ? 1'h1 : grant_1;
-	initial last_requestor <= 1'h1;
+	assign next_mask = mask[0] ? 1'h0 : mask >> 1'h1 | 3'h4;
+	always_ff @(posedge clk) mask <= rst ? 3'h0 : restart ? 1'h0 : advance ? next_mask : mask;
+	assign masked_requestors = requestors &  ~ ({mask, 1'h0});
+	assign use_masked_selector = masked_requestors[3] ? 1'h1 : masked_requestors[2] ? 1'h1 : masked_requestors[1] ? 1'h1 : masked_requestors[0] ? 1'h1 : 1'h0;
+	assign unmasked_selector = requestors[3] ? 2'h3 : requestors[2] ? 2'h2 : requestors[1] ? 1'h1 : requestors[0] ? 1'h0 : 1'h0;
+	assign masked_selector = masked_requestors[3] ? 2'h3 : masked_requestors[2] ? 2'h2 : masked_requestors[1] ? 1'h1 : masked_requestors[0] ? 1'h0 : 1'h0;
+	assign grant = use_masked_selector ? masked_selector : unmasked_selector;
 
-	assign grant = grant_1;
 endmodule
 
 

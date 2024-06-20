@@ -7,12 +7,12 @@ from .number import is_number
 from .primitives import concat, Reg, Select, SelectFirst
 from enum import Enum
 
+class ArbiterGrantEncoding(Enum):
+    OneHot = 0
+    Binary = 1
+
 
 class RoundRobinArbiter(GenericModule):
-
-    class OutputKind(Enum):
-        OneHot = 0
-        Binary = 1
 
     from itertools import chain as _chain
     """
@@ -38,25 +38,26 @@ class RoundRobinArbiter(GenericModule):
     rst = RstPort()
 
     requestors = Input()
-    grants = Output()
-    advance = Input(logic)
+    grant = Output()
+    advance = Input(logic, default_value = 1)
     restart = Input(logic, default_value = 0)
 
-    def construct(self, output_kind: 'RoundRobinArbiter.OutputKind' = None):
-        if output_kind is None: output_kind = RoundRobinArbiter.OutputKind.OneHot
-        self.output_kind = output_kind
+    # TODO: make arbitration_order functional.
+    def construct(self, arbitration_order, grant_encoding: 'ArbiterGrantEncoding' = None):
+        if grant_encoding is None: grant_encoding = ArbiterGrantEncoding.Binary
+        self.grant_encoding = grant_encoding
 
     def body(self) -> None:
         requestor_cnt = self.requestors.get_num_bits()
 
         if not is_number(self.requestors.get_net_type()):
             raise SyntaxErrorException(f"RoundRobinArbiter {self} only supports Numbers as the requestor input type")
-        if self.output_kind == RoundRobinArbiter.OutputKind.OneHot:
+        if self.grant_encoding == ArbiterGrantEncoding.OneHot:
             grant_type = self.requestors.get_net_type()
         else:
             grant_type = Number(min_val=0, max_val=requestor_cnt-1)
 
-        self.grants.set_net_type(grant_type)
+        self.grant.set_net_type(grant_type)
         mask = Wire(Unsigned(requestor_cnt-1))
 
         # Mask contains N number of 1's: adding a 1 every type we advance, and resetting to 0, when it's all 1's.
@@ -84,7 +85,7 @@ class RoundRobinArbiter(GenericModule):
         # we use the second (unasked) priority encoder. This encoder will look at all inputs, but
         # (since we know that the bottom N bits are 0) in practice will only select from the top (masked) inputs.
 
-        if self.output_kind == RoundRobinArbiter.OutputKind.OneHot:
+        if self.grant_encoding == ArbiterGrantEncoding.OneHot:
             requestor_values = tuple(1<< i for i in range(requestor_cnt-1,-1,-1))
         else:
             requestor_values = tuple(i for i in range(requestor_cnt-1,-1,-1))
@@ -105,8 +106,70 @@ class RoundRobinArbiter(GenericModule):
             default_port = 0
         )
 
-        self.grants <<= Select(
+        self.grant <<= Select(
             use_masked_selector,
             unmasked_selector,
             masked_selector
         )
+
+class FixedPriorityArbiter(GenericModule):
+    requestors = Input()
+    grant = Output()
+
+    # self.arbitration_order contains requestor-indices in descending
+    # priority order. So, for instnace, if we had 5 requestors, and
+    # self.arbitration_order = (0,4,1,3,2)
+    # would mean that self.requestors[0] would be the highest priority,
+    # self.requestors[4] would be the next, etc. while self.requestors[2]
+    # would have the lowest priority.
+    def construct(self, arbitration_order, grant_encoding: 'ArbiterGrantEncoding' = None):
+        if grant_encoding is None: grant_encoding = ArbiterGrantEncoding.Binary
+        self.arbitration_order = arbitration_order
+        self.grant_encoding = grant_encoding
+
+    def body(self):
+        #SelectorType = Number(min_val=0, max_val=self.requestors.get_num_bits())
+        #self.grant.set_net_type(SelectorType)
+
+        selectors = []
+        for requestor_idx in self.arbitration_order[:-1]:
+            grant_value = (1 << requestor_idx) if self.grant_encoding == ArbiterGrantEncoding.OneHot else requestor_idx
+            selectors += [self.requestors[requestor_idx], grant_value]
+        default_grant_value = (1 << self.arbitration_order[-1]) if self.grant_encoding == ArbiterGrantEncoding.OneHot else self.arbitration_order[-1]
+        self.grant <<= SelectFirst(*selectors, default_port = default_grant_value)
+
+class StickyFixedPriorityArbiter(GenericModule):
+    requestors = Input()
+    grant = Output()
+    clk = ClkPort()
+    rst = RstPort()
+
+    # self.arbitration_order contains requestor-indices in descending
+    # priority order. So, for instnace, if we had 5 requestors, and
+    # self.arbitration_order = (0,4,1,3,2)
+    # would mean that self.requestors[0] would be the highest priority,
+    # self.requestors[4] would be the next, etc. while self.requestors[2]
+    # would have the lowest priority.
+    def construct(self, arbitration_order, grant_encoding: 'ArbiterGrantEncoding' = None):
+        if grant_encoding is None: grant_encoding = ArbiterGrantEncoding.Binary
+        self.arbitration_order = arbitration_order
+        self.grant_encoding = grant_encoding
+
+    def body(self):
+        SelectorType = Number(min_val=0, max_val=self.requestors.get_num_bits()-1)
+
+        # We will use the highest priority requestor as the 'nothing is selected'
+        # value.
+        last_requestor = Wire(SelectorType)
+
+        selectors = []
+        for requestor_idx in self.arbitration_order[:-1]:
+            grant_value = (1 << requestor_idx) if self.grant_encoding == ArbiterGrantEncoding.OneHot else requestor_idx
+            selectors += [self.requestors[requestor_idx], grant_value]
+        default_grant_value = (1 << self.arbitration_order[-1]) if self.grant_encoding == ArbiterGrantEncoding.OneHot else self.arbitration_order[-1]
+        current_requestor = SelectFirst(*selectors, default_port = default_grant_value)
+        sticky_request = Select(last_requestor, *self.requestors) # contains the current request state of the previously selected requestor
+        grant = Select(sticky_request, current_requestor, last_requestor) # select the previously selected requestor if it keeps requesting
+        last_requestor <<= Reg(grant, reset_value_port=self.arbitration_order[0])
+        self.grant <<= grant
+

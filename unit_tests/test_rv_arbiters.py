@@ -84,7 +84,7 @@ class RspChecker(RvSimSink):
 
 #@pytest.mark.skip(reason="Test is under development")
 @pytest.mark.parametrize("mode", ("sim","rtl"))
-@pytest.mark.parametrize("arbitration_algorithm", (FixedPriorityArbiter, StickyFixedPriorityArbiter))
+@pytest.mark.parametrize("arbitration_algorithm", (FixedPriorityArbiter, StickyFixedPriorityArbiter, RoundRobinArbiter))
 def test_arbiter(mode: str, arbitration_algorithm):
 
     def create_arbiter():
@@ -98,6 +98,10 @@ def test_arbiter(mode: str, arbitration_algorithm):
             self.rsp1 = Wire(Response)
             self.req2 = Wire(Request)
             self.rsp2 = Wire(Response)
+            self.req3 = Wire(Request)
+            self.rsp3 = Wire(Response)
+            self.req4 = Wire(Request)
+            self.rsp4 = Wire(Response)
 
             self.out_req = Wire(Request)
             self.out_rsp = Wire(Response)
@@ -111,6 +115,14 @@ def test_arbiter(mode: str, arbitration_algorithm):
             self.req2_gen = ReqGenerator(top_byte=0x22, expectation_queue=self.expectation_queue2)
             self.req2_chk = RspChecker(top_byte=0x22, expectation_queue=self.expectation_queue2)
 
+            self.expectation_queue3 = []
+            self.req3_gen = ReqGenerator(top_byte=0x33, expectation_queue=self.expectation_queue3)
+            self.req3_chk = RspChecker(top_byte=0x33, expectation_queue=self.expectation_queue3)
+
+            self.expectation_queue4 = []
+            self.req4_gen = ReqGenerator(top_byte=0x44, expectation_queue=self.expectation_queue4)
+            self.req4_chk = RspChecker(top_byte=0x44, expectation_queue=self.expectation_queue4)
+
             self.out_chk = ReqChecker()
             self.out_gen = RspGenerator()
 
@@ -118,12 +130,20 @@ def test_arbiter(mode: str, arbitration_algorithm):
             self.req1_chk.input_port <<= self.rsp1
             self.req2 <<= self.req2_gen.output_port
             self.req2_chk.input_port <<= self.rsp2
+            self.req3 <<= self.req3_gen.output_port
+            self.req3_chk.input_port <<= self.rsp3
+            self.req4 <<= self.req4_gen.output_port
+            self.req4_chk.input_port <<= self.rsp4
 
             dut = create_arbiter()
             dut.get_client("req1", 0).request <<= self.req1
-            self.rsp1 <<= dut.get_client("req1", 0).response
+            self.rsp1 <<= dut.get_client("req1", None).response
             dut.get_client("req2", 1).request <<= self.req2
-            self.rsp2 <<= dut.get_client("req2", 1).response
+            self.rsp2 <<= dut.get_client("req2", None).response
+            dut.get_client("req3", 4).request <<= self.req3
+            self.rsp3 <<= dut.get_client("req3", None).response
+            dut.get_client("req4", 3).request <<= self.req4
+            self.rsp4 <<= dut.get_client("req4", None).response
             self.out_req <<= dut.output_request
             dut.output_response <<= self.out_rsp
 
@@ -164,6 +184,10 @@ def test_arbiter(mode: str, arbitration_algorithm):
         rsp1 = Output(Response)
         req2 = Input(Request)
         rsp2 = Output(Response)
+        req3 = Input(Request)
+        rsp3 = Output(Response)
+        req4 = Input(Request)
+        rsp4 = Output(Response)
 
         out_req = Output(Request)
         out_rsp = Input(Response)
@@ -174,6 +198,10 @@ def test_arbiter(mode: str, arbitration_algorithm):
             self.rsp1 <<= dut.get_client("req1", None).response
             dut.get_client("req2", 0).request <<= self.req2
             self.rsp2 <<= dut.get_client("req2", None).response
+            dut.get_client("req3", 4).request <<= self.req3
+            self.rsp3 <<= dut.get_client("req3", None).response
+            dut.get_client("req4", 3).request <<= self.req4
+            self.rsp4 <<= dut.get_client("req4", None).response
             self.out_req <<= dut.output_request
             dut.output_response <<= self.out_rsp
 
@@ -185,5 +213,7 @@ def test_arbiter(mode: str, arbitration_algorithm):
 
 
 if __name__ == "__main__":
-    #test_arbiter("sim", FixedPriorityArbiter)
-    test_arbiter("rtl", FixedPriorityArbiter)
+    test_arbiter("sim", FixedPriorityArbiter)
+    test_arbiter("sim", StickyFixedPriorityArbiter)
+    test_arbiter("sim", RoundRobinArbiter)
+    #test_arbiter("rtl", FixedPriorityArbiter)

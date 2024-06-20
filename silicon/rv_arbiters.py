@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional, Sequence
-from .module import GenericModule, Module
+from .module import GenericModule, Module,has_port
 from .port import JunctionBase, Input, Output, Wire, Port
 from .net_type import NetType
 from .auto_input import ClkPort, RstPort
@@ -13,6 +13,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from .sim_asserts import AssertOnPosClk
 from .utils import ScopedAttr
+from .arbiters import FixedPriorityArbiter, StickyFixedPriorityArbiter, RoundRobinArbiter, ArbiterGrantEncoding
 
 """
 A rather generic arbiter.
@@ -22,60 +23,6 @@ in the 'arbitration_order' member variable. This is a list of strings, which
 are the port prefixes in decreasing priority (i.e. first element is the highest
 priority).
 """
-
-class FixedPriorityArbiter(GenericModule):
-    requestors = Input()
-    selected_requestor = Output()
-
-    # self.arbitration_order contains requestor-indices in descending
-    # priority order. So, for instnace, if we had 5 requestors, and
-    # self.arbitration_order = (0,4,1,3,2)
-    # would mean that self.requestors[0] would be the highest priority,
-    # self.requestors[4] would be the next, etc. while self.requestors[2]
-    # would have the lowest priority.
-    def construct(self, arbitration_order):
-        self.arbitration_order = arbitration_order
-
-    def body(self):
-        #SelectorType = Number(min_val=0, max_val=self.requestors.get_num_bits())
-        #self.selected_requestor.set_net_type(SelectorType)
-
-        selectors = []
-        for requestor_idx in self.arbitration_order[:-1]:
-            selectors += [self.requestors[requestor_idx], requestor_idx]
-        self.selected_requestor <<= SelectFirst(*selectors, default_port = self.arbitration_order[-1])
-
-class StickyFixedPriorityArbiter(GenericModule):
-    requestors = Input()
-    selected_requestor = Output()
-    clk = ClkPort()
-    rst = RstPort()
-
-    # self.arbitration_order contains requestor-indices in descending
-    # priority order. So, for instnace, if we had 5 requestors, and
-    # self.arbitration_order = (0,4,1,3,2)
-    # would mean that self.requestors[0] would be the highest priority,
-    # self.requestors[4] would be the next, etc. while self.requestors[2]
-    # would have the lowest priority.
-    def construct(self, arbitration_order):
-        self.arbitration_order = arbitration_order
-
-    def body(self):
-        SelectorType = Number(min_val=0, max_val=self.requestors.get_num_bits()-1)
-
-        # We will use the highest priority requestor as the 'nothing is selected'
-        # value.
-        last_requestor = Wire(SelectorType)
-
-        selectors = []
-        for requestor_idx in self.arbitration_order[:-1]:
-            selectors += [self.requestors[requestor_idx], requestor_idx]
-        current_requestor = SelectFirst(*selectors, default_port = self.arbitration_order[-1])
-        sticky_request = Select(last_requestor, *self.requestors) # contains the current request state of the previously selected requestor
-        selected_requestor = Select(sticky_request, current_requestor, last_requestor) # select the previously selected requestor if it keeps requesting
-        last_requestor <<= Reg(selected_requestor, reset_value_port=self.arbitration_order[0])
-        self.selected_requestor <<= selected_requestor
-
 
 class GenericRVArbiter(GenericModule):
     clk = ClkPort()
@@ -100,6 +47,7 @@ class GenericRVArbiter(GenericModule):
 
     output_request = Output()
     output_response = Input()
+    grant = Output()
 
     def construct(self, request_if, response_if, max_oustanding_responses, arbitration_algorithm):
         self.request_if = request_if
@@ -189,11 +137,15 @@ class GenericRVArbiter(GenericModule):
         for client_name in arbitration_order:
             binary_arbitration_order.append(binary_requestor_indices[client_name])
 
-        arbiter_logic = self.arbitration_algorithm(binary_arbitration_order)
+        arbiter_logic = self.arbitration_algorithm(arbitration_order=binary_arbitration_order, grant_encoding=ArbiterGrantEncoding.Binary)
         selected_port = arbiter_logic(binary_requestors)
+        self.grant <<= selected_port
 
-        #request_progress = self.output_request.ready & self.output_request.valid & selector_fifo_input.ready
+        request_progress = self.output_request.ready & self.output_request.valid & selector_fifo_input.ready
         response_progress = self.output_response.ready & self.output_response.valid if self.response_has_back_pressure else self.output_response.valid
+
+        if has_port(arbiter_logic, "advance"):
+            arbiter_logic.advance <<= request_progress
 
         selector_fifo_input.data <<= selected_port
         response_port <<= selector_fifo_output.data
@@ -268,3 +220,7 @@ class FixedPriorityRVArbiter(GenericRVArbiter):
 class SitckyFixedPriorityRVArbiter(GenericRVArbiter):
     def construct(self, request_if, response_if, max_oustanding_responses):
         return super().construct(request_if, response_if, max_oustanding_responses, StickyFixedPriorityArbiter)
+
+class RoundRobinRVArbiter(GenericRVArbiter):
+    def construct(self, request_if, response_if, max_oustanding_responses):
+        return super().construct(request_if, response_if, max_oustanding_responses, RoundRobinArbiter)
