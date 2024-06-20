@@ -21,12 +21,12 @@ def test_round_robin_arbiter():
             self.grants = Wire(Unsigned(8))
             self.advance = Wire(logic)
 
-            dut = RoundRobinArbiter()
+            dut = RoundRobinArbiter(grant_encoding=ArbiterGrantEncoding.one_hot)
             self.grants <<= dut(self.requestors, self.advance)
 
         def simulate(self, simulator: Simulator):
             seed(0)
-            def clk() -> int:
+            def clk() -> TSimEvent:
                 yield 5
                 self.clk <<= ~self.clk & self.clk
                 yield 5
@@ -68,12 +68,12 @@ def test_round_robin_arbiter_binary():
             self.grants = Wire(Unsigned(3))
             self.advance = Wire(logic)
 
-            dut = RoundRobinArbiter(RoundRobinArbiter.OutputKind.Binary)
+            dut = RoundRobinArbiter(grant_encoding=ArbiterGrantEncoding.binary)
             self.grants <<= dut(self.requestors, self.advance)
 
         def simulate(self, simulator: Simulator):
             seed(0)
-            def clk() -> int:
+            def clk() -> TSimEvent:
                 yield 5
                 self.clk <<= ~self.clk & self.clk
                 yield 5

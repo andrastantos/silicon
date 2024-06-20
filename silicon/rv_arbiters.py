@@ -137,7 +137,7 @@ class GenericRVArbiter(GenericModule):
         for client_name in arbitration_order:
             binary_arbitration_order.append(binary_requestor_indices[client_name])
 
-        arbiter_logic = self.arbitration_algorithm(arbitration_order=binary_arbitration_order, grant_encoding=ArbiterGrantEncoding.Binary)
+        arbiter_logic = self.arbitration_algorithm(arbitration_order=binary_arbitration_order, grant_encoding=ArbiterGrantEncoding.binary)
         selected_port = arbiter_logic(binary_requestors)
         self.grant <<= selected_port
 
