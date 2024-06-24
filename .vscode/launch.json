@@ -216,6 +216,15 @@
             "justMyCode": false
         },
         {
+            "name": "Python: UNIT_TEST/test_apb",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/unit_tests/test_apb.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/unit_tests",
+            "justMyCode": false
+        },
+        {
             "name": "Python: CPC6128/i8255",
             "type": "debugpy",
             "request": "launch",

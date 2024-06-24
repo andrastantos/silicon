@@ -1,26 +1,35 @@
 # Contains a simple generic definition for the APB bus.
 #     https://developer.arm.com/documentation/ihi0024/latest/
 
+from dataclasses import dataclass
+from collections import OrderedDict
+from enum import Enum as PyEnum
+from typing import Dict
+
 from .composite import Interface, Reverse, GenericMember
 from .number import logic
 from .net_type import NetType
-from silicon import *
-from silicon.exceptions import AdaptTypeError
+from .module import GenericModule
+from .auto_input import ClkPort, RstPort
+from .port import Input, Output, Junction, Wire
+from .exceptions import SyntaxErrorException
+from .number import Unsigned
+from .primitives import Reg
 
 class ApbBaseIf(Interface):
-    """
-    APB signalling
 
-                <-- read -->      <-- write ->
-        CLK     \__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/
-        psel    ___/^^^^^^^^^^^\_____/^^^^^^^^^^^\______
-        penable _________/^^^^^\___________/^^^^^\______
-        pready  ---------/^^^^^\-----------/^^^^^\------
-        pwrite  ---/^^^^^^^^^^^\-----\___________/------
-        paddr   ---<===========>-----<===========>------
-        prdata  ---------<=====>------------------------
-        pwdata  ---------------------<===========>------
-    """
+    #APB signalling
+    #
+    #            <-- read -->      <-- write ->
+    #    CLK     \__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/
+    #    psel    ___/^^^^^^^^^^^\_____/^^^^^^^^^^^\______
+    #    penable _________/^^^^^\___________/^^^^^\______
+    #    pready  ---------/^^^^^\-----------/^^^^^\------
+    #    pwrite  ---/^^^^^^^^^^^\-----\___________/------
+    #    paddr   ---<===========>-----<===========>------
+    #    prdata  ---------<=====>------------------------
+    #    pwdata  ---------------------<===========>------
+
     pwrite = logic
     psel = logic
     penable = logic
@@ -52,3 +61,81 @@ def ApbIf(data_type: NetType, addr_type: NetType = None) -> type:
     _apb_if_cache[key] = ApbIfType
     return ApbIfType
 
+
+class APBReg(GenericModule):
+    clk = ClkPort()
+    rst = RstPort()
+
+    write_strobe = Output(logic)
+    read_strobe = Output(logic)
+
+    apb_bus = Input()
+
+    def construct(self, address=None):
+        self.address = address
+        self.fields: Dict[str, 'APBReg.FieldDesc'] = OrderedDict()
+        self.bitmask = []
+        #self.in_add_field = False
+
+    class Kind(PyEnum):
+        ctrl = 0,
+        stat = 1,
+        both = 2
+
+    @dataclass
+    class FieldDesc(object):
+        high_bit: int
+        low_bit: int
+        ctrl_port: Junction = None
+        stat_port: Junction = None
+
+    def add_field(self, name, high_bit, low_bit, kind: 'APBReg.Kind', net_type: NetType = None):
+        if name in self.fields:
+            raise SyntaxErrorException(f"Field name {name} is already used")
+        if high_bit < low_bit:
+            raise SyntaxErrorException(f"Bit-range higher ({high_bit}) end must higher then the lower end ({low_bit})")
+
+        desc = APBReg.FieldDesc(high_bit, low_bit)
+        while len(self.bitmask) <= high_bit:
+            self.bitmask.append(0)
+
+        width = high_bit - low_bit + 1
+        for ibit in range(low_bit, high_bit+1):
+            if self.bitmask[ibit] == 1:
+                raise SyntaxErrorException(f"Bit {ibit} is already used")
+            self.bitmask[ibit] = 1
+        #with ScopedAttr(self, "in_add_field", True):
+        if net_type is None:
+            net_type = Unsigned(width)
+        if kind == APBReg.Kind.stat or kind == APBReg.Kind.both:
+            stat_port = self.create_named_port(f"{name}_stat", port_type=Input, net_type=net_type)
+            desc.stat_port = stat_port
+        if kind == APBReg.Kind.ctrl or kind == APBReg.Kind.both:
+            ctrl_port = self.create_named_port(f"{name}_ctrl", port_type=Output, net_type=net_type)
+            desc.ctrl_port = ctrl_port
+        self.fields[name] = desc
+        return desc
+
+    def body(self):
+        if self.address is not None:
+            reg_decode = self.apb_bus.paddr == self.address
+        else:
+            reg_decode = 1
+
+        write_strobe = self.apb_bus.psel & self.apb_bus.pwrite & self.apb_bus.penable & reg_decode
+        self.write_strobe <<= write_strobe
+        read_strobe = self.apb_bus.psel & ~self.apb_bus.pwrite & self.apb_bus.penable & reg_decode
+        self.read_strobe <<= read_strobe
+
+        self.apb_bus.pready <<= 1
+
+        read_value = Wire(self.apb_bus.prdata.get_net_type())
+        for field in self.fields.values():
+            for fbit, rbit in enumerate(range(field.low_bit, field.high_bit+1)):
+                read_value[rbit] <<= field.stat_port[fbit] if field.stat_port is not None else field.ctrl_port[fbit]
+            if field.ctrl_port is not None:
+                field.ctrl_port <<= Reg(self.apb_bus.pwdata[field.high_bit:field.low_bit], clock_en=write_strobe)
+        for rbit, used in enumerate(self.bitmask):
+            if used == 0:
+                read_value[rbit] <<= 0
+        self.apb_bus.prdata <<= read_value
