@@ -191,6 +191,7 @@ class SystemVerilog(BackEnd):
     @staticmethod
     def get_reserved_names() -> Sequence[str]:
         return (
+            "reg",
             "accept_on",
             "export",
             "ref",
