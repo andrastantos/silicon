@@ -946,7 +946,7 @@ class Module(object):
                 raise InvalidPortError
             port = self._true_module.create_named_port_callback(name, net_type)
             if port is None and port_type is not None:
-                port = port_type()
+                port = port_type(net_type)
             if port is None:
                 raise InvalidPortError
             if not is_port(port):
