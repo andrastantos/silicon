@@ -103,7 +103,7 @@ class ApbGenerator(GenericModule):
         simulator.sim_assert(read_val == 0xf9)
 
 
-
+@pytest.mark.parametrize("mode", ("sim","rtl"))
 def test_apb_reg(mode: str):
 
     class top(Module):
