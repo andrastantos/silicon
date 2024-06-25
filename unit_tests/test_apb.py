@@ -114,12 +114,12 @@ def test_apb_reg(mode: str):
         stat3 = Input(logic)
 
         def body(self):
-            reg = APBReg(address=0)
-            self.high_nibble = reg.add_field(name="HighNibble", high_bit=7, low_bit=4, kind=APBReg.Kind.ctrl).ctrl_port
-            lsb = reg.add_field(name="lsb", high_bit=0, low_bit=0, kind=APBReg.Kind.both)
+            reg = ApbReg(address=0)
+            self.high_nibble = reg.add_field(name="HighNibble", high_bit=7, low_bit=4, kind=ApbReg.Kind.ctrl).ctrl_port
+            lsb = reg.add_field(name="lsb", high_bit=0, low_bit=0, kind=ApbReg.Kind.both)
             lsb.stat_port <<= self.high_nibble[0]
             self.bit0 <<= lsb.ctrl_port
-            reg.add_field(name="bit3", high_bit=3, low_bit=3, kind=APBReg.Kind.stat).stat_port <<= self.stat3
+            reg.add_field(name="bit3", high_bit=3, low_bit=3, kind=ApbReg.Kind.stat).stat_port <<= self.stat3
             reg.apb_bus <<= self.apb
 
     def create_arbiter():

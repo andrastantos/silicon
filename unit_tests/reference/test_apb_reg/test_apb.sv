@@ -21,7 +21,7 @@ module top (
 	logic [3:0] high_nibble;
 	logic reg1_lsb_stat;
 
-	APBReg reg1 (
+	ApbReg reg1 (
 		.clk(clk),
 		.rst(rst),
 		.write_strobe(reg1_write_strobe),
@@ -45,9 +45,9 @@ endmodule
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// APBReg
+// ApbReg
 ////////////////////////////////////////////////////////////////////////////////
-module APBReg (
+module ApbReg (
 	input logic clk,
 	input logic rst,
 	output logic write_strobe,

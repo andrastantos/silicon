@@ -62,7 +62,7 @@ def ApbIf(data_type: NetType, addr_type: NetType = None) -> type:
     return ApbIfType
 
 
-class APBReg(GenericModule):
+class ApbReg(GenericModule):
     clk = ClkPort()
     rst = RstPort()
 
@@ -73,7 +73,7 @@ class APBReg(GenericModule):
 
     def construct(self, address=None):
         self.address = address
-        self.fields: Dict[str, 'APBReg.FieldDesc'] = OrderedDict()
+        self.fields: Dict[str, 'ApbReg.FieldDesc'] = OrderedDict()
         self.bitmask = []
         #self.in_add_field = False
 
@@ -89,13 +89,13 @@ class APBReg(GenericModule):
         ctrl_port: Junction = None
         stat_port: Junction = None
 
-    def add_field(self, name, high_bit, low_bit, kind: 'APBReg.Kind', net_type: NetType = None):
+    def add_field(self, name, high_bit, low_bit, kind: 'ApbReg.Kind', net_type: NetType = None):
         if name in self.fields:
             raise SyntaxErrorException(f"Field name {name} is already used")
         if high_bit < low_bit:
             raise SyntaxErrorException(f"Bit-range higher ({high_bit}) end must higher then the lower end ({low_bit})")
 
-        desc = APBReg.FieldDesc(high_bit, low_bit)
+        desc = ApbReg.FieldDesc(high_bit, low_bit)
         while len(self.bitmask) <= high_bit:
             self.bitmask.append(0)
 
@@ -107,10 +107,10 @@ class APBReg(GenericModule):
         #with ScopedAttr(self, "in_add_field", True):
         if net_type is None:
             net_type = Unsigned(width)
-        if kind == APBReg.Kind.stat or kind == APBReg.Kind.both:
+        if kind == ApbReg.Kind.stat or kind == ApbReg.Kind.both:
             stat_port = self.create_named_port(f"{name}_stat", port_type=Input, net_type=net_type)
             desc.stat_port = stat_port
-        if kind == APBReg.Kind.ctrl or kind == APBReg.Kind.both:
+        if kind == ApbReg.Kind.ctrl or kind == ApbReg.Kind.both:
             ctrl_port = self.create_named_port(f"{name}_ctrl", port_type=Output, net_type=net_type)
             desc.ctrl_port = ctrl_port
         self.fields[name] = desc
