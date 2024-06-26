@@ -138,4 +138,6 @@ class ApbReg(GenericModule):
         for rbit, used in enumerate(self.bitmask):
             if used == 0:
                 read_value[rbit] <<= 0
+        for idx in range(len(self.bitmask), self.apb_bus.prdata.get_net_type().get_num_bits()):
+            read_value[idx] <<= 0
         self.apb_bus.prdata <<= read_value
