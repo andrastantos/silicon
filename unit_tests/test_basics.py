@@ -1001,6 +1001,44 @@ def test_invalid_port_param(mode="rtl"):
 
     pass
 
+"""
+So, it seems we have all sorts of possible name collisions due to the way we resolve interface member names.
+
+For instance, in `get_xnets_for_junction` we hard-code member-names.
+`port.py` also has a bunch of similar cases (search for MEMBER_DELIMITER)
+
+I think the problem lies in us not registering names for members of interfaces early enough and then
+assuming the won't collide if their base-names won't.
+"""
+@pytest.mark.skip(reason="These insidious collisions are hard to fix.")
+def test_name_collision(mode="rtl"):
+    class If(si.Interface):
+        signal = si.Unsigned(8)
+    class Top(si.Module):
+        i1 = si.Input(If)
+        o = si.Output(si.Unsigned(8))
+        clk = si.ClkPort()
+        rst = si.RstPort()
+
+
+        def body(self):
+            i2 = si.Wire(If)
+            i2 <<= si.Reg(self.i1)
+            i2_signal = si.Reg(i2.signal)
+            o = si.Reg(i2_signal)
+
+        def simulate(self) -> si.TSimEvent:
+            pass
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
+
+
+
 if __name__ == "__main__":
     #test_module_decorator1()
     #test_module_decorator()
@@ -1042,4 +1080,5 @@ if __name__ == "__main__":
     #test_size_cast_95_size("rtl")
     #test_negative_slice("rtl")
     #test_inverted_slice("rtl")
-    test_invalid_port_param("rtl")
+    #test_invalid_port_param("rtl")
+    test_name_collision("rtl")
