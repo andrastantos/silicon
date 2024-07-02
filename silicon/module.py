@@ -1126,7 +1126,7 @@ class Module(object):
                                 for member_name, member_source in new_source.items():
                                     member_sink, member_reversed = sink.get_member_junctions()[member_name]
                                     if base_name is not None:
-                                        name = f"{base_name}_{member_name}"
+                                        name = f"{base_name}{MEMBER_DELIMITER}{member_name}"
                                         naming_wire = Wire(member_source.get_net_type(), scope)
                                         self.netlist.symbol_table[scope].add_soft_symbol(naming_wire, name) # This creates duplicates of course, but that will be resolved later on
                                         if member_reversed:
