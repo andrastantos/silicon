@@ -770,3 +770,136 @@ def RSReg(set, reset):
         0
     ))
     return state
+
+
+
+
+class GenericLatch(GenericModule):
+    output_port = Output()
+    input_port = Input()
+    latch_port = Input()
+    reset_port = RstPort()
+    reset_value_port = RstValPort()
+
+    def construct(self, latch_level: int) -> None:
+        self.latch_level = latch_level
+
+
+    def body(self) -> None:
+        new_net_type = self.input_port.get_net_type() if self.input_port.is_specialized() else None
+        if new_net_type is None:
+            raise SyntaxErrorException(f"Can't figure out output port type for Reg")
+        assert not self.output_port.is_specialized() or self.output_port.get_net_type() is new_net_type
+        if not self.output_port.is_specialized():
+            self.output_port.set_net_type(new_net_type)
+
+
+    def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
+        assert False
+
+    def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
+        assert len(self.get_outputs()) == 1
+        if self.output_port.is_composite():
+            if self.input_port.get_net_type() is not self.output_port.get_net_type():
+                raise SyntaxErrorException(f"Can only latch composite types if the input and output types are the same.")
+
+            input_members = self.input_port.get_all_member_junctions(add_self=False)
+            output_members = self.output_port.get_all_member_junctions(add_self=False)
+
+            if self.reset_value_port.is_specialized():
+                if self.input_port.get_net_type() is not self.reset_value_port.get_net_type():
+                    raise SyntaxErrorException(f"Can only latch composite types if the input and reset_value_port types are the same.")
+                reset_value_members = self.reset_value_port.get_all_member_junctions(add_self=False)
+            else:
+                assert not self.reset_value_port.has_driver(), f"Strange: didn't expect a non-specialized input to have a driver..."
+                # will cause the logic inside generate_inline_statement to go down the proper path to generate default reset values
+                reset_value_members = (self.reset_value_port, ) * len(output_members)
+
+            inline_block = InlineComposite(self.output_port)
+            for input_member, output_member, reset_value_member in zip(input_members, output_members, reset_value_members):
+                statement = self.generate_inline_statement(back_end, target_namespace, output_member, input_member, reset_value_member)
+                sub_block = InlineStatement(output_member, statement)
+                inline_block.add_member_inlines((sub_block, ))
+            yield inline_block
+        else:
+            yield InlineStatement((self.output_port,), self.generate_inline_statement(back_end, target_namespace, self.output_port, self.input_port, self.reset_value_port))
+
+    def generate_inline_statement(self, back_end: 'BackEnd', target_namespace: Module, output_port: Junction, input_port: Junction, reset_value_port: Junction) -> str:
+        assert back_end.language == "SystemVerilog"
+
+        if back_end.support_always_ff:
+            always = "always_comb"
+        else:
+            always = "always @(*)"
+
+        assert is_module(target_namespace)
+        output_name = output_port.get_lhs_name(back_end, target_namespace)
+        assert output_name is not None
+        latch, _ = self.latch_port.get_rhs_expression(back_end, target_namespace, None, back_end.get_operator_precedence("()")) # Get parenthesis around the expression if it's anything complex
+        input_expression, input_precedence = input_port.get_rhs_expression(back_end, target_namespace)
+        if not self.reset_port.has_driver():
+            input_expression, _ = back_end.wrap_expression(input_expression, input_precedence, back_end.get_operator_precedence("<="))
+            ret_val = f"{always} if ({latch} == {self.latch_level}) {output_name} = {input_expression};\n"
+        else:
+            rst_expression, rst_precedence = self.reset_port.get_rhs_expression(back_end, target_namespace)
+            if reset_value_port.has_driver():
+                rst_val_expression, _ = reset_value_port.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), back_end.get_operator_precedence("?:"))
+            else:
+                rst_val_expression = output_port.get_net_type().get_default_value(back_end)
+            input_expression, _ = back_end.wrap_expression(input_expression, input_precedence, back_end.get_operator_precedence("?:"))
+            rst_sensitivity_expression, _ = back_end.wrap_expression(rst_expression, rst_precedence, back_end.get_operator_precedence("()"))
+            rst_test_expression, _ = back_end.wrap_expression(rst_expression, rst_precedence, back_end.get_operator_precedence("?:"))
+            ret_val = f"{always} if ({rst_test_expression}) {output_name} = {rst_val_expression}; else if ({latch} == {self.latch_level}) {output_name} = {input_expression};\n"
+        if self.reset_value_port.is_specialized():
+            ret_val += f"initial {output_name} <= {rst_val_expression};\n"
+        return ret_val
+
+    def simulate(self) -> TSimEvent:
+        def reset():
+            if self.reset_value_port.has_driver():
+                self.output_port <<= self.reset_value_port
+            else:
+                if self.output_port.is_composite():
+                    members = self.output_port.get_all_member_junctions(add_self=False)
+                    for member in members:
+                        member <<= member.get_net_type().get_default_sim_value()
+                else:
+                    self.output_port <<= self.output_port.get_net_type().get_default_sim_value()
+
+        has_reset = self.reset_port.has_driver()
+        while True:
+            if has_reset:
+                yield (self.reset_port, self.latch_port, self.input_port)
+            else:
+                yield (self.latch_port, self.input_port)
+
+            if has_reset and self.reset_port.sim_value == 1:
+                reset()
+            else:
+                if self.output_port.is_composite():
+                    out_members = self.output_port.get_all_member_junctions(add_self=False)
+                    in_members = self.input_port.get_all_member_junctions(add_self=False)
+                    for out_member, in_member in zip(out_members, in_members):
+                        if self.latch_port.sim_value is None:
+                            out_member <<= None
+                        else:
+                            out_member <<= in_member
+                else:
+                    if self.latch_port.sim_value is None:
+                        self.output_port <<= None
+                    if self.latch_port.sim_value == self.latch_level:
+                        self.output_port <<= self.input_port
+
+class HighLatch(GenericLatch):
+    def __new__(cls, *args, **kwargs):
+        return Module.__new__(cls, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(1)
+
+class LowLatch(GenericLatch):
+    def __new__(cls, *args, **kwargs):
+        return Module.__new__(cls, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(0)
+
+Latch = LowLatch

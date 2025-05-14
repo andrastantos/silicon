@@ -413,7 +413,7 @@ def test_default_select():
     test.rtl_generation(top, inspect.currentframe().f_code.co_name)
 
 
-def test_latch(mode: str = "sim"):
+def test_latchreg(mode: str = "sim"):
     class top(Module):
         in1 = Input(Unsigned(8))
         out1 = Output(Unsigned(8))
@@ -484,6 +484,90 @@ def test_latch(mode: str = "sim"):
     else:
         test.simulation(sim_top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
+def test_latchreg_sim(): test_latchreg("sim")
+def test_latchreg_rtl(): test_latchreg("rtl")
+
+def test_latch(mode: str = "sim"):
+    class top(Module):
+        in1 = Input(Unsigned(8))
+        out1 = Output(Unsigned(8))
+        latch = Input(logic)
+        rst = RstPort()
+
+        def body(self):
+            dut = LowLatch()
+            self.out1 <<= dut(self.in1)
+            dut.latch_port <<= self.latch
+
+    class sim_top(Module):
+        clk = Input(logic)
+        rst = RstPort()
+
+        def body(self):
+            self.data = Wire(Unsigned(8))
+            self.check = Wire(Unsigned(8))
+            dut = top()
+            dut.rst <<= self.rst
+            dut.latch <<= self.clk
+            self.check <<= dut(self.data)
+
+        def simulate(self) -> TSimEvent:
+            def clk():
+                yield 10
+                self.clk <<= ~self.clk & self.clk
+                yield 10
+                self.clk <<= ~self.clk
+                yield 0
+
+            print("Simulation started")
+
+            self.rst <<= 1
+            self.clk <<= 1
+            yield 10
+            for i in range(5):
+                yield from clk()
+            self.rst <<= 0
+            self.data <<= 1
+
+            yield from clk()
+            self.data <<= 1
+            yield 0
+            assert self.check == 1
+            yield from clk()
+            assert self.check == 1
+            self.data <<= 2
+            yield 0
+            assert self.check == 1
+            yield from clk()
+            assert self.check == 2
+            yield from clk()
+            assert self.check == 2
+            yield 5
+            self.data <<= 3
+            yield 5
+            self.clk <<= ~self.clk
+            # latches are difficult: they have state so they don't reduce the update
+            # tree and as such we don't actually know how many 0-waits we'll need.
+            # This is an experimental value that seems to work for now.
+            yield 0
+            yield 0
+            assert self.check == 3
+            yield 5
+            self.data <<= 4
+            yield 0
+            yield 0
+            assert self.check == 4
+            yield 5
+            self.clk <<= ~self.clk
+            yield from clk()
+            now = yield 10
+            print(f"Done at {now}")
+
+    if mode == "rtl":
+        test.rtl_generation(top, inspect.currentframe().f_code.co_name)
+    else:
+        test.simulation(sim_top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
 def test_latch_sim(): test_latch("sim")
 def test_latch_rtl(): test_latch("rtl")
 
@@ -508,4 +592,5 @@ if __name__ == "__main__":
     #test_select_first_sim()
     #test_select_first_sim2()
     #test_latch("sim")
-    test_enum_mux()
+    #test_enum_mux()
+    test_latch_sim()
