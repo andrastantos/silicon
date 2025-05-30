@@ -190,6 +190,9 @@ class Simulator(object):
                             sensitivity_list = generator.send(now)
                             Simulator._process_yield(generator, sensitivity_list, sim_context, now)
                         except StopIteration:
+                            # FIXME: the generator could be sitting in several other sensitivity lists and can still be called again.
+                            #        We should go through all sensitivity lists and prune them from this generator.
+                            #        That is expensive though without some more thinking but luckily it doesn't happen all that often.
                             pass # The generator decided not to yield again: simply don't schedule it
                     # The previous loop re-populated value_changes with new things, so let's apply those changes (which will trigger a bunch of listeners, added to the generators)
                     for xnet, value in self.value_changes.items():
