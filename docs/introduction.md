@@ -256,10 +256,76 @@ Finally, the `<<=` operator really just takes what's on the right-hand side (whi
 
 In other words, these two lines of code within the `body` of `FullAdder` actually instantiated eight sub-modules and hooked their inputs and outputs together. No evaluation, no mention of time. Just a plain data-flow graph description of the computation to be performed *at a later time*, during simulation. Or to be walked for RTL generation as the case may be.
 
-There are two important take-aways here:
+# Explicit instantiation
+
+You can take it one step further and explicitly instantiate the sub-modules:
+
+```python
+class FullAdder(si.Module):
+    in_a = si.Input(si.logic)
+    in_b = si.Input(si.logic)
+    in_c = si.Input(si.logic)
+    out_r = si.Output(si.logic)
+    out_c = si.Output(si.logic)
+
+    def body(self):
+        xor1 = si.xor_gate()
+        xor2 = si.xor_gate()
+        and1 = si.and_gate()
+        and2 = si.and_gate()
+        and3 = si.and_gate()
+        or1 = si.or_gate()
+
+        xor1.input_port_0 <<= self.in_a
+        xor1.input_port_1 <<= self.in_b
+        xor2.input_port_0 <<= xor1.output_port
+        xor2.input_port_1 <<= self.in_c
+        self.out_r <<= xor2.output_port
+
+        and1.input_port_0 <<= self.in_a
+        and1.input_port_1 <<= self.in_b
+        and2.input_port_0 <<= self.in_b
+        and2.input_port_1 <<= self.in_c
+        and3.input_port_0 <<= self.in_c
+        and3.input_port_1 <<= self.in_a
+        or1.input_port_0 <<= and1.output_port
+        or1.input_port_1 <<= and2.output_port
+        or1.input_port_2 <<= and3.output_port
+
+        self.out_c <<= or1.output_port
+```
+
+This looks very painful and unnecessary. In this case, it is. For more complex modules however, this style is more descriptive then the ones introduced above. Just to prove that this is the same as before, the generated RTL still looks the same:
+
+```verilog
+////////////////////////////////////////////////////////////////////////////////
+// FullAdder
+////////////////////////////////////////////////////////////////////////////////
+module FullAdder (
+        input logic in_a,
+        input logic in_b,
+        input logic in_c,
+        output logic out_r,
+        output logic out_c
+);
+
+        assign out_r = in_a ^ in_b ^ in_c;
+        assign out_c = in_a & in_b | in_b & in_c | in_c & in_a;
+
+endmodule
+```
+
+# Summary
+
+In practice all three styles introduced here can be freely mixed together within a single `body` definition. Some modules (especially logic gates) are best instantiated using expression-style descriptions. Some, such as multiplexers and registers will commonly use function-call style instantiations. Yet others, such as processors or memories are probably best instantiated using explicit instantiation.
+
+Hopefully this short introduction helps you in better understanding some of the design philosophies underpinning Silicon and making sense of code and examples you'll come across in the future.
+
+Apart from that, if you take away anything from this article, it should be this:
 
 1. Even though in many cases you will write expressions very similar to - say - Verilog, they mean very different things: they instantiate sub-modules and create small networks of them *directly*. There's no compilation happening other then what the Python interpreter provides. Just the creation of modules and the binding of their ports
 
 2. In both Verilog and VHDL module instantiation and inference are very different processes with very different syntax. In Silicon there is just one thing: instantiation.
 
 The end-result of this is that the language is highly expendable and modular. It allows the development of higher abstractions and the creation of module libraries that integrate seamlessly with existing modules.
+
