@@ -777,6 +777,17 @@ class Number(NetTypeFactory):
                 except TypeError:
                     pass
                 try:
+                    # We will need to make [:-2] - style ranges work. This would be a Verilog-style range from MSB to MSB-2
+                    #                      [-2:] - this would be a Verilog-style range from MSB-2 to 0
+                    # NOTE: this is broken for fractional types, but I wanted to get rid of them anyways.
+                    #       we can also simply assert that for these slice-notations, we expect integer types.
+                    #       At least that would be a graceful degradation.
+                    if thing.start is None or thing.stop is None:
+                        try:
+                            precision = outer_type.precision
+                            if precision != 0: raise SyntaxErrorException("For fractional number slices, both ends of the range must be specified")
+                        except AttributeError:
+                            pass
                     start = int(thing.start) if thing.start is not None else outer_type.get_num_bits() - 1
                     end = int(thing.stop) if thing.stop is not None else 0
                     step = thing.step
