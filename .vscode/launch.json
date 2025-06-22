@@ -13,6 +13,14 @@
             "cwd": "${workspaceFolder}/unit_tests"
         },
         {
+            "name": "Python: UNIT_TEST/test_one_hot_decode",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/unit_tests/test_one_hot_decode.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/unit_tests"
+        },
+        {
             "name": "Python: UNIT_TEST/test_behavior",
             "type": "debugpy",
             "request": "launch",

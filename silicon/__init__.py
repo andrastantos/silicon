@@ -24,5 +24,6 @@ from .sim_asserts import AssertAlways, AssertOnNegClk, AssertOnClk, AssertOnPosC
 from .arbiters import RoundRobinArbiter, FixedPriorityArbiter, StickyFixedPriorityArbiter, ArbiterGrantEncoding
 from .apb_bus import ApbIf, ApbBaseIf, ApbReg
 from .reg_bank_utils import RegField, RegMapEntry, create_apb_reg_map
+from .one_hot_decode import OneHotDecode
 
 from ._fyeah import f, lazy_f
