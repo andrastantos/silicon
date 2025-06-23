@@ -1246,7 +1246,7 @@ class Number(NetTypeFactory):
                     min_val = min_none(min_val, net_type.min_val)
                     precision = max_none(precision, net_type.precision)
                 return Number(max_val=max_val, min_val=min_val, precision=precision)
-            elif operation in ("OR", "AND", "XOR"):
+            elif operation in ("OR", "NOR", "AND", "NAND", "XOR"):
                 all_signed = True
                 all_unsigned = True
                 final_signed = False

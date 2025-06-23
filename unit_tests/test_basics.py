@@ -1037,6 +1037,36 @@ def test_name_collision(mode="rtl"):
         t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
 
 
+def test_nand_nor(mode = "rtl"):
+    class Top(si.Module):
+        in_a = si.Input(si.Unsigned(2))
+        in_b = si.Input(si.Unsigned(2))
+        in_c = si.Input(si.Unsigned(4))
+        out_nor = si.Output(si.Unsigned(4))
+        out_nand = si.Output(si.Unsigned(2))
+
+        def body(self):
+            self.out_nor <<= si.nor_gate(self.in_a, self.in_b, self.in_c)
+            self.out_nand <<= si.nand_gate(self.in_a, self.in_b)
+
+        def simulate(self) -> si.TSimEvent:
+            for a in range(4):
+                for b in range(4):
+                    for c in range(16):
+                        self.in_a <<= a
+                        self.in_b <<= b
+                        self.in_c <<= c
+                        yield 1
+                        assert self.out_nor.sim_value == (~(a | b | c)) & 0xf
+                        assert self.out_nand.sim_value == (~(a & b)) & 0x3
+
+
+    si.set_verbosity_level(VerbosityLevels.instantiation)
+    if mode == "rtl":
+        t.test.rtl_generation(Top, inspect.currentframe().f_code.co_name)
+    else:
+        t.test.simulation(Top, inspect.currentframe().f_code.co_name, add_unnamed_scopes=True)
+
 
 
 if __name__ == "__main__":
@@ -1081,4 +1111,5 @@ if __name__ == "__main__":
     #test_negative_slice("rtl")
     #test_inverted_slice("rtl")
     #test_invalid_port_param("rtl")
-    test_name_collision("rtl")
+    #test_name_collision("rtl")
+    test_nand_nor("sim")

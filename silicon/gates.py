@@ -84,6 +84,8 @@ class NInputGate(Gate):
     """
     def sim_op(self, next_input: Port, partial_output: Any) -> Any:
         raise NotImplementedError
+    def final_sim_op(self, output: Any) -> Any:
+        return output
     def simulate(self) -> TSimEvent:
         target_precision = self.output_port.precision
         while True:
@@ -106,10 +108,11 @@ class NInputGate(Gate):
                         out_val = self.sim_op(input, out_val)
             if some_none:
                 out_val = self.sim_op(None, out_val)
-            self.output_port <<= out_val
+            self.output_port <<= self.final_sim_op(out_val)
     def generate_op(self, back_end: str) -> Tuple[str, int]:
         raise NotImplementedError
-
+    def generate_final_op(self, back_end: str) -> Tuple[str, int]:
+        return None, None
     def get_inline_block(self, back_end: 'BackEnd', target_namespace: Module) -> Generator[InlineBlock, None, None]:
         assert len(self.get_outputs()) == 1
         verilog_bit_width = max(port.get_net_type().get_num_bits() for port in self.get_inputs().values())
@@ -127,6 +130,11 @@ class NInputGate(Gate):
             input_expression, input_precedence = input.get_rhs_expression(back_end, target_namespace, self.output_port.get_net_type(), op_precedence)
             input_expression, _ = self.adjust_fractional(input, input_expression, input_precedence, back_end)
             ret_val += input_expression
+        final_op, final_precedence = self.generate_final_op(back_end)
+        if final_op is not None:
+            ret_val = f"{final_op}({ret_val})"
+            assert final_precedence is not None
+            op_precedence = final_precedence
         return ret_val, op_precedence
 
 class and_gate(NInputGate):
@@ -148,6 +156,34 @@ class and_gate(NInputGate):
         return "&", back_end.get_operator_precedence("&", back_end.BINARY)
     def get_operation_str(self) -> str:
         return "AND"
+    def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
+        return adjust_precision(input, input_expression, input_precedence, self.output_port.precision, back_end)
+
+class nand_gate(NInputGate):
+    def sim_op(self, next_input: Port, partial_output: Any) -> Any:
+        next_input = _sim_value(next_input)
+        if next_input is None:
+            if partial_output == 0:
+                return Number.NetValue(0)
+            else:
+                return None
+        if partial_output is None:
+            if next_input == 0:
+                return Number.NetValue(0)
+            else:
+                return None
+        return next_input & partial_output
+    def final_sim_op(self, output):
+        return output.invert(self.output_port.get_num_bits())
+    def generate_op(self, back_end: 'BackEnd') -> Tuple[str, int]:
+        assert back_end.language == "SystemVerilog"
+        return "&", back_end.get_operator_precedence("&", back_end.BINARY)
+    def generate_final_op(self, back_end):
+        assert back_end.language == "SystemVerilog"
+        op = "~"
+        return op, back_end.get_operator_precedence(op, back_end.UNARY)
+    def get_operation_str(self) -> str:
+        return "NAND"
     def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
         return adjust_precision(input, input_expression, input_precedence, self.output_port.precision, back_end)
 
@@ -176,6 +212,38 @@ class or_gate(NInputGate):
         return "|", back_end.get_operator_precedence("|", back_end.BINARY)
     def get_operation_str(self) -> str:
         return "OR"
+    def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
+        return adjust_precision(input, input_expression, input_precedence, self.output_port.precision, back_end)
+
+class nor_gate(NInputGate):
+    def sim_op(cls, next_input: Port, partial_output: Any) -> Any:
+        def all_ones(n):
+            if n is None: return None
+            return ((n+1) & n == 0) and (n!=0)
+
+        next_input = _sim_value(next_input)
+        if next_input is None:
+            if all_ones(_sim_value(partial_output)):
+                return partial_output
+            else:
+                return None
+        if partial_output is None:
+            if all_ones(_sim_value(next_input)):
+                return next_input
+            else:
+                return None
+        return next_input | partial_output
+    def final_sim_op(self, output):
+        return output.invert(self.output_port.get_num_bits())
+    def generate_op(self, back_end: 'BackEnd') -> Tuple[str, int]:
+        assert back_end.language == "SystemVerilog"
+        return "|", back_end.get_operator_precedence("|", back_end.BINARY)
+    def generate_final_op(self, back_end):
+        assert back_end.language == "SystemVerilog"
+        op = "~"
+        return op, back_end.get_operator_precedence(op, back_end.UNARY)
+    def get_operation_str(self) -> str:
+        return "NOR"
     def adjust_fractional(self, input: 'Junction', input_expression: str, input_precedence: int, back_end: 'BackEnd') -> Tuple[str, int]:
         return adjust_precision(input, input_expression, input_precedence, self.output_port.precision, back_end)
 
