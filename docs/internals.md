@@ -35,6 +35,10 @@ rv_interface.py:class RvSimSource(GenericModule):
 rv_interface.py:class RvSimSink(GenericModule):
 rv_interface.py:class RvController(GenericModule):
 
+# Introduction
+
+In this chapter I will introduce the basic building-blocks of Silicon and explain their use. This introduction is not comprehensive in the sense a reference manual would be, but intended more as a guide to understand the concepts better.
+
 # Modules
 
 `Module`s are the basic build-blocks of Silicon, and the main construction mechanism to create a design. They are very similar to Verilog modules, so if you are familiar with that concept, you are going to feel at home.
@@ -68,13 +72,18 @@ Of course, real-life modules are way more complex than this, and contain state a
 
 # Nets and their types
 
-Modules have ports. Ports can be inputs, outputs or uncommitted; no bidirectional ports are supported in Silicon. Modules are instantiated in a hierarchy, and their ports are connected to one another as well. Connecting ports together is called 'binding'. If a set of ports are bound to one another, they are forming a net. Each net can have at most a single driver or source, but can have any number of sinks.
+Modules have ports. Ports can be inputs, outputs; no bidirectional ports are supported in Silicon. Modules are instantiated in a hierarchy, and their ports are connected to one another as well. Connecting ports together is called 'binding'. If a set of ports are bound to one another, they are forming a net. Each net can have at most a single driver, or source, but can have any number of sinks.
 
 Nets exist strictly within a single level in the module instantiation hierarchy. This means that they either are driven by an input of the enclosing module or by an output of a submodule. Sinks can be outputs of the enclosing module or an input of a submodule.
+
+Of course nets (through the module hierarchy) form larger constructs. For instance, a net, driven by an input of the enclosing module will have a driver in the module one up in the hierarchy. Nets that are connected together and form the same physical connectivity tree are called `XNets`. Ultimately, `XNets` also have to have one driver and as many sinks as necessary, but they can also have 'pass-through' nodes in them; these are module ports that establish the connectivity between the nets comprising the `XNet`.
+
+Each net or `XNet` carries a piece of information from the driver to the sink(s). This piece of information is in the end encoded as a set of binary values on a set of physical wires, but logically, they are just values. What values are permitted and what are not needs to be specified though. The mechanism for doing so is to assign a 'type' for each net. These types are described as classes that inherit from the `NetType` baseclass. Every net and `XNet` can have (and for the netlist to be error-free must have) exactly one `NetType`. This is not to say that type-conversions can't happen, just that such type-conversions break the nets into pieces that indeed share the same type.
 
 ## Wires
 
 On top of inputs and outputs, Modules can also have internal wires. These are different from Nets in that they only provide a naming alias (and potentially typing hints) to the framework. They themselves are nodes on a net just as inputs and outputs are.
+
 ## Uncommitted ports
 
 In some corner-cases it is beneficial to not specify the direction of a port when it's defined. For instance, imagine the following expression:
