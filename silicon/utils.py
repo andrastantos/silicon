@@ -535,7 +535,3 @@ def decrement(wire):
     net_type = wire.get_net_type()
     return net_type(wire-1)
 
-def overflow_add(a, b):
-    net_type = a.get_net_type()
-    return net_type(a+b)
-
