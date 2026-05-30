@@ -903,3 +903,48 @@ class LowLatch(GenericLatch):
         super().__init__(0)
 
 Latch = LowLatch
+
+
+
+class RSFlop(Module):
+    q = Output(logic)
+    r = Input(logic)
+    s = Input(logic)
+
+    def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
+        return """
+module RSFlop (
+    input r
+    input s
+    output q
+);
+
+    always @* begin
+        case({s,r})
+            2'b00:
+                q <= q;
+            2'b01:
+                q <= 0;
+            2'b10:
+                q <= 1;
+            2'b11:
+                q <= 1'bx;
+            default:
+                q <= 1'bx;
+        endcase
+    end
+endmodule
+"""
+
+    def simulate(self) -> TSimEvent:
+        while True:
+            yield (self.r, self.s)
+
+            if self.r.sim_value is None or self.s.sim_value is None or (self.r.sim_value == 1 and self.s.sim_value == 1):
+                self.q <<= None
+            elif self.r.sim_value == 1:
+                self.q <<= 0
+            elif self.s.sim_value == 1:
+                self.q <<= 1
+            else:
+                pass
