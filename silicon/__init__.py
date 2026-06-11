@@ -1,6 +1,6 @@
 from .net_type import *
 from .port import *
-from .module import *
+from .module import Module, GenericModule, DecoratorModule, modularize, module, InlineBlock, InlineComposite, InlineExpression, InlineStatement, has_port
 from .netlist import *
 from .constant import *
 from .number import *
@@ -25,5 +25,6 @@ from .arbiters import RoundRobinArbiter, FixedPriorityArbiter, StickyFixedPriori
 from .apb_bus import ApbIf, ApbBaseIf, ApbReg
 from .reg_bank_utils import RegField, RegMapEntry, create_apb_reg_map
 from .one_hot_decode import OneHotDecode
-
+from . import trivial_adaptor
+from . import member_access
 from ._fyeah import f, lazy_f
